@@ -353,12 +353,7 @@ export function ClienteMenuView() {
         <p className="text-center text-[11px] text-white/70">
           Precios en COP · Sujetos a disponibilidad
         </p>
-        <Link
-          to="/login"
-          className="block text-center text-xs text-white/80 hover:text-white underline underline-offset-4"
-        >
-          Acceso personal del negocio
-        </Link>
+        
       </main>
 
       {/* Footer domicilios — estilo carta física */}
