@@ -1,0 +1,186 @@
+import { useState } from "react";
+import { Eye, Printer } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { queueLabel } from "@/lib/comanda-queue";
+import { faseOpcionNames, orderItemSubtitle, printComanda } from "@/lib/comanda-display";
+import { useMenu } from "@/lib/menu-context";
+import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
+import { cn } from "@/lib/utils";
+
+const STATUS_LABEL: Record<Comanda["status"], string> = {
+  pendiente: "En preparación",
+  lista: "Lista",
+  entregada: "Entregada",
+};
+
+const STATUS_DOT: Record<Comanda["status"], string> = {
+  pendiente: "bg-amber-500",
+  lista: "bg-emerald-500",
+  entregada: "bg-muted-foreground/40",
+};
+
+type Props = {
+  comanda: Comanda;
+  size?: "sm" | "default" | "lg";
+  variant?: "default" | "outline" | "ghost" | "secondary";
+  className?: string;
+  label?: string;
+  iconOnly?: boolean;
+};
+
+function OrderItemRow({
+  item,
+  productos,
+}: {
+  item: Comanda["items"][number];
+  productos: MicheladaType[];
+}) {
+  const tops = faseOpcionNames(item.micheladaId, item.selectedToppings, productos);
+  const subtitle = orderItemSubtitle(item);
+  const extras: string[] = [
+    ...tops,
+    ...item.additions.map((a) => (a.price > 0 ? `${a.name} +$${a.price}` : a.name)),
+  ];
+
+  return (
+    <li className="py-3.5 first:pt-0">
+      <div className="flex justify-between gap-4 items-baseline">
+        <div className="min-w-0">
+          <p className="font-medium text-[15px] leading-snug">{item.micheladaName}</p>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+          )}
+        </div>
+        <span className="text-[15px] font-medium tabular-nums shrink-0">${item.total}</span>
+      </div>
+      {extras.length > 0 && (
+        <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{extras.join(" · ")}</p>
+      )}
+      {item.notes && (
+        <p className="text-xs text-foreground/80 mt-1.5 pl-2 border-l-2 border-muted-foreground/25">
+          {item.notes}
+        </p>
+      )}
+    </li>
+  );
+}
+
+export function ComandaViewDialog({
+  comanda,
+  size = "sm",
+  variant = "outline",
+  className,
+  label = "Ver comanda",
+  iconOnly = false,
+}: Props) {
+  const { productos } = useMenu();
+  const [open, setOpen] = useState(false);
+  const isPreview = comanda.folio <= 0;
+
+  return (
+    <>
+      <Button
+        type="button"
+        size={size}
+        variant={variant}
+        className={cn("gap-1.5", className)}
+        onClick={() => setOpen(true)}
+      >
+        <Eye className="h-4 w-4" />
+        {!iconOnly && label}
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md gap-0 p-0 overflow-hidden max-h-[min(88vh,640px)] flex flex-col sm:rounded-xl">
+          <DialogHeader className="px-5 pt-5 pb-4 space-y-3 text-left border-b">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <DialogTitle className="text-lg font-semibold tracking-tight leading-tight">
+                  {isPreview
+                    ? "Vista previa"
+                    : `${queueLabel(comanda.queueOrder)} · Folio #${comanda.folio}`}
+                </DialogTitle>
+                <p className="text-sm text-muted-foreground mt-1 truncate">{comanda.cliente}</p>
+              </div>
+              {!isPreview && (
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 pt-0.5">
+                  <span className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[comanda.status])} />
+                  {STATUS_LABEL[comanda.status]}
+                </span>
+              )}
+              {isPreview && (
+                <span className="text-xs text-muted-foreground shrink-0">Borrador</span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              {comanda.mesa && <span>Mesa {comanda.mesa}</span>}
+              {!isPreview && (
+                <span>
+                  {new Date(comanda.createdAt).toLocaleString("es-MX", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+              {comanda.items.length > 0 && (
+                <span>
+                  {comanda.items.length} ítem{comanda.items.length === 1 ? "" : "s"}
+                </span>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            {comanda.items.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-10">Sin productos</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {comanda.items.map((it) => (
+                  <OrderItemRow key={it.id} item={it} productos={productos} />
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t px-5 py-4 space-y-4 bg-muted/20">
+            <div className="flex justify-between items-baseline">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="text-xl font-semibold tabular-nums">${comanda.total}</span>
+            </div>
+
+            <Separator />
+
+            <DialogFooter className="flex-row gap-2 p-0 sm:justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground"
+                onClick={() => printComanda(comanda, productos)}
+                disabled={comanda.items.length === 0}
+              >
+                <Printer className="h-4 w-4" />
+                Imprimir
+              </Button>
+              <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(false)}>
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
