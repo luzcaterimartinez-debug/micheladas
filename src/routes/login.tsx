@@ -152,7 +152,7 @@ function LoginPage() {
                 </Button>
               </form>
               <p className="mt-5 text-center text-xs text-slate-500 leading-relaxed">
-                Personal: admin, mesero y barra · pruebas en backend/README.md
+                
               </p>
             </div>
           </ThemedPanel>
