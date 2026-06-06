@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 480
     jwt_algorithm: str = "HS256"
 
-    cors_origins: str = "http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str = "http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173,https://micheladas-black.vercel.app"
 
     @property
     def cors_origin_list(self) -> list[str]:

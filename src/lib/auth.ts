@@ -14,7 +14,7 @@ export type AuthSession = {
 
 const STORAGE_KEY = "micheladas_auth";
 
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "http://localhost:8000";
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 
 export function getApiUrl(): string {
   return API_URL;
@@ -88,6 +88,10 @@ export async function validateSession(): Promise<AuthSession | null> {
       return null;
     }
     user = await res.json();
+    if (!user) {
+      clearSession();
+      return null;
+    }
   } catch {
     // Backend caído o conexión cortada: conservar sesión local para no romper la ruta
     return stored;
