@@ -12,6 +12,9 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
+// Importar registro de PWA
+import { registerSW } from "virtual:pwa-register";
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -77,19 +80,30 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Micheladas Black" },
+      { name: "description", content: "Sistema de pedidos de micheladas" },
+      { name: "author", content: "Micheladas Black" },
+      { property: "og:title", content: "Micheladas Black" },
+      { property: "og:description", content: "Sistema de pedidos de micheladas" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "theme-color", content: "#1a1a2e" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "Micheladas" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
+      },
+      {
+        rel: "manifest",
+        href: "/manifest.webmanifest",
+      },
+      {
+        rel: "apple-touch-icon",
+        href: "/apple-touch-icon.png",
       },
     ],
   }),
@@ -115,6 +129,21 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // Registrar service worker de PWA
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const updateSW = registerSW({
+        onNeedRefresh() {
+          console.log("New content available, please refresh");
+        },
+        onOfflineReady() {
+          console.log("App is ready to work offline");
+        },
+      });
+      return () => updateSW();
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

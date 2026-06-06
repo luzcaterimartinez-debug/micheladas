@@ -8,4 +8,4 @@ from app.main import app
 from mangum import Mangum
 
 # Mangum adapta ASGI (FastAPI) para AWS Lambda/Vercel
-handler = Mangum(app)
+handler = Mangum(app, lifespan="off")
