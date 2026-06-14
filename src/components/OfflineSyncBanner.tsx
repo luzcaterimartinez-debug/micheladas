@@ -36,7 +36,11 @@ export function OfflineSyncBanner() {
           ) : serverDown ? (
             <>
               <ServerCrash className="h-4 w-4 shrink-0" />
-              <span className="truncate">Servidor no disponible — inicia el backend (puerto 8000)</span>
+              <span className="truncate">
+                {import.meta.env.PROD
+                  ? "Servidor no disponible — revisa la API o intenta más tarde"
+                  : "Servidor no disponible — inicia el backend (puerto 8000)"}
+              </span>
             </>
           ) : (
             <>

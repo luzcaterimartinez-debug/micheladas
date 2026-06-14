@@ -84,7 +84,7 @@ async function servePublicAsset(request) {
 let serverEntryPromise;
 async function getServerEntry() {
   if (!serverEntryPromise) {
-    serverEntryPromise = import("./server-BZCx45gI.mjs").then((n) => n.s).then(
+    serverEntryPromise = import("./server-DNusHuW2.mjs").then((n) => n.s).then(
       (m) => m.default ?? m
     );
   }
