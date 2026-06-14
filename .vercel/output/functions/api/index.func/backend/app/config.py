@@ -57,19 +57,29 @@ class Settings(BaseSettings):
         return value
 
 
+def production_config_errors(settings: Settings | None = None) -> list[str]:
+    """Errores de configuración en producción (vacío = OK). No lanza excepciones."""
+    cfg = settings or get_settings()
+    if not cfg.is_production:
+        return []
+
+    errors: list[str] = []
+    if cfg.jwt_secret in _INSECURE_JWT_SECRETS:
+        errors.append(
+            "JWT_SECRET debe ser único y seguro (no uses el valor de desarrollo). "
+            "Genera uno con: python -c \"from app.config import generate_jwt_secret; print(generate_jwt_secret())\""
+        )
+    elif len(cfg.jwt_secret) < 32:
+        errors.append("JWT_SECRET debe tener al menos 32 caracteres.")
+    if not cfg.cors_origin_list:
+        errors.append("CORS_ORIGINS debe incluir el dominio del frontend (ej. https://micheladas-black.vercel.app).")
+    return errors
+
+
 @lru_cache
 def get_settings() -> Settings:
     settings = Settings()
-    if settings.is_production:
-        if settings.jwt_secret in _INSECURE_JWT_SECRETS:
-            raise RuntimeError(
-                "APP_ENV=production requiere JWT_SECRET único y seguro (mín. 32 caracteres aleatorios)."
-            )
-        if len(settings.jwt_secret) < 32:
-            raise RuntimeError("APP_ENV=production requiere JWT_SECRET de al menos 32 caracteres.")
-        if not settings.cors_origin_list:
-            raise RuntimeError("APP_ENV=production requiere CORS_ORIGINS con el dominio del frontend.")
-    elif settings.jwt_secret in _INSECURE_JWT_SECRETS:
+    if not settings.is_production and settings.jwt_secret in _INSECURE_JWT_SECRETS:
         warnings.warn(
             "JWT_SECRET por defecto — define JWT_SECRET en .env antes de desplegar.",
             stacklevel=2,

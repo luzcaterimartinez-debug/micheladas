@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from app.config import get_settings
+from app.config import get_settings, production_config_errors
 from app.database import check_database
 from app.routers import admin, admin_menu, auth, caja, comandas, inventario, menu, mesas, nomina, reportes
 
@@ -32,10 +33,33 @@ app.include_router(nomina.router)
 app.include_router(caja.router)
 
 
+@app.middleware("http")
+async def guard_production_config(request: Request, call_next):
+    if request.url.path == "/api/health":
+        return await call_next(request)
+    config_errors = production_config_errors(settings)
+    if config_errors:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Configuración de producción incompleta", "config_errors": config_errors},
+        )
+    return await call_next(request)
+
+
 @app.get("/api/health")
-def health(response: Response) -> dict[str, str]:
+def health(response: Response) -> dict[str, str | list[str]]:
+    config_errors = production_config_errors(settings)
+    if config_errors:
+        response.status_code = 503
+        return {
+            "status": "error",
+            "config": "invalid",
+            "config_errors": config_errors,
+            "env": settings.app_env,
+        }
+
     db_ok, db_error = check_database()
-    payload: dict[str, str] = {
+    payload: dict[str, str | list[str]] = {
         "status": "ok" if db_ok else "degraded",
         "database": "ok" if db_ok else "error",
         "env": settings.app_env,
