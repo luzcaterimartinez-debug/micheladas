@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 let lastCapturedError;
 const TTL_MS = 5e3;
 function record(error) {
@@ -50,10 +52,39 @@ function renderErrorPage() {
   </body>
 </html>`;
 }
+const PUBLIC_FILES = /* @__PURE__ */ new Set([
+  "/favicon.ico",
+  "/apple-touch-icon.png",
+  "/icon-192x192.png",
+  "/icon-512x512.png",
+  "/manifest.webmanifest"
+]);
+const MIME = {
+  ".ico": "image/x-icon",
+  ".png": "image/png",
+  ".webmanifest": "application/manifest+json"
+};
+async function servePublicAsset(request) {
+  const { pathname } = new URL(request.url);
+  if (!PUBLIC_FILES.has(pathname)) return null;
+  const ext = pathname.slice(pathname.lastIndexOf("."));
+  const filePath = join(process.cwd(), "public", pathname.slice(1));
+  try {
+    const data = await readFile(filePath);
+    return new Response(data, {
+      headers: {
+        "Content-Type": MIME[ext] ?? "application/octet-stream",
+        "Cache-Control": "public, max-age=86400"
+      }
+    });
+  } catch {
+    return null;
+  }
+}
 let serverEntryPromise;
 async function getServerEntry() {
   if (!serverEntryPromise) {
-    serverEntryPromise = import("./server-DCVOG0Gs.mjs").then((n) => n.s).then(
+    serverEntryPromise = import("./server-BZCx45gI.mjs").then((n) => n.s).then(
       (m) => m.default ?? m
     );
   }
@@ -76,6 +107,8 @@ async function normalizeCatastrophicSsrResponse(response) {
 const server = {
   async fetch(request, env, ctx) {
     try {
+      const staticResponse = await servePublicAsset(request);
+      if (staticResponse) return staticResponse;
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

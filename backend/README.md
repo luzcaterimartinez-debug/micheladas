@@ -82,11 +82,29 @@ npm run test
 
 Desde la raíz del proyecto: `npm run test` (frontend) y `npm run test:backend` (API).
 
-## Producción
+## Producción (Vercel)
 
-1. Copia las plantillas de entorno:
-   - Backend: `copy .env.production.example .env` (en `backend/`)
-   - Frontend: configura `VITE_API_URL` en tu hosting (ver `.env.production.example` en la raíz)
+El frontend (TanStack/Nitro) y el API Python (`api/[...path].py`) se despliegan juntos.
+
+**Variables obligatorias en Vercel → Settings → Environment Variables:**
+
+| Variable | Ejemplo |
+|----------|---------|
+| `MYSQL_HOST` | host de tu MySQL (Hostinger, etc.) |
+| `MYSQL_USER` | usuario BD |
+| `MYSQL_PASSWORD` | contraseña |
+| `MYSQL_DATABASE` | `michelada` |
+| `JWT_SECRET` | secreto largo (32+ caracteres) |
+| `APP_ENV` | `production` |
+| `CORS_ORIGINS` | `https://micheladas-black.vercel.app` |
+
+`VITE_API_URL` puede quedar **vacío** en Vercel (el frontend usa el mismo dominio `/api/...`).
+
+Tras cambios en `vercel.json` o `api/`, haz **Redeploy** en Vercel.
+
+Para servidor propio (no Vercel):
+
+1. Copia `backend/.env.production.example` → `backend/.env`
 2. Genera `JWT_SECRET` seguro:
    ```bash
    python -c "from app.config import generate_jwt_secret; print(generate_jwt_secret())"

@@ -34,6 +34,16 @@ export default defineConfig({
   },
   nitro: {
     preset: "vercel",
+    vercel: {
+      config: {
+        routes: [
+          {
+            src: "/api(?:/(.*))?",
+            dest: "/api/$1"
+          }
+        ]
+      }
+    }
   },
   vite: {
     publicDir: "public",
