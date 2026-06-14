@@ -2,15 +2,20 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
- 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    mysql_host: str = "82.197.82.29"
+    mysql_host: str = "localhost"
     mysql_port: int = 3306
-    mysql_user: str = "u659323332_micheladas"
-    mysql_password: str = "Michelandia123*"
-    mysql_database: str = "u659323332_micheladas"
+    mysql_user: str = "root"
+    mysql_password: str = ""
+    mysql_database: str = "michelada"
+    mysql_pool_size: int = 5
+    mysql_connection_timeout: int = 10
+
+    query_cache_ttl_seconds: int = 30
+    query_cache_comandas_ttl_seconds: int = 8
 
     jwt_secret: str = "dev-secret-change-in-production"
     jwt_expire_minutes: int = 480

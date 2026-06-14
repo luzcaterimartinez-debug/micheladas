@@ -8,6 +8,24 @@ import {
 } from "@/lib/inventory-api";
 import { nextQueueOrderForToday, sortComandasByQueue } from "@/lib/comanda-queue";
 import {
+  getCachedComandas,
+  getCachedInventario,
+  getCachedMesas,
+  nextLocalFolio,
+  setCachedComandas,
+  setCachedInventario,
+  setCachedMesas,
+} from "@/lib/offline/local-cache";
+import { isAppOnline, isNetworkFailure } from "@/lib/offline/network";
+import { enqueueOp } from "@/lib/offline/outbox";
+import {
+  buildOptimisticComanda,
+  flushOutbox,
+  mergeComandaInCache,
+  patchComandaInCache,
+  removeComandaFromCache,
+} from "@/lib/offline/sync-engine";
+import {
   createComandaApi,
   createMesaApi,
   deleteComandaApi,
@@ -201,11 +219,6 @@ const DEFAULT_INVENTORY: InventoryItem[] = [
   { key: "rielitos", name: "Rielitos", stock: 60, unit: "pz", minStock: 10 },
 ];
 
-const LS_COMANDAS = "michelada_comandas_v1";
-const LS_INVENTORY = "michelada_inventory_v1";
-const LS_FOLIO = "michelada_folio_v1";
-const LS_MESAS = "michelada_mesas_v1";
-
 const DEFAULT_MESAS: Mesa[] = [
   { id: "m1", nombre: "Mesa 1", capacidad: 4, estado: "libre" },
   { id: "m2", nombre: "Mesa 2", capacidad: 4, estado: "libre" },
@@ -216,21 +229,6 @@ const DEFAULT_MESAS: Mesa[] = [
   { id: "llevar", nombre: "Para llevar", capacidad: 0, estado: "libre" },
 ];
 
-function read<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const v = localStorage.getItem(key);
-    return v ? (JSON.parse(v) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function write<T>(key: string, value: T) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(key, JSON.stringify(value));
-  window.dispatchEvent(new CustomEvent("michelada-store-change", { detail: { key } }));
-}
-
 export function useComandas() {
   const [comandas, setComandas] = useState<Comanda[]>([]);
   const [loading, setLoading] = useState(true);
@@ -238,17 +236,30 @@ export function useComandas() {
 
   const reload = useCallback(async () => {
     if (!getStoredSession()) {
-      setComandas(read(LS_COMANDAS, [] as Comanda[]));
+      setComandas(getCachedComandas());
       setLoading(false);
       return;
     }
+
+    const cached = getCachedComandas();
+    if (!isAppOnline()) {
+      setComandas([...cached].sort(sortComandasByQueue));
+      setLoading(false);
+      return;
+    }
+
     try {
+      if (cached.length > 0) {
+        setComandas([...cached].sort(sortComandasByQueue));
+      }
+      await flushOutbox();
       const data = await fetchComandas({ status: "pendiente,lista,entregada" });
+      setCachedComandas(data);
       setComandas([...data].sort(sortComandasByQueue));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar comandas");
-      setComandas(read(LS_COMANDAS, [] as Comanda[]));
+      setComandas([...cached].sort(sortComandasByQueue));
     } finally {
       setLoading(false);
     }
@@ -257,7 +268,9 @@ export function useComandas() {
   useEffect(() => {
     void reload();
     if (!getStoredSession()) return;
-    const interval = window.setInterval(() => void reload(), 3000);
+    const interval = window.setInterval(() => {
+      if (isAppOnline()) void reload();
+    }, 3000);
     return () => window.clearInterval(interval);
   }, [reload]);
 
@@ -267,60 +280,141 @@ export function useComandas() {
     error,
     reload,
     addComanda: async (c: Omit<Comanda, "id" | "folio" | "queueOrder" | "createdAt" | "status">) => {
-      if (getStoredSession()) {
-        const nueva = await createComandaApi(c);
-        setComandas((prev) => [...prev, nueva].sort(sortComandasByQueue));
+      if (!getStoredSession()) {
+        const prev = getCachedComandas();
+        const folio = nextLocalFolio();
+        const nueva: Comanda = {
+          ...c,
+          id: crypto.randomUUID(),
+          folio,
+          queueOrder: nextQueueOrderForToday(prev),
+          createdAt: Date.now(),
+          status: "pendiente",
+        };
+        const all = [...prev, nueva].sort(sortComandasByQueue);
+        setCachedComandas(all);
+        setComandas(all);
         return nueva;
       }
-      const prev = read<Comanda[]>(LS_COMANDAS, []);
-      const folio = read<number>(LS_FOLIO, 1000) + 1;
-      write(LS_FOLIO, folio);
-      const nueva: Comanda = {
-        ...c,
-        id: crypto.randomUUID(),
-        folio,
-        queueOrder: nextQueueOrderForToday(prev),
-        createdAt: Date.now(),
-        status: "pendiente",
+
+      const clientId = crypto.randomUUID();
+
+      const queueOffline = () => {
+        const nueva = buildOptimisticComanda(c, clientId);
+        enqueueOp({ type: "comanda:create", clientId, payload: c });
+        mergeComandaInCache(nueva);
+        setComandas((prev) => [...prev, nueva].sort(sortComandasByQueue));
+        return nueva;
       };
-      const all = [...prev, nueva].sort(sortComandasByQueue);
-      write(LS_COMANDAS, all);
-      setComandas(all);
-      return nueva;
+
+      if (!isAppOnline()) return queueOffline();
+
+      try {
+        const nueva = await createComandaApi(c, clientId);
+        mergeComandaInCache(nueva);
+        setComandas((prev) =>
+          [...prev.filter((x) => x.id !== nueva.id), nueva].sort(sortComandasByQueue),
+        );
+        return nueva;
+      } catch (err) {
+        if (isNetworkFailure(err)) return queueOffline();
+        throw err;
+      }
     },
     updateStatus: async (id: string, status: Comanda["status"]) => {
-      if (getStoredSession()) {
-        const updated = await patchComandaApi(id, { status });
-        setComandas((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      if (!getStoredSession()) {
+        const all = getCachedComandas()
+          .map((c) => (c.id === id ? { ...c, status } : c))
+          .sort(sortComandasByQueue);
+        setCachedComandas(all);
+        setComandas(all);
         return;
       }
-      const all = read<Comanda[]>(LS_COMANDAS, []).map((c) =>
-        c.id === id ? { ...c, status } : c,
-      );
-      write(LS_COMANDAS, all);
-      setComandas(all);
+
+      const applyLocal = () => {
+        patchComandaInCache(id, { status });
+        enqueueOp({ type: "comanda:patch", comandaId: id, patch: { status } });
+        setComandas((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, status } : c)).sort(sortComandasByQueue),
+        );
+      };
+
+      if (!isAppOnline()) {
+        applyLocal();
+        return;
+      }
+
+      try {
+        const updated = await patchComandaApi(id, { status });
+        mergeComandaInCache(updated);
+        setComandas((prev) =>
+          prev.map((c) => (c.id === id ? updated : c)).sort(sortComandasByQueue),
+        );
+      } catch (err) {
+        if (isNetworkFailure(err)) applyLocal();
+        else throw err;
+      }
     },
     remove: async (id: string) => {
-      if (getStoredSession()) {
-        await deleteComandaApi(id);
-        setComandas((prev) => prev.filter((c) => c.id !== id));
+      if (!getStoredSession()) {
+        const all = getCachedComandas().filter((c) => c.id !== id);
+        setCachedComandas(all);
+        setComandas(all);
         return;
       }
-      const all = read<Comanda[]>(LS_COMANDAS, []).filter((c) => c.id !== id);
-      write(LS_COMANDAS, all);
-      setComandas(all);
+
+      const applyLocal = () => {
+        removeComandaFromCache(id);
+        enqueueOp({ type: "comanda:delete", comandaId: id });
+        setComandas((prev) => prev.filter((c) => c.id !== id));
+      };
+
+      if (!isAppOnline()) {
+        applyLocal();
+        return;
+      }
+
+      try {
+        await deleteComandaApi(id);
+        removeComandaFromCache(id);
+        setComandas((prev) => prev.filter((c) => c.id !== id));
+      } catch (err) {
+        if (isNetworkFailure(err)) applyLocal();
+        else throw err;
+      }
     },
     reassignMesa: async (id: string, mesa: string | undefined, cliente?: string) => {
-      if (getStoredSession()) {
-        const updated = await patchComandaApi(id, { mesa, cliente });
-        setComandas((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      if (!getStoredSession()) {
+        const all = getCachedComandas()
+          .map((c) => (c.id === id ? { ...c, mesa, cliente: cliente ?? c.cliente } : c))
+          .sort(sortComandasByQueue);
+        setCachedComandas(all);
+        setComandas(all);
         return;
       }
-      const all = read<Comanda[]>(LS_COMANDAS, []).map((c) =>
-        c.id === id ? { ...c, mesa, cliente: cliente ?? c.cliente } : c,
-      );
-      write(LS_COMANDAS, all);
-      setComandas(all);
+
+      const patch = { mesa, cliente };
+      const applyLocal = () => {
+        patchComandaInCache(id, patch);
+        enqueueOp({ type: "comanda:patch", comandaId: id, patch });
+        setComandas((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, ...patch } : c)).sort(sortComandasByQueue),
+        );
+      };
+
+      if (!isAppOnline()) {
+        applyLocal();
+        return;
+      }
+
+      try {
+        const updated = await patchComandaApi(id, patch);
+        mergeComandaInCache(updated);
+        setComandas((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      } catch (err) {
+        if (isNetworkFailure(err)) applyLocal();
+        else throw err;
+      }
     },
   };
 }
@@ -331,14 +425,24 @@ export function useMesas() {
 
   const reload = useCallback(async () => {
     if (!getStoredSession()) {
-      setMesas(read(LS_MESAS, DEFAULT_MESAS));
+      setMesas(getCachedMesas(DEFAULT_MESAS));
       setLoading(false);
       return;
     }
+
+    const cached = getCachedMesas(DEFAULT_MESAS);
+    if (!isAppOnline()) {
+      setMesas(cached);
+      setLoading(false);
+      return;
+    }
+
     try {
-      setMesas(await fetchMesas());
+      const data = await fetchMesas();
+      setCachedMesas(data);
+      setMesas(data);
     } catch {
-      setMesas(read(LS_MESAS, DEFAULT_MESAS));
+      setMesas(cached);
     } finally {
       setLoading(false);
     }
@@ -347,7 +451,9 @@ export function useMesas() {
   useEffect(() => {
     void reload();
     if (!getStoredSession()) return;
-    const interval = window.setInterval(() => void reload(), 10000);
+    const interval = window.setInterval(() => {
+      if (isAppOnline()) void reload();
+    }, 10000);
     return () => window.clearInterval(interval);
   }, [reload]);
 
@@ -356,53 +462,101 @@ export function useMesas() {
     loading,
     reload,
     marcarAtendida: async (id: string) => {
-      if (getStoredSession()) {
+      if (!getStoredSession()) {
+        const next = getCachedMesas(DEFAULT_MESAS).map((m) =>
+          m.id === id ? { ...m, estado: "libre" as const, cliente: undefined } : m,
+        );
+        setCachedMesas(next);
+        setMesas(next);
+        return next.find((m) => m.id === id)!;
+      }
+
+      const applyLocal = () => {
+        const next = getCachedMesas(DEFAULT_MESAS).map((m) =>
+          m.id === id ? { ...m, estado: "libre" as const, cliente: undefined } : m,
+        );
+        setCachedMesas(next);
+        enqueueOp({ type: "mesa:atendida", mesaId: id });
+        setMesas(next);
+        return next.find((m) => m.id === id)!;
+      };
+
+      if (!isAppOnline()) return applyLocal();
+
+      try {
         const updated = await marcarMesaAtendidaApi(id);
+        setCachedMesas(
+          getCachedMesas(DEFAULT_MESAS).map((m) => (m.id === id ? updated : m)),
+        );
         setMesas((prev) => prev.map((m) => (m.id === id ? updated : m)));
         return updated;
+      } catch (err) {
+        if (isNetworkFailure(err)) return applyLocal();
+        throw err;
       }
-      const next = read<Mesa[]>(LS_MESAS, DEFAULT_MESAS).map((m) =>
-        m.id === id ? { ...m, estado: "libre" as const, cliente: undefined } : m,
-      );
-      write(LS_MESAS, next);
-      setMesas(next);
-      return next.find((m) => m.id === id)!;
     },
     updateMesa: async (id: string, patch: Partial<Mesa>) => {
-      if (getStoredSession()) {
+      if (!getStoredSession()) {
+        const next = getCachedMesas(DEFAULT_MESAS).map((m) =>
+          m.id === id ? { ...m, ...patch } : m,
+        );
+        setCachedMesas(next);
+        setMesas(next);
+        return;
+      }
+
+      const applyLocal = () => {
+        const next = getCachedMesas(DEFAULT_MESAS).map((m) =>
+          m.id === id ? { ...m, ...patch } : m,
+        );
+        setCachedMesas(next);
+        enqueueOp({ type: "mesa:patch", mesaId: id, patch });
+        setMesas(next);
+      };
+
+      if (!isAppOnline()) {
+        applyLocal();
+        return;
+      }
+
+      try {
         const updated = await patchMesaApi(id, patch);
         setMesas((prev) => prev.map((m) => (m.id === id ? updated : m)));
-        return;
+        setCachedMesas(
+          getCachedMesas(DEFAULT_MESAS).map((m) => (m.id === id ? updated : m)),
+        );
+      } catch (err) {
+        if (isNetworkFailure(err)) applyLocal();
+        else throw err;
       }
-      const next = read<Mesa[]>(LS_MESAS, DEFAULT_MESAS).map((m) =>
-        m.id === id ? { ...m, ...patch } : m,
-      );
-      write(LS_MESAS, next);
-      setMesas(next);
     },
     addMesa: async (nombre: string, capacidad: number) => {
-      if (getStoredSession()) {
-        const nueva = await createMesaApi(nombre, capacidad);
-        setMesas((prev) => [...prev, nueva]);
+      if (!getStoredSession()) {
+        const nueva: Mesa = { id: crypto.randomUUID(), nombre, capacidad, estado: "libre" };
+        const next = [...getCachedMesas(DEFAULT_MESAS), nueva];
+        setCachedMesas(next);
+        setMesas(next);
         return;
       }
-      const nueva: Mesa = { id: crypto.randomUUID(), nombre, capacidad, estado: "libre" };
-      const next = [...read<Mesa[]>(LS_MESAS, DEFAULT_MESAS), nueva];
-      write(LS_MESAS, next);
-      setMesas(next);
+      if (!isAppOnline()) throw new Error("Sin conexión: no se puede crear mesa nueva offline");
+      const nueva = await createMesaApi(nombre, capacidad);
+      setMesas((prev) => [...prev, nueva]);
+      setCachedMesas([...getCachedMesas(DEFAULT_MESAS), nueva]);
     },
     removeMesa: async (id: string) => {
-      if (getStoredSession()) {
-        await deleteMesaApi(id);
-        setMesas((prev) => prev.filter((m) => m.id !== id));
+      if (!getStoredSession()) {
+        const next = getCachedMesas(DEFAULT_MESAS).filter((m) => m.id !== id);
+        setCachedMesas(next);
+        setMesas(next);
         return;
       }
-      const next = read<Mesa[]>(LS_MESAS, DEFAULT_MESAS).filter((m) => m.id !== id);
-      write(LS_MESAS, next);
-      setMesas(next);
+      if (!isAppOnline()) throw new Error("Sin conexión: no se puede eliminar mesa offline");
+      await deleteMesaApi(id);
+      setMesas((prev) => prev.filter((m) => m.id !== id));
+      setCachedMesas(getCachedMesas(DEFAULT_MESAS).filter((m) => m.id !== id));
     },
     resetMesas: () => {
-      write(LS_MESAS, DEFAULT_MESAS);
+      setCachedMesas(DEFAULT_MESAS);
       setMesas(DEFAULT_MESAS);
       void reload();
     },
@@ -416,16 +570,26 @@ export function useInventory() {
 
   const reload = useCallback(async () => {
     if (!getStoredSession()) {
-      setItems(read(LS_INVENTORY, DEFAULT_INVENTORY));
+      setItems(getCachedInventario(DEFAULT_INVENTORY));
       setLoading(false);
       return;
     }
+
+    const cached = getCachedInventario(DEFAULT_INVENTORY);
+    if (!isAppOnline()) {
+      setItems(cached);
+      setLoading(false);
+      return;
+    }
+
     try {
-      setItems(await fetchInventario());
+      const data = await fetchInventario();
+      setCachedInventario(data);
+      setItems(data);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar inventario");
-      setItems(read(LS_INVENTORY, DEFAULT_INVENTORY));
+      setItems(cached);
     } finally {
       setLoading(false);
     }
@@ -434,27 +598,29 @@ export function useInventory() {
   useEffect(() => {
     void reload();
     if (!getStoredSession()) {
-      const handler = () => setItems(read(LS_INVENTORY, DEFAULT_INVENTORY));
+      const handler = () => setItems(getCachedInventario(DEFAULT_INVENTORY));
       window.addEventListener("michelada-store-change", handler);
       return () => window.removeEventListener("michelada-store-change", handler);
     }
-    const interval = window.setInterval(() => void reload(), 8000);
+    const interval = window.setInterval(() => {
+      if (isAppOnline()) void reload();
+    }, 8000);
     return () => window.clearInterval(interval);
   }, [reload]);
 
   const setStockLocal = (key: string, stock: number) => {
-    const next = read<InventoryItem[]>(LS_INVENTORY, DEFAULT_INVENTORY).map((i) =>
+    const next = getCachedInventario(DEFAULT_INVENTORY).map((i) =>
       i.key === key ? { ...i, stock } : i,
     );
-    write(LS_INVENTORY, next);
+    setCachedInventario(next);
     setItems(next);
   };
 
   const decrementLocal = (key: string, qty: number) => {
-    const next = read<InventoryItem[]>(LS_INVENTORY, DEFAULT_INVENTORY).map((i) =>
+    const next = getCachedInventario(DEFAULT_INVENTORY).map((i) =>
       i.key === key ? { ...i, stock: Math.max(0, i.stock - qty) } : i,
     );
-    write(LS_INVENTORY, next);
+    setCachedInventario(next);
     setItems(next);
   };
 
@@ -464,48 +630,71 @@ export function useInventory() {
     error,
     reload,
     setStock: async (key: string, stock: number) => {
-      if (getStoredSession()) {
-        const updated = await patchInventarioStock(key, stock);
-        setItems((prev) => prev.map((i) => (i.key === key ? updated : i)));
+      if (!getStoredSession()) {
+        setStockLocal(key, stock);
         return;
       }
-      setStockLocal(key, stock);
+
+      const applyLocal = () => {
+        setStockLocal(key, stock);
+        enqueueOp({ type: "inventario:patch", key, stock });
+      };
+
+      if (!isAppOnline()) {
+        applyLocal();
+        return;
+      }
+
+      try {
+        const updated = await patchInventarioStock(key, stock);
+        setItems((prev) => prev.map((i) => (i.key === key ? updated : i)));
+        setCachedInventario(
+          getCachedInventario(DEFAULT_INVENTORY).map((i) => (i.key === key ? updated : i)),
+        );
+      } catch (err) {
+        if (isNetworkFailure(err)) applyLocal();
+        else throw err;
+      }
     },
     decrement: (key: string, qty: number) => {
-      if (getStoredSession()) return;
+      if (getStoredSession() && isAppOnline()) return;
       decrementLocal(key, qty);
     },
     decrementBatch: (totals: Record<string, number>) => {
-      if (getStoredSession()) return;
-      let next = read<InventoryItem[]>(LS_INVENTORY, DEFAULT_INVENTORY);
+      if (getStoredSession() && isAppOnline()) return;
+      let next = getCachedInventario(DEFAULT_INVENTORY);
       for (const [key, qty] of Object.entries(totals)) {
         next = next.map((i) =>
           i.key === key ? { ...i, stock: Math.max(0, i.stock - qty) } : i,
         );
       }
-      write(LS_INVENTORY, next);
+      setCachedInventario(next);
       setItems(next);
     },
     reset: async () => {
-      if (getStoredSession()) {
-        setItems(await resetInventarioApi());
+      if (!getStoredSession()) {
+        setCachedInventario(DEFAULT_INVENTORY);
+        setItems(DEFAULT_INVENTORY);
         return;
       }
-      write(LS_INVENTORY, DEFAULT_INVENTORY);
-      setItems(DEFAULT_INVENTORY);
+      if (!isAppOnline()) throw new Error("Sin conexión");
+      const data = await resetInventarioApi();
+      setCachedInventario(data);
+      setItems(data);
     },
     removeItem: async (key: string) => {
-      if (getStoredSession()) {
-        const { deleteInventarioItem } = await import("@/lib/inventory-api");
-        await deleteInventarioItem(key);
-        setItems((prev) => prev.filter((i) => i.key !== key));
+      if (!getStoredSession()) {
+        const next = getCachedInventario(DEFAULT_INVENTORY).filter((i) => i.key !== key);
+        setCachedInventario(next);
+        setItems(next);
         return;
       }
-      const next = read<InventoryItem[]>(LS_INVENTORY, DEFAULT_INVENTORY).filter(
-        (i) => i.key !== key,
-      );
-      write(LS_INVENTORY, next);
-      setItems(next);
+      if (!isAppOnline()) throw new Error("Sin conexión");
+      const { deleteInventarioItem } = await import("@/lib/inventory-api");
+      await deleteInventarioItem(key);
+      const next = getCachedInventario(DEFAULT_INVENTORY).filter((i) => i.key !== key);
+      setCachedInventario(next);
+      setItems((prev) => prev.filter((i) => i.key !== key));
     },
   };
 }

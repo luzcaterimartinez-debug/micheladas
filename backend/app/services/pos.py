@@ -7,8 +7,10 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from app.cache import cache_invalidate, query_cache
+from app.config import get_settings
 from app.database import fetch_all, fetch_one, get_db
-from app.services.inventario import apply_order_deductions
+from app.services.inventario import apply_order_deductions, invalidate_inventario_cache
 from app.models.pos import (
     ComandaCreate,
     ComandaOut,
@@ -28,6 +30,26 @@ DEFAULT_MESAS: list[tuple[str, str, int, int]] = [
     ("barra", "Barra", 8, 6),
     ("llevar", "Para llevar", 0, 7),
 ]
+
+MESAS_CACHE_KEY = "mesas:list"
+COMANDAS_CACHE_PREFIX = "comandas:"
+
+
+def invalidate_mesas_cache() -> None:
+    cache_invalidate("mesas:")
+
+
+def invalidate_comandas_cache() -> None:
+    cache_invalidate(COMANDAS_CACHE_PREFIX)
+
+
+def invalidate_pos_cache() -> None:
+    invalidate_mesas_cache()
+    invalidate_comandas_cache()
+
+
+def _comandas_cache_ttl() -> float:
+    return float(get_settings().query_cache_comandas_ttl_seconds)
 
 
 def _ts_ms(dt: datetime | None) -> int:
@@ -107,6 +129,10 @@ def _row_to_comanda(cursor: Any, row: dict[str, Any]) -> ComandaOut:
 
 
 def list_mesas() -> list[MesaOut]:
+    return query_cache(MESAS_CACHE_KEY, _list_mesas_db)
+
+
+def _list_mesas_db() -> list[MesaOut]:
     with get_db() as (conn, cursor):
         rows = fetch_all(
             cursor,
@@ -180,6 +206,7 @@ def create_mesa(body: MesaCreate) -> MesaOut:
             "SELECT id, nombre, capacidad, estado, cliente FROM mesas WHERE id = %s",
             (mesa_id,),
         )
+    invalidate_mesas_cache()
     assert row is not None
     return MesaOut(
         id=str(row["id"]),
@@ -209,6 +236,7 @@ def delete_mesa(mesa_id: str) -> None:
         if cursor.rowcount == 0:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mesa no encontrada")
         conn.commit()
+    invalidate_mesas_cache()
 
 
 def delete_comanda(comanda_id: str) -> None:
@@ -217,6 +245,7 @@ def delete_comanda(comanda_id: str) -> None:
         if cursor.rowcount == 0:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comanda no encontrada")
         conn.commit()
+    invalidate_comandas_cache()
 
 
 def marcar_mesa_atendida(mesa_id: str) -> MesaOut:
@@ -250,6 +279,7 @@ def marcar_mesa_atendida(mesa_id: str) -> MesaOut:
             "SELECT id, nombre, capacidad, estado, cliente FROM mesas WHERE id = %s",
             (mesa_id,),
         )
+    invalidate_pos_cache()
     assert row is not None
     return MesaOut(
         id=str(row["id"]),
@@ -300,6 +330,7 @@ def update_mesa(mesa_id: str, patch: MesaUpdate) -> MesaOut:
                 (mesa_id,),
             )
 
+    invalidate_mesas_cache()
     assert row is not None
     return MesaOut(
         id=str(row["id"]),
@@ -346,6 +377,24 @@ def list_comandas(
     mesa_id: str | None = None,
     limit: int = 200,
 ) -> list[ComandaOut]:
+    key = f"{COMANDAS_CACHE_PREFIX}list:{status_filter or ''}:{mesa_id or ''}:{limit}"
+    return query_cache(
+        key,
+        lambda: _list_comandas_db(
+            status_filter=status_filter,
+            mesa_id=mesa_id,
+            limit=limit,
+        ),
+        ttl_seconds=_comandas_cache_ttl(),
+    )
+
+
+def _list_comandas_db(
+    *,
+    status_filter: str | None = None,
+    mesa_id: str | None = None,
+    limit: int = 200,
+) -> list[ComandaOut]:
     with get_db() as (_, cursor):
         query = """
             SELECT id, folio, orden_cola, cliente, mesa_id, mesa_nombre, total, status, creado_en, mesero_id
@@ -371,6 +420,15 @@ def list_comandas(
 
 
 def get_comanda(comanda_id: str) -> ComandaOut:
+    key = f"{COMANDAS_CACHE_PREFIX}one:{comanda_id}"
+    return query_cache(
+        key,
+        lambda: _get_comanda_db(comanda_id),
+        ttl_seconds=_comandas_cache_ttl(),
+    )
+
+
+def _get_comanda_db(comanda_id: str) -> ComandaOut:
     with get_db() as (_, cursor):
         row = fetch_one(
             cursor,
@@ -387,8 +445,22 @@ def get_comanda(comanda_id: str) -> ComandaOut:
 
 
 def create_comanda(body: ComandaCreate, mesero_id: int | None) -> ComandaOut:
-    comanda_id = str(uuid.uuid4())
     with get_db() as (conn, cursor):
+        if body.id:
+            existing = fetch_one(
+                cursor,
+                """
+                SELECT id, folio, orden_cola, cliente, mesa_id, mesa_nombre, total, status, creado_en, mesero_id
+                FROM comandas WHERE id = %s
+                """,
+                (body.id,),
+            )
+            if existing:
+                return _row_to_comanda(cursor, existing)
+            comanda_id = body.id
+        else:
+            comanda_id = str(uuid.uuid4())
+
         mesa_id, mesa_nombre = _resolve_mesa(cursor, body.mesaId, body.mesa)
         folio = _next_folio(cursor)
         orden_cola = _next_orden_cola(cursor)
@@ -439,6 +511,8 @@ def create_comanda(body: ComandaCreate, mesero_id: int | None) -> ComandaOut:
             )
         apply_order_deductions(cursor, body.items)
         conn.commit()
+        invalidate_inventario_cache()
+        invalidate_pos_cache()
         row = fetch_one(
             cursor,
             """
@@ -510,6 +584,7 @@ def update_comanda(comanda_id: str, patch: ComandaUpdate) -> ComandaOut:
             """,
             (comanda_id,),
         )
+    invalidate_pos_cache()
     assert row is not None
     with get_db() as (_, cursor):
         return _row_to_comanda(cursor, row)

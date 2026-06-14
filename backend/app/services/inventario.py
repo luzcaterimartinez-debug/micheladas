@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from app.cache import cache_invalidate, query_cache
 from app.database import fetch_all, fetch_one, get_db
 from app.models.inventario import InventarioOut, InventarioUpdate
 from app.models.pos import OrderItemIn
@@ -35,7 +36,18 @@ def _row_to_out(row: dict[str, Any]) -> InventarioOut:
     )
 
 
+INVENTARIO_CACHE_KEY = "inventario:list"
+
+
+def invalidate_inventario_cache() -> None:
+    cache_invalidate("inventario:")
+
+
 def list_inventario() -> list[InventarioOut]:
+    return query_cache(INVENTARIO_CACHE_KEY, _list_inventario_db)
+
+
+def _list_inventario_db() -> list[InventarioOut]:
     with get_db() as (conn, cursor):
         count = fetch_one(cursor, "SELECT COUNT(*) AS n FROM inventario")
         if count and int(count["n"]) == 0:
@@ -66,6 +78,7 @@ def update_stock(clave: str, body: InventarioUpdate) -> InventarioOut:
             (body.stock, clave),
         )
         conn.commit()
+        invalidate_inventario_cache()
         row["stock"] = body.stock
         return _row_to_out(row)
 
@@ -76,7 +89,8 @@ def reset_inventario() -> list[InventarioOut]:
             "UPDATE inventario SET stock = stock_inicial"
         )
         conn.commit()
-        return list_inventario()
+    invalidate_inventario_cache()
+    return list_inventario()
 
 
 def delete_inventario_item(clave: str) -> None:
@@ -90,6 +104,7 @@ def delete_inventario_item(clave: str) -> None:
         )
         cursor.execute("DELETE FROM inventario WHERE clave = %s", (clave,))
         conn.commit()
+    invalidate_inventario_cache()
 
 
 def _consumo_por_producto(producto_id: str) -> list[tuple[str, float]]:

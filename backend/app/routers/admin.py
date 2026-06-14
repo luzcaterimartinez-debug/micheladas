@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import require_roles
 from app.auth.password import hash_password
+from app.cache import cache_invalidate, query_cache
 from app.database import fetch_all, fetch_one, get_db
 from app.models.admin import UserAdmin, UserCreate, UserUpdate
 from app.models.user import Rol, UserPublic
@@ -12,9 +13,14 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 AdminUser = Annotated[UserPublic, Depends(require_roles(Rol.ADMIN))]
 
+USERS_CACHE_KEY = "usuarios:list"
 
-@router.get("/users", response_model=list[UserAdmin])
-def list_users(_: AdminUser) -> list[UserAdmin]:
+
+def invalidate_users_cache() -> None:
+    cache_invalidate("usuarios:")
+
+
+def _list_users_db() -> list[UserAdmin]:
     with get_db() as (_, cursor):
         rows = fetch_all(
             cursor,
@@ -34,6 +40,11 @@ def list_users(_: AdminUser) -> list[UserAdmin]:
         )
         for r in rows
     ]
+
+
+@router.get("/users", response_model=list[UserAdmin])
+def list_users(_: AdminUser) -> list[UserAdmin]:
+    return query_cache(USERS_CACHE_KEY, _list_users_db)
 
 
 @router.post("/users", response_model=UserAdmin, status_code=status.HTTP_201_CREATED)
@@ -62,6 +73,7 @@ def create_user(body: UserCreate, admin: AdminUser) -> UserAdmin:
     if row is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error al crear usuario")
 
+    invalidate_users_cache()
     return UserAdmin(
         id=row["id"],
         nombre=row["nombre"],
@@ -121,6 +133,7 @@ def update_user(user_id: int, body: UserUpdate, admin: AdminUser) -> UserAdmin:
             (user_id,),
         )
 
+    invalidate_users_cache()
     return UserAdmin(
         id=updated["id"],
         nombre=updated["nombre"],

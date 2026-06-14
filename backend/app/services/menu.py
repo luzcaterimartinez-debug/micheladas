@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from app.cache import cache_invalidate, query_cache
 from app.database import fetch_all, fetch_one, get_db
 from app.menu_constants import parse_pasos, pasos_to_json, slugify
 from app.models.menu import (
@@ -150,7 +151,19 @@ def sync_product_toppings(cursor, producto_id: str, topping_ids: list[str]) -> N
     sync_product_opciones(cursor, producto_id, topping_ids)
 
 
+MENU_CACHE_PREFIX = "menu:"
+
+
+def invalidate_menu_cache() -> None:
+    cache_invalidate(MENU_CACHE_PREFIX)
+
+
 def load_menu(*, include_inactive: bool = False) -> MenuOut:
+    key = f"{MENU_CACHE_PREFIX}{'all' if include_inactive else 'active'}"
+    return query_cache(key, lambda: _load_menu_db(include_inactive=include_inactive))
+
+
+def _load_menu_db(*, include_inactive: bool = False) -> MenuOut:
     with get_db() as (_, cursor):
         fases, fase_names = _load_fase_catalog(cursor)
         active_fase_ids = [f.id for f in fases if include_inactive or f.activo]
@@ -242,11 +255,39 @@ def load_menu(*, include_inactive: bool = False) -> MenuOut:
 
 
 def list_fases(*, include_inactive: bool = True) -> list[FaseOut]:
-    with get_db() as (_, cursor):
-        fases, _ = _load_fase_catalog(cursor)
+    key = f"{MENU_CACHE_PREFIX}fases:{'all' if include_inactive else 'active'}"
+    fases = query_cache(key, lambda: _list_fases_db())
     if include_inactive:
         return fases
     return [f for f in fases if f.activo]
+
+
+def _list_fases_db() -> list[FaseOut]:
+    with get_db() as (_, cursor):
+        fases, _ = _load_fase_catalog(cursor)
+    return fases
+
+
+def list_all_toppings() -> list[FaseOpcionOut]:
+    """Compatibilidad admin: catálogo plano de opciones."""
+    return query_cache(
+        f"{MENU_CACHE_PREFIX}toppings",
+        _list_all_toppings_db,
+    )
+
+
+def _list_all_toppings_db() -> list[FaseOpcionOut]:
+    with get_db() as (_, cursor):
+        rows = fetch_all(
+            cursor,
+            """
+            SELECT o.id, o.nombre, o.fase_id, o.inventario_clave, o.cantidad, f.nombre AS fase_nombre
+            FROM menu_fase_opciones o
+            JOIN menu_fases f ON f.id = o.fase_id
+            ORDER BY f.orden, o.nombre
+            """,
+        )
+    return [_opcion_out(r) for r in rows]
 
 
 def create_fase(nombre: str, descripcion: str, activo: bool) -> FaseOut:
@@ -264,6 +305,7 @@ def create_fase(nombre: str, descripcion: str, activo: bool) -> FaseOut:
             (fase_id, nombre.strip(), descripcion.strip(), int(activo), orden),
         )
         conn.commit()
+    invalidate_menu_cache()
     return FaseOut(id=fase_id, name=nombre.strip(), description=descripcion.strip(), activo=activo, opciones=[])
 
 
@@ -291,6 +333,7 @@ def update_fase(fase_id: str, **fields: Any) -> FaseOut:
                 (nombre, descripcion, int(activo), fase_id),
             )
         conn.commit()
+    invalidate_menu_cache()
     fases = list_fases()
     return next((f for f in fases if f.id == fase_id), FaseOut(id=fase_id, name=nombre, description=descripcion, activo=bool(activo)))
 
@@ -328,6 +371,7 @@ def create_fase_opcion(
             (opcion_id,),
         )
         conn.commit()
+    invalidate_menu_cache()
     return _opcion_out(row) if row else FaseOpcionOut(
         id=opcion_id,
         name=nombre.strip(),
@@ -386,6 +430,7 @@ def update_fase_opcion(
             (opcion_id,),
         )
         conn.commit()
+    invalidate_menu_cache()
     return _opcion_out(row)
 
 
@@ -395,6 +440,7 @@ def delete_fase_opcion(opcion_id: str) -> None:
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Opción no encontrada")
         conn.commit()
+    invalidate_menu_cache()
 
 
 def delete_adicion(adicion_id: str) -> None:
@@ -403,18 +449,5 @@ def delete_adicion(adicion_id: str) -> None:
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Adición no encontrada")
         conn.commit()
+    invalidate_menu_cache()
 
-
-def list_all_toppings() -> list[FaseOpcionOut]:
-    """Compatibilidad admin: catálogo plano de opciones."""
-    with get_db() as (_, cursor):
-        rows = fetch_all(
-            cursor,
-            """
-            SELECT o.id, o.nombre, o.fase_id, o.inventario_clave, o.cantidad, f.nombre AS fase_nombre
-            FROM menu_fase_opciones o
-            JOIN menu_fases f ON f.id = o.fase_id
-            ORDER BY f.orden, o.nombre
-            """,
-        )
-    return [_opcion_out(r) for r in rows]

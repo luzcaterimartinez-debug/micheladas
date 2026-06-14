@@ -31,6 +31,7 @@ from app.services.menu import (
     delete_adicion,
     delete_fase_opcion,
     get_producto_by_id,
+    invalidate_menu_cache,
     list_all_toppings,
     list_fases,
     load_menu,
@@ -137,6 +138,7 @@ def create_categoria(body: CategoriaCreate, _: AdminUser) -> CategoriaOut:
         )
         conn.commit()
 
+    invalidate_menu_cache()
     return CategoriaOut(
         id=cat_id,
         name=body.nombre.strip(),
@@ -172,6 +174,7 @@ def update_categoria(categoria_id: str, body: CategoriaUpdate, _: AdminUser) -> 
         )
         conn.commit()
 
+    invalidate_menu_cache()
     menu = load_menu(include_inactive=True)
     cat = next((c for c in menu.categorias if c.id == categoria_id), None)
     if cat:
@@ -225,6 +228,7 @@ def create_producto(body: ProductoCreate, _: AdminUser) -> ProductoOut:
 
         producto = get_producto_by_id(cursor, producto_id)
 
+    invalidate_menu_cache()
     if producto is None:
         raise HTTPException(status_code=500, detail="Error al crear producto")
     return producto
@@ -274,6 +278,7 @@ def update_producto(producto_id: str, body: ProductoUpdate, _: AdminUser) -> Pro
         conn.commit()
         producto = get_producto_by_id(cursor, producto_id)
 
+    invalidate_menu_cache()
     if producto is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
     return producto
@@ -308,6 +313,7 @@ def create_adicion(body: AdicionCreate, _: AdminUser) -> AdicionOut:
         )
         conn.commit()
 
+    invalidate_menu_cache()
     return AdicionOut(
         id=adicion_id,
         name=body.nombre.strip(),
@@ -346,6 +352,7 @@ def update_adicion(adicion_id: str, body: AdicionUpdate, _: AdminUser) -> Adicio
         )
         conn.commit()
 
+    invalidate_menu_cache()
     return AdicionOut(
         id=adicion_id,
         name=nombre,

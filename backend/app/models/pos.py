@@ -49,6 +49,7 @@ class ComandaOut(BaseModel):
 
 
 class ComandaCreate(BaseModel):
+    id: str | None = Field(default=None, max_length=36, description="ID cliente para sync offline")
     cliente: str = Field(min_length=1, max_length=100)
     mesaId: str | None = Field(default=None, max_length=50)
     mesa: str | None = Field(default=None, max_length=100)

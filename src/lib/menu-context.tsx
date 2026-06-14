@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { fetchMenu } from "@/lib/menu-api";
+import { getCachedMenu } from "@/lib/offline/local-cache";
 import {
   FALLBACK_MENU,
   flattenProductos,
@@ -24,7 +25,7 @@ type MenuContextValue = {
 const MenuContext = createContext<MenuContextValue | null>(null);
 
 export function MenuProvider({ children }: { children: ReactNode }) {
-  const [menu, setMenu] = useState<MenuData>(FALLBACK_MENU);
+  const [menu, setMenu] = useState<MenuData>(() => getCachedMenu(FALLBACK_MENU));
   const [loading, setLoading] = useState(true);
 
   const refetch = useCallback(async () => {

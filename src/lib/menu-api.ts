@@ -1,6 +1,8 @@
 import type { Fase, FaseOpcion } from "@/lib/fases";
 import type { Addition, MicheladaType } from "@/lib/micheladas-store";
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
+import { getCachedMenu, setCachedMenu } from "@/lib/offline/local-cache";
+import { isAppOnline } from "@/lib/offline/network";
 import {
   FALLBACK_MENU,
   normalizeMenuFromApi,
@@ -108,16 +110,26 @@ export async function fetchMenu(): Promise<MenuData> {
   const session = getStoredSession();
   if (!session) return FALLBACK_MENU;
 
-  const res = await fetch(`${getApiUrl()}/api/menu`, {
-    headers: { Authorization: `Bearer ${session.accessToken}` },
-  });
-
-  if (!res.ok) {
-    console.warn("Menú API:", parseApiError(await res.json().catch(() => ({})), res.status));
-    return FALLBACK_MENU;
+  if (!isAppOnline()) {
+    return getCachedMenu(FALLBACK_MENU);
   }
 
-  return parseMenuResponse(await res.json());
+  try {
+    const res = await fetch(`${getApiUrl()}/api/menu`, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+    });
+
+    if (!res.ok) {
+      console.warn("Menú API:", parseApiError(await res.json().catch(() => ({})), res.status));
+      return getCachedMenu(FALLBACK_MENU);
+    }
+
+    const menu = parseMenuResponse(await res.json());
+    setCachedMenu(menu);
+    return menu;
+  } catch {
+    return getCachedMenu(FALLBACK_MENU);
+  }
 }
 
 export async function fetchMenuAdmin(): Promise<MenuData> {

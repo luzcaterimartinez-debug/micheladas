@@ -123,11 +123,13 @@ export async function fetchComandas(opts?: {
 
 export async function createComandaApi(
   input: Omit<Comanda, "id" | "folio" | "queueOrder" | "createdAt" | "status">,
+  clientId?: string,
 ): Promise<Comanda> {
   const res = await fetch(`${getApiUrl()}/api/comandas`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
+      id: clientId,
       cliente: input.cliente,
       mesaId: input.mesaId,
       mesa: input.mesa,

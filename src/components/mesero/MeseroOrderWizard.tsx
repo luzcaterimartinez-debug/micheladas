@@ -31,6 +31,8 @@ import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
 import { faseOpcionNames } from "@/lib/comanda-display";
 import { isFasePaso, opcionesForFase, parseFaseIdFromPaso } from "@/lib/fases";
 import { getStoredSession } from "@/lib/auth";
+import { isAppOnline } from "@/lib/offline/network";
+import { getPendingCount } from "@/lib/offline/outbox";
 import { buildOrderDeductions } from "@/lib/inventory-deduction";
 import { getComandasListas, getMesaActivity } from "@/lib/pos-utils";
 import { useMenu } from "@/lib/menu-context";
@@ -174,6 +176,7 @@ export function MeseroOrderWizard() {
     const mesa = mesaSeleccionada?.nombre;
     setSending(true);
     try {
+      const pendingBefore = getPendingCount();
       const c = await addComanda({
         cliente: nombre,
         mesaId: mesaId || undefined,
@@ -181,13 +184,16 @@ export function MeseroOrderWizard() {
         items: cart,
         total: cartTotal,
       });
-      if (!getStoredSession()) {
+      const queued = getPendingCount() > pendingBefore;
+      if (!getStoredSession() || !isAppOnline() || queued) {
         decrementBatch(buildOrderDeductions(cart, adiciones, productos, faseOpciones));
       } else {
         void reloadInventario();
       }
       toast.success(
-        `Turno ${c.queueOrder} · Comanda #${c.folio} enviada. Se imprime en barra automáticamente.`,
+        queued
+          ? `Turno ${c.queueOrder} · Comanda #${c.folio} guardada localmente. Se sincronizará al volver la red.`
+          : `Turno ${c.queueOrder} · Comanda #${c.folio} enviada. Se imprime en barra automáticamente.`,
       );
       void reloadMesas();
       setCart([]);
