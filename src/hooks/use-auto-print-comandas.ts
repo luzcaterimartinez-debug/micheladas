@@ -40,6 +40,24 @@ export function setAutoPrintEnabled(enabled: boolean): void {
   localStorage.setItem(AUTO_PRINT_KEY, enabled ? "1" : "0");
 }
 
+export function markComandaPrinted(id: string): void {
+  if (typeof window === "undefined") return;
+  const ids = loadPrintedIds();
+  if (ids.has(id)) return;
+  ids.add(id);
+  savePrintedIds(ids);
+}
+
+/** Imprime al enviar pedido y evita reimpresión en la estación de barra (mismo navegador). */
+export function printComandaOnSend(
+  comanda: Comanda,
+  productos: MicheladaType[],
+): void {
+  if (typeof window === "undefined") return;
+  printComanda(comanda, productos, { silent: true });
+  markComandaPrinted(comanda.id);
+}
+
 export type LastPrinted = {
   folio: number;
   queueOrder: number;

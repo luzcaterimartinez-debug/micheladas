@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { faseOpcionNames } from "@/lib/comanda-display";
+import { printComandaOnSend } from "@/hooks/use-auto-print-comandas";
 import { getStoredSession } from "@/lib/auth";
 import { buildOrderDeductions } from "@/lib/inventory-deduction";
 import { useMenu } from "@/lib/menu-context";
@@ -96,8 +97,9 @@ export function OrderBuilder() {
       } else {
         void reloadInventario();
       }
+      printComandaOnSend(c, productos);
       toast.success(
-        `${c.queueOrder ? `Turno ${c.queueOrder} · ` : ""}Comanda #${c.folio} enviada. Se imprime en barra automáticamente.`,
+        `${c.queueOrder ? `Turno ${c.queueOrder} · ` : ""}Comanda #${c.folio} enviada. Ticket impreso.`,
       );
       setCart([]);
       setCliente("");
