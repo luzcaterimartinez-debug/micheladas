@@ -1,7 +1,7 @@
 import { R as React2, j as jsxRuntimeExports } from "./react.mjs";
 import { c as createContextScope } from "./radix-ui__react-context.mjs";
 import { u as useComposedRefs } from "./radix-ui__react-compose-refs.mjs";
-import { b as createSlot } from "./radix-ui__react-slot.mjs";
+import { d as createSlot } from "./radix-ui__react-slot.mjs";
 function createCollection(name) {
   const PROVIDER_NAME = name + "CollectionProvider";
   const [createCollectionContext, createCollectionScope] = createContextScope(PROVIDER_NAME);

@@ -36,6 +36,7 @@ export default defineConfig({
     preset: "vercel",
   },
   vite: {
+    publicDir: "public",
     server: {
       proxy: {
         "/api": {
