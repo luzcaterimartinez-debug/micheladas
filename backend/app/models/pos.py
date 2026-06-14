@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 ComandaStatus = Literal["pendiente", "lista", "entregada"]
 MesaEstado = Literal["libre", "ocupada", "reservada"]
+MetodoPago = Literal["efectivo", "tarjeta", "transferencia", "mixto"]
 class AdicionItem(BaseModel):
     id: str
     name: str
@@ -46,6 +47,15 @@ class ComandaOut(BaseModel):
     total: float
     createdAt: int
     status: ComandaStatus
+    pagado: bool = False
+    metodoPago: MetodoPago | None = None
+    montoPagado: float | None = None
+    propina: float = 0
+    pagoEfectivo: float | None = None
+    pagoTarjeta: float | None = None
+    pagoTransferencia: float | None = None
+    pagadoEn: int | None = None
+    cobradoPorId: int | None = None
 
 
 class ComandaCreate(BaseModel):

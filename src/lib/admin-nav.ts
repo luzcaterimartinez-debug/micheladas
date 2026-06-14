@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
+  Banknote,
   BookOpen,
   Boxes,
   ClipboardList,
@@ -23,6 +24,7 @@ export type AdminSection =
   | "adiciones"
   | "usuarios"
   | "comandas"
+  | "caja"
   | "reportes"
   | "nomina"
   | "inventario"
@@ -43,6 +45,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { id: "adiciones", label: "Adiciones", icon: ListPlus },
   { id: "usuarios", label: "Usuarios", icon: UserCog },
   { id: "comandas", label: "Comandas", icon: ClipboardList },
+  { id: "caja", label: "Caja", icon: Banknote },
   { id: "reportes", label: "Reportes", icon: BarChart3 },
   { id: "nomina", label: "Nómina", icon: Wallet },
   { id: "inventario", label: "Inventario", icon: Boxes },
@@ -53,7 +56,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
 export const ADMIN_NAV_GROUPS: { label: string; ids: AdminSection[] }[] = [
   { label: "General", ids: ["resumen", "reportes"] },
   { label: "Menú", ids: ["categorias", "menu", "fases", "adiciones"] },
-  { label: "Operación", ids: ["comandas", "inventario", "mesas", "pos"] },
+  { label: "Operación", ids: ["comandas", "caja", "inventario", "mesas", "pos"] },
   { label: "Equipo", ids: ["usuarios", "nomina"] },
 ];
 

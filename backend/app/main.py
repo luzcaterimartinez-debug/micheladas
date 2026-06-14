@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import admin, admin_menu, auth, comandas, inventario, menu, mesas, nomina, reportes
+from app.database import check_database
+from app.routers import admin, admin_menu, auth, caja, comandas, inventario, menu, mesas, nomina, reportes
 
 app = FastAPI(
     title="Micheladas API",
@@ -28,8 +29,19 @@ app.include_router(comandas.router)
 app.include_router(inventario.router)
 app.include_router(reportes.router)
 app.include_router(nomina.router)
+app.include_router(caja.router)
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health(response: Response) -> dict[str, str]:
+    db_ok, db_error = check_database()
+    payload: dict[str, str] = {
+        "status": "ok" if db_ok else "degraded",
+        "database": "ok" if db_ok else "error",
+        "env": settings.app_env,
+    }
+    if db_error and not settings.is_production:
+        payload["database_error"] = db_error
+    if not db_ok:
+        response.status_code = 503
+    return payload

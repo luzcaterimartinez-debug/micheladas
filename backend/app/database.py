@@ -37,6 +37,22 @@ def get_connection() -> MySQLConnection:
     return get_pool().get_connection()
 
 
+def check_database() -> tuple[bool, str | None]:
+    """Ping MySQL; returns (ok, error_message)."""
+    try:
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            cursor.close()
+            return True, None
+        finally:
+            conn.close()
+    except Exception as exc:
+        return False, str(exc)
+
+
 @contextmanager
 def get_db() -> Generator[tuple[MySQLConnection, MySQLCursorDict], None, None]:
     conn = get_connection()

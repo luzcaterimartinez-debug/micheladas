@@ -11,6 +11,7 @@ import { AdminMenu } from "@/components/admin/AdminMenu";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminReportes } from "@/components/admin/AdminReportes";
 import { AdminNomina } from "@/components/admin/AdminNomina";
+import { AdminCaja } from "@/components/admin/AdminCaja";
 import { AdminMobileHeader, AdminMobileNav } from "@/components/admin/AdminMobileNav";
 import { MenuProvider } from "@/lib/menu-context";
 import { ComandasList } from "@/components/ComandasList";
@@ -132,6 +133,7 @@ function AdminPanel() {
             {section === "adiciones" && <AdminAdiciones />}
             {section === "usuarios" && <AdminUsers />}
             {section === "comandas" && <ComandasList />}
+            {section === "caja" && <AdminCaja />}
             {section === "reportes" && <AdminReportes />}
             {section === "nomina" && <AdminNomina />}
             {section === "inventario" && <InventoryPanel />}

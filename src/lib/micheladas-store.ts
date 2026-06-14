@@ -98,6 +98,15 @@ export type Comanda = {
   total: number;
   createdAt: number;
   status: "pendiente" | "lista" | "entregada";
+  pagado?: boolean;
+  metodoPago?: "efectivo" | "tarjeta" | "transferencia" | "mixto";
+  montoPagado?: number;
+  propina?: number;
+  pagoEfectivo?: number;
+  pagoTarjeta?: number;
+  pagoTransferencia?: number;
+  pagadoEn?: number;
+  cobradoPorId?: number;
 };
 
 export type Mesa = {

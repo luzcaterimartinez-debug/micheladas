@@ -1,15 +1,17 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { VitePWA } from "vite-plugin-pwa";
 
-const apiUrl = (process.env.VITE_API_URL ?? "").replace(/\/$/, "");
+const apiUrlEnv = (process.env.VITE_API_URL ?? "").replace(/\/$/, "");
 let apiPattern: RegExp | undefined;
-if (apiUrl) {
+if (apiUrlEnv) {
   try {
-    const { origin } = new URL(apiUrl);
+    const { origin } = new URL(apiUrlEnv);
     apiPattern = new RegExp(`^${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/api/.*`, "i");
   } catch {
     apiPattern = undefined;
   }
+} else {
+  apiPattern = /^\/api\/.*/i;
 }
 
 const runtimeCaching = apiPattern
@@ -34,6 +36,14 @@ export default defineConfig({
     preset: "vercel",
   },
   vite: {
+    server: {
+      proxy: {
+        "/api": {
+          target: "http://localhost:8000",
+          changeOrigin: true,
+        },
+      },
+    },
     plugins: [
       VitePWA({
         registerType: "autoUpdate",

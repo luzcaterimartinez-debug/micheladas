@@ -20,6 +20,8 @@ dist-ssr
 # Python backend
 backend/.venv/
 backend/.env
+backend/backups/*.sql
+backend/backups/*.sql.gz
 __pycache__/
 *.pyc
 

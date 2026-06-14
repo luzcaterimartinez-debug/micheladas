@@ -1,9 +1,27 @@
+import { getApiUrl } from "@/lib/auth";
+
 export const LS_MENU = "michelada_menu_v1";
 export const LS_OUTBOX = "michelada_outbox_v1";
 export const LS_SYNC_META = "michelada_sync_meta_v1";
 
 export function isAppOnline(): boolean {
   return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+export async function checkServerReachable(): Promise<boolean> {
+  if (!isAppOnline()) return false;
+  const base = getApiUrl();
+  const url = base ? `${base}/api/health` : "/api/health";
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    });
+    return res.status === 200 || res.status === 503;
+  } catch {
+    return false;
+  }
 }
 
 export function isNetworkFailure(err: unknown): boolean {

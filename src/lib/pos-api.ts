@@ -34,7 +34,7 @@ function mapOrderItem(raw: Record<string, unknown>): OrderItem {
   };
 }
 
-function mapComanda(raw: Record<string, unknown>): Comanda {
+export function mapComanda(raw: Record<string, unknown>): Comanda {
   const items = ((raw.items as Record<string, unknown>[]) ?? []).map(mapOrderItem);
   return {
     id: String(raw.id),
@@ -48,6 +48,15 @@ function mapComanda(raw: Record<string, unknown>): Comanda {
     total: Number(raw.total),
     createdAt: Number(raw.createdAt),
     status: raw.status as Comanda["status"],
+    pagado: Boolean(raw.pagado),
+    metodoPago: raw.metodoPago != null ? (raw.metodoPago as Comanda["metodoPago"]) : undefined,
+    montoPagado: raw.montoPagado != null ? Number(raw.montoPagado) : undefined,
+    propina: Number(raw.propina ?? 0),
+    pagoEfectivo: raw.pagoEfectivo != null ? Number(raw.pagoEfectivo) : undefined,
+    pagoTarjeta: raw.pagoTarjeta != null ? Number(raw.pagoTarjeta) : undefined,
+    pagoTransferencia: raw.pagoTransferencia != null ? Number(raw.pagoTransferencia) : undefined,
+    pagadoEn: raw.pagadoEn != null ? Number(raw.pagadoEn) : undefined,
+    cobradoPorId: raw.cobradoPorId != null ? Number(raw.cobradoPorId) : undefined,
   };
 }
 

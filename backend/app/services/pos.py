@@ -31,7 +31,11 @@ DEFAULT_MESAS: list[tuple[str, str, int, int]] = [
     ("llevar", "Para llevar", 0, 7),
 ]
 
-MESAS_CACHE_KEY = "mesas:list"
+COMANDAS_SELECT = """
+  id, folio, orden_cola, cliente, mesa_id, mesa_nombre, total, status, creado_en, mesero_id,
+  pagado, metodo_pago, monto_pagado, propina,
+  pago_efectivo, pago_tarjeta, pago_transferencia, pagado_en, cobrado_por
+"""
 COMANDAS_CACHE_PREFIX = "comandas:"
 
 
@@ -113,6 +117,8 @@ def _load_items(cursor: Any, comanda_id: str) -> list[OrderItemOut]:
 def _row_to_comanda(cursor: Any, row: dict[str, Any]) -> ComandaOut:
     items = _load_items(cursor, str(row["id"]))
     mesero_raw = row.get("mesero_id")
+    cobrado_raw = row.get("cobrado_por")
+    pagado_en = row.get("pagado_en")
     return ComandaOut(
         id=str(row["id"]),
         folio=int(row["folio"]),
@@ -125,6 +131,15 @@ def _row_to_comanda(cursor: Any, row: dict[str, Any]) -> ComandaOut:
         total=float(row["total"]),
         createdAt=_ts_ms(row.get("creado_en")),
         status=row["status"],
+        pagado=bool(row.get("pagado")),
+        metodoPago=row.get("metodo_pago"),
+        montoPagado=float(row["monto_pagado"]) if row.get("monto_pagado") is not None else None,
+        propina=float(row.get("propina") or 0),
+        pagoEfectivo=float(row["pago_efectivo"]) if row.get("pago_efectivo") is not None else None,
+        pagoTarjeta=float(row["pago_tarjeta"]) if row.get("pago_tarjeta") is not None else None,
+        pagoTransferencia=float(row["pago_transferencia"]) if row.get("pago_transferencia") is not None else None,
+        pagadoEn=_ts_ms(pagado_en) if pagado_en else None,
+        cobradoPorId=int(cobrado_raw) if cobrado_raw is not None else None,
     )
 
 
@@ -375,14 +390,16 @@ def list_comandas(
     *,
     status_filter: str | None = None,
     mesa_id: str | None = None,
+    pagado: bool | None = None,
     limit: int = 200,
 ) -> list[ComandaOut]:
-    key = f"{COMANDAS_CACHE_PREFIX}list:{status_filter or ''}:{mesa_id or ''}:{limit}"
+    key = f"{COMANDAS_CACHE_PREFIX}list:{status_filter or ''}:{mesa_id or ''}:{pagado}:{limit}"
     return query_cache(
         key,
         lambda: _list_comandas_db(
             status_filter=status_filter,
             mesa_id=mesa_id,
+            pagado=pagado,
             limit=limit,
         ),
         ttl_seconds=_comandas_cache_ttl(),
@@ -393,11 +410,12 @@ def _list_comandas_db(
     *,
     status_filter: str | None = None,
     mesa_id: str | None = None,
+    pagado: bool | None = None,
     limit: int = 200,
 ) -> list[ComandaOut]:
     with get_db() as (_, cursor):
-        query = """
-            SELECT id, folio, orden_cola, cliente, mesa_id, mesa_nombre, total, status, creado_en, mesero_id
+        query = f"""
+            SELECT {COMANDAS_SELECT}
             FROM comandas
         """
         params: list[Any] = []
@@ -411,6 +429,9 @@ def _list_comandas_db(
         if mesa_id:
             clauses.append("mesa_id = %s")
             params.append(mesa_id)
+        if pagado is not None:
+            clauses.append("pagado = %s")
+            params.append(1 if pagado else 0)
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY orden_cola ASC, creado_en ASC LIMIT %s"
@@ -432,8 +453,8 @@ def _get_comanda_db(comanda_id: str) -> ComandaOut:
     with get_db() as (_, cursor):
         row = fetch_one(
             cursor,
-            """
-            SELECT id, folio, orden_cola, cliente, mesa_id, mesa_nombre, total, status, creado_en, mesero_id
+            f"""
+            SELECT {COMANDAS_SELECT}
             FROM comandas
             WHERE id = %s
             """,
@@ -449,8 +470,8 @@ def create_comanda(body: ComandaCreate, mesero_id: int | None) -> ComandaOut:
         if body.id:
             existing = fetch_one(
                 cursor,
-                """
-                SELECT id, folio, orden_cola, cliente, mesa_id, mesa_nombre, total, status, creado_en, mesero_id
+                f"""
+                SELECT {COMANDAS_SELECT}
                 FROM comandas WHERE id = %s
                 """,
                 (body.id,),
@@ -515,8 +536,8 @@ def create_comanda(body: ComandaCreate, mesero_id: int | None) -> ComandaOut:
         invalidate_pos_cache()
         row = fetch_one(
             cursor,
-            """
-            SELECT id, folio, orden_cola, cliente, mesa_id, mesa_nombre, total, status, creado_en, mesero_id
+            f"""
+            SELECT {COMANDAS_SELECT}
             FROM comandas WHERE id = %s
             """,
             (comanda_id,),
@@ -578,8 +599,8 @@ def update_comanda(comanda_id: str, patch: ComandaUpdate) -> ComandaOut:
         conn.commit()
         row = fetch_one(
             cursor,
-            """
-            SELECT id, folio, orden_cola, cliente, mesa_id, mesa_nombre, total, status, creado_en, mesero_id
+            f"""
+            SELECT {COMANDAS_SELECT}
             FROM comandas WHERE id = %s
             """,
             (comanda_id,),

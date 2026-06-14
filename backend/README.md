@@ -33,6 +33,7 @@ python -m scripts.migrate_pos
 python -m scripts.migrate_inventario
 python -m scripts.migrate_inventario_vinculo
 python -m scripts.migrate_adiciones_porcion
+python -m scripts.migrate_caja
 ```
 
 (O con cliente MySQL: `mysql -u root < database/schema.sql`)
@@ -80,3 +81,25 @@ npm run test
 ```
 
 Desde la raíz del proyecto: `npm run test` (frontend) y `npm run test:backend` (API).
+
+## Producción
+
+1. Copia las plantillas de entorno:
+   - Backend: `copy .env.production.example .env` (en `backend/`)
+   - Frontend: configura `VITE_API_URL` en tu hosting (ver `.env.production.example` en la raíz)
+2. Genera `JWT_SECRET` seguro:
+   ```bash
+   python -c "from app.config import generate_jwt_secret; print(generate_jwt_secret())"
+   ```
+3. Define `APP_ENV=production` — la API **no arranca** si `JWT_SECRET` es débil o `CORS_ORIGINS` está vacío.
+4. Health check: `GET /api/health` devuelve `200` solo si MySQL responde; si la BD falla, `503` con `"database": "error"`.
+
+## Respaldos MySQL
+
+```bash
+cd backend
+python -m scripts.backup_db
+python -m scripts.backup_db --output ./backups --keep 14
+```
+
+Requiere `mysqldump` en PATH. Los archivos se guardan en `backend/backups/` (`.sql.gz` por defecto). Programa la tarea diaria con el Programador de tareas de Windows o cron en Linux (ver docstring en `scripts/backup_db.py`).

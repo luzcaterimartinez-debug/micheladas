@@ -8,10 +8,18 @@ from fastapi.testclient import TestClient
 pytestmark = pytest.mark.integration
 
 
-def test_health_ok(client: TestClient) -> None:
+def test_health_ok(client: TestClient, db_available: bool) -> None:
     r = client.get("/api/health")
+    data = r.json()
+    assert "status" in data
+    assert "database" in data
+    if not db_available:
+        assert r.status_code == 503
+        assert data["database"] == "error"
+        return
     assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+    assert data["status"] == "ok"
+    assert data["database"] == "ok"
 
 
 def test_login_admin(client: TestClient, admin_token: str) -> None:

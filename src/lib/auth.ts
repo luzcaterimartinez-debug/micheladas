@@ -14,10 +14,19 @@ export type AuthSession = {
 
 const STORAGE_KEY = "micheladas_auth";
 
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
-
 export function getApiUrl(): string {
-  return API_URL;
+  const fromEnv = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
+  // Desarrollo: peticiones relativas /api → proxy de Vite hacia :8000
+  if (import.meta.env.DEV) return "";
+  // Producción (Vercel): API en el mismo dominio vía /api/index.py
+  if (typeof window !== "undefined") return window.location.origin;
+  return "";
+}
+
+function apiUrl(path: string): string {
+  const base = getApiUrl();
+  return base ? `${base}${path}` : path;
 }
 
 export function getStoredSession(): AuthSession | null {
@@ -42,11 +51,20 @@ export function clearSession(): void {
 }
 
 export async function login(email: string, password: string): Promise<AuthSession> {
-  const res = await fetch(`${API_URL}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(apiUrl("/api/auth/login"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+  } catch {
+    throw new Error(
+      import.meta.env.DEV
+        ? "No se pudo conectar al servidor. Inicia el backend: cd backend && uvicorn app.main:app --reload --port 8000"
+        : "No se pudo conectar al servidor. Revisa tu conexión o la configuración de VITE_API_URL.",
+    );
+  }
 
   const data = await res.json().catch(() => ({}));
 
@@ -64,7 +82,7 @@ export async function login(email: string, password: string): Promise<AuthSessio
 
 export async function fetchCurrentUser(token: string): Promise<AuthUser | null> {
   try {
-    const res = await fetch(`${API_URL}/api/auth/me`, {
+    const res = await fetch(apiUrl("/api/auth/me"), {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;
@@ -80,7 +98,7 @@ export async function validateSession(): Promise<AuthSession | null> {
 
   let user: AuthUser | null;
   try {
-    const res = await fetch(`${API_URL}/api/auth/me`, {
+    const res = await fetch(apiUrl("/api/auth/me"), {
       headers: { Authorization: `Bearer ${stored.accessToken}` },
     });
     if (!res.ok) {

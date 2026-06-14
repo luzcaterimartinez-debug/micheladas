@@ -1,24 +1,18 @@
 # Iconos PWA
 
-Este directorio debe contener los siguientes iconos para que la PWA funcione correctamente:
+Archivos en este directorio (generados o incluidos en el repo):
 
-## Iconos requeridos:
+- `icon-192x192.png` — Android
+- `icon-512x512.png` — Android / splash
+- `apple-touch-icon.png` — iOS (180×180)
+- `favicon.ico` — navegador
 
-1. **icon-192x192.png** - Icono de 192x192 píxeles para Android
-2. **icon-512x512.png** - Icono de 512x512 píxeles para Android
-3. **apple-touch-icon.png** - Icono de 180x180 píxeles para iOS
-4. **favicon.ico** - Favicon para navegadores (opcional)
+Regenerar desde la raíz del proyecto:
 
-## Cómo generar los iconos:
+```bash
+pip install pillow
+python scripts/generate_pwa_icons.py
+```
 
-Puedes usar herramientas como:
-- https://realfavicongenerator.net/
-- https://www.favicon-generator.org/
-- https://www.pwabuilder.com/imageGenerator
+Colores Michelandia: fondo `#4db8eb`, acento `#f5c518`.
 
-Sube tu logo o imagen base y genera los diferentes tamaños.
-
-## Colores sugeridos:
-
-- **Color de tema**: #1a1a2e (azul oscuro)
-- **Color de fondo**: #1a1a2e (azul oscuro)
