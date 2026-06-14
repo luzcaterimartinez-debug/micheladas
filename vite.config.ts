@@ -39,9 +39,9 @@ export default defineConfig({
         routes: [
           {
             src: "/api(?:/(.*))?",
-            dest: "/api/$1"
-          }
-        ]
+            dest: "/api/index",
+          },
+        ],
       }
     }
   },

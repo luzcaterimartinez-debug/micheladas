@@ -1,6 +1,6 @@
 {
   "runtime": "python3.12",
-  "handler": "[...path].py",
+  "handler": "index.py",
   "launcherType": "Python",
   "memory": 1024,
   "maxDuration": 30

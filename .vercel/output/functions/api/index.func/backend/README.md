@@ -84,7 +84,8 @@ Desde la raíz del proyecto: `npm run test` (frontend) y `npm run test:backend` 
 
 ## Producción (Vercel)
 
-El frontend (TanStack/Nitro) y el API Python (`api/[...path].py`) se despliegan juntos.
+El frontend (TanStack/Nitro) y el API Python (`api/index.py`) se despliegan juntos.
+El build ejecuta `postbuild` que empaqueta la función en `.vercel/output/functions/api/index.func`.
 
 **Variables obligatorias en Vercel → Settings → Environment Variables:**
 

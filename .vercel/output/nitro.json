@@ -1,5 +1,5 @@
 {
-  "date": "2026-06-14T15:56:16.682Z",
+  "date": "2026-06-14T16:02:26.734Z",
   "preset": "vercel",
   "framework": {
     "name": "nitro",
@@ -22,7 +22,7 @@
         "routes": [
           {
             "src": "/api(?:/(.*))?",
-            "dest": "/api/$1"
+            "dest": "/api/index"
           }
         ]
       },
