@@ -205,7 +205,11 @@ export const ADDITIONS: Addition[] = [
 ];
 
 const DEFAULT_INVENTORY: InventoryItem[] = [
+  { key: "ginger", name: "Ginger ale", stock: 48, unit: "pz", minStock: 12 },
+  { key: "soda", name: "Soda", stock: 48, unit: "pz", minStock: 12 },
   { key: "cerveza", name: "Cerveza (botellas)", stock: 96, unit: "pz", minStock: 10 },
+  { key: "cola_pola", name: "Cola y pola", stock: 48, unit: "pz", minStock: 12 },
+  { key: "smirnoff", name: "Smirnoff", stock: 24, unit: "pz", minStock: 6 },
   { key: "clamato", name: "Clamato", stock: 8, unit: "L", minStock: 2 },
   { key: "limon", name: "Limón", stock: 100, unit: "pz", minStock: 15 },
   { key: "chamoy", name: "Chamoy", stock: 3, unit: "L", minStock: 1 },

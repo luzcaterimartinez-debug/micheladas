@@ -10,8 +10,14 @@ from app.database import fetch_all, fetch_one, get_db
 from app.models.inventario import InventarioOut, InventarioUpdate
 from app.models.pos import OrderItemIn
 
+MICHELADA_BASES: tuple[str, ...] = ("ginger", "soda", "cerveza", "cola_pola", "smirnoff")
+
 DEFAULT_ITEMS: list[dict[str, Any]] = [
+    {"clave": "ginger", "nombre": "Ginger ale", "stock": 48, "unidad": "pz", "minimo": 12},
+    {"clave": "soda", "nombre": "Soda", "stock": 48, "unidad": "pz", "minimo": 12},
     {"clave": "cerveza", "nombre": "Cerveza (botellas)", "stock": 96, "unidad": "pz", "minimo": 10},
+    {"clave": "cola_pola", "nombre": "Cola y pola", "stock": 48, "unidad": "pz", "minimo": 12},
+    {"clave": "smirnoff", "nombre": "Smirnoff", "stock": 24, "unidad": "pz", "minimo": 6},
     {"clave": "clamato", "nombre": "Clamato", "stock": 8, "unidad": "L", "minimo": 2},
     {"clave": "limon", "nombre": "Limón", "stock": 100, "unidad": "pz", "minimo": 15},
     {"clave": "chamoy", "nombre": "Chamoy", "stock": 3, "unidad": "L", "minimo": 1},
@@ -107,8 +113,18 @@ def delete_inventario_item(clave: str) -> None:
     invalidate_inventario_cache()
 
 
+def _bebida_base_from_producto_id(producto_id: str) -> str | None:
+    for base in MICHELADA_BASES:
+        if producto_id.endswith(f"_{base}"):
+            return base
+    return None
+
+
 def _consumo_por_producto(producto_id: str) -> list[tuple[str, float]]:
-    base = [("cerveza", 1.0), ("limon", 2.0)]
+    bebida = _bebida_base_from_producto_id(producto_id)
+    if bebida:
+        return [(bebida, 1.0), ("limon", 2.0)]
+    base: list[tuple[str, float]] = [("cerveza", 1.0), ("limon", 2.0)]
     if producto_id.startswith("cubana"):
         base.append(("clamato", 0.2))
     return base

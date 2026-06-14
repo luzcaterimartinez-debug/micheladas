@@ -19,6 +19,21 @@ def test_consumo_por_producto_cubana() -> None:
     assert "clamato" in keys
 
 
+def test_consumo_por_producto_michelandia_bases() -> None:
+    for pid, bebida in (
+        ("tradicional_ginger", "ginger"),
+        ("lulo_soda", "soda"),
+        ("maracumazana_cerveza", "cerveza"),
+        ("frutos_rojos_cola_pola", "cola_pola"),
+        ("blueberry_mango_smirnoff", "smirnoff"),
+    ):
+        lines = _consumo_por_producto(pid)
+        keys = {k: q for k, q in lines}
+        assert keys[bebida] == 1.0
+        assert keys["limon"] == 2.0
+        assert "cerveza" not in keys or bebida == "cerveza"
+
+
 def test_consumo_tuples_from_models() -> None:
     consumo = [
         ConsumoLine(clave="cerveza", cantidad=2),

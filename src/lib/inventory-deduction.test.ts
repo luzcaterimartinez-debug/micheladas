@@ -99,4 +99,52 @@ describe("buildOrderDeductions", () => {
     expect(totals.cerveza).toBe(1);
     expect(totals.clamato).toBeCloseTo(0.2);
   });
+
+  it("descuenta la base Michelandia (ginger, soda, etc.)", () => {
+    const michelandia: MicheladaType[] = [
+      {
+        id: "tradicional_ginger",
+        name: "Tradicional · Ginger",
+        price: 10000,
+        description: "",
+        faseOpciones: [],
+        consumo: [
+          { clave: "ginger", cantidad: 1 },
+          { clave: "limon", cantidad: 2 },
+        ],
+      },
+      {
+        id: "lulo_soda",
+        name: "Lulo · Soda",
+        price: 14000,
+        description: "",
+        faseOpciones: [],
+      },
+    ];
+    const cart: OrderItem[] = [
+      {
+        id: "1",
+        micheladaId: "tradicional_ginger",
+        micheladaName: "Tradicional · Ginger",
+        basePrice: 10000,
+        selectedToppings: [],
+        additions: [],
+        total: 10000,
+      },
+      {
+        id: "2",
+        micheladaId: "lulo_soda",
+        micheladaName: "Lulo · Soda",
+        basePrice: 14000,
+        selectedToppings: [],
+        additions: [],
+        total: 14000,
+      },
+    ];
+    const totals = buildOrderDeductions(cart, adiciones, michelandia, []);
+    expect(totals.ginger).toBe(1);
+    expect(totals.soda).toBe(1);
+    expect(totals.limon).toBe(4);
+    expect(totals.cerveza).toBeUndefined();
+  });
 });

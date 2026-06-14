@@ -6,7 +6,23 @@ function add(totals: Record<string, number>, key: string, qty: number) {
   totals[key] = (totals[key] ?? 0) + qty;
 }
 
+const MICHELADA_BASES = ["ginger", "soda", "cerveza", "cola_pola", "smirnoff"] as const;
+
+function bebidaBaseFromProductoId(productoId: string): string | null {
+  for (const base of MICHELADA_BASES) {
+    if (productoId.endsWith(`_${base}`)) return base;
+  }
+  return null;
+}
+
 function defaultProductConsumo(productoId: string): ConsumoLine[] {
+  const bebida = bebidaBaseFromProductoId(productoId);
+  if (bebida) {
+    return [
+      { clave: bebida, cantidad: 1 },
+      { clave: "limon", cantidad: 2 },
+    ];
+  }
   const lines: ConsumoLine[] = [
     { clave: "cerveza", cantidad: 1 },
     { clave: "limon", cantidad: 2 },

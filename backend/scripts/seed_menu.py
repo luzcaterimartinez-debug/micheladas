@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import get_db
+from app.services.inventario import ensure_inventario_seeded, sync_consumo_producto
 
 PASOS = json.dumps(["notas"])
 
@@ -190,8 +191,13 @@ def main() -> None:
                 (aid, nombre, precio, stock, qty, orden),
             )
 
+        ensure_inventario_seeded(cursor)
+        cursor.execute("SELECT id FROM menu_productos WHERE activo = 1")
+        for row in cursor.fetchall():
+            sync_consumo_producto(cursor, row["id"])
+
     print(
-        f"Menú Michelandia: {productos} productos, {len(ADICIONES)} adiciones."
+        f"Menú Michelandia: {productos} productos, {len(ADICIONES)} adiciones, consumo sincronizado."
     )
 
 
