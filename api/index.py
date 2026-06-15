@@ -25,11 +25,4 @@ except Exception as boot_error:
     async def boot_error_handler(full_path: str) -> JSONResponse:
         return JSONResponse(status_code=503, content=_boot_detail)
 
-    @app.get("/api/debug")
-async def debug():
-    return {
-        "app_type": str(type(app))
-    }
-
 handler = Mangum(app, lifespan="off")
-
