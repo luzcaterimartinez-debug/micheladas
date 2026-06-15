@@ -1,3 +1,5 @@
+import base64
+import json
 import os
 import sys
 import traceback
@@ -15,6 +17,7 @@ else:
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from starlette.testclient import TestClient
 
 try:
     from app.main import app
@@ -35,3 +38,58 @@ except Exception as boot_error:
                 "traceback": _boot_tb,
             },
         )
+
+_client: TestClient | None = None
+
+
+def _get_client() -> TestClient:
+    global _client
+    if _client is None:
+        _client = TestClient(app, raise_server_exceptions=False)
+    return _client
+
+
+def handler(event: dict, context) -> dict:
+    """Entrypoint Vercel — event["body"] es JSON con method, path, headers, body."""
+    try:
+        payload = json.loads(event["body"])
+    except (KeyError, TypeError, json.JSONDecodeError) as exc:
+        return {
+            "statusCode": 500,
+            "headers": {"content-type": "application/json"},
+            "body": json.dumps({"detail": "Evento inválido", "error": str(exc)}),
+        }
+
+    method = str(payload.get("method", "GET")).upper()
+    path = str(payload.get("path", "/"))
+    headers = payload.get("headers") or {}
+
+    raw_body = payload.get("body", "")
+    if payload.get("encoding") == "base64" and raw_body:
+        content = base64.b64decode(raw_body)
+    elif isinstance(raw_body, str):
+        content = raw_body.encode("utf-8") if raw_body else b""
+    elif isinstance(raw_body, (bytes, bytearray)):
+        content = bytes(raw_body)
+    else:
+        content = b""
+
+    try:
+        response = _get_client().request(method, path, headers=headers, content=content)
+    except Exception as exc:
+        return {
+            "statusCode": 500,
+            "headers": {"content-type": "application/json"},
+            "body": json.dumps({"detail": "Error en la API", "error": str(exc)}),
+        }
+
+    out: dict = {
+        "statusCode": response.status_code,
+        "headers": dict(response.headers),
+    }
+    try:
+        out["body"] = response.content.decode("utf-8")
+    except UnicodeDecodeError:
+        out["body"] = base64.b64encode(response.content).decode("ascii")
+        out["encoding"] = "base64"
+    return out
