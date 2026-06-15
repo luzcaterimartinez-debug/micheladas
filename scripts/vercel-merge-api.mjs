@@ -85,15 +85,18 @@ fs.mkdirSync(funcDir, { recursive: true });
 
 fs.copyFileSync(path.join(root, "api/index.py"), path.join(funcDir, "index.py"));
 fs.copyFileSync(path.join(root, "api/requirements.txt"), path.join(funcDir, "requirements.txt"));
+if (fs.existsSync(path.join(root, "pyproject.toml"))) {
+  fs.copyFileSync(path.join(root, "pyproject.toml"), path.join(funcDir, "pyproject.toml"));
+}
 copyRecursive(path.join(root, "backend"), path.join(funcDir, "backend"));
 
 fs.writeFileSync(
   path.join(funcDir, ".vc-config.json"),
   `${JSON.stringify(
     {
+      handler: "index.app",
       runtime: "python3.12",
-      handler: "index.py",
-      launcherType: "Python",
+      environment: {},
       memory: 1024,
       maxDuration: 30,
     },
@@ -103,5 +106,11 @@ fs.writeFileSync(
 );
 
 patchConfigRoutes();
+
+const indexPy = path.join(funcDir, "index.py");
+if (!fs.existsSync(indexPy)) {
+  console.error("ERROR: no se generó api/index.func/index.py");
+  process.exit(1);
+}
 
 console.log("API Python empaquetada en", path.relative(root, funcDir));

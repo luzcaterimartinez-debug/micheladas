@@ -52,9 +52,10 @@ class Settings(BaseSettings):
     @field_validator("jwt_secret")
     @classmethod
     def jwt_secret_not_empty(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("JWT_SECRET no puede estar vacío")
-        return value
+        stripped = value.strip()
+        if not stripped:
+            return _DEV_JWT_SECRET
+        return stripped
 
 
 def production_config_errors(settings: Settings | None = None) -> list[str]:

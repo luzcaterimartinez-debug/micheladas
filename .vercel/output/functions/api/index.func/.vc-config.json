@@ -1,7 +1,7 @@
 {
+  "handler": "index.app",
   "runtime": "python3.12",
-  "handler": "index.py",
-  "launcherType": "Python",
+  "environment": {},
   "memory": 1024,
   "maxDuration": 30
 }
