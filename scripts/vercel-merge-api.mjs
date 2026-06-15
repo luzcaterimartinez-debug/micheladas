@@ -144,7 +144,7 @@ fs.writeFileSync(
   path.join(funcDir, ".vc-config.json"),
   `${JSON.stringify(
     {
-      handler: "index.app",
+      handler: "index.handler",
       runtime: "python3.12",
       environment: {},
       memory: 1024,

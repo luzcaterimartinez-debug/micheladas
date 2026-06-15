@@ -2,18 +2,16 @@ import os
 import sys
 import traceback
 
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 
-app = FastAPI(title="Micheladas API")
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from mangum import Mangum
 
 try:
-    from app.main import app as backend_app
-
-    app.mount("/", backend_app)
+    from app.main import app
 except Exception as boot_error:
+    app = FastAPI(title="Micheladas API (boot error)")
     _boot_detail = {
         "detail": "Error al iniciar la API",
         "error": str(boot_error),
@@ -26,3 +24,5 @@ except Exception as boot_error:
     )
     async def boot_error_handler(full_path: str) -> JSONResponse:
         return JSONResponse(status_code=503, content=_boot_detail)
+
+handler = Mangum(app, lifespan="off")
