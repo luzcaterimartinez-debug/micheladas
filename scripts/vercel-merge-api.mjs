@@ -135,9 +135,17 @@ fs.mkdirSync(funcDir, { recursive: true });
 
 fs.copyFileSync(path.join(root, "api/index.py"), path.join(funcDir, "index.py"));
 fs.copyFileSync(path.join(root, "api/requirements.txt"), path.join(funcDir, "requirements.txt"));
-if (fs.existsSync(path.join(root, "pyproject.toml"))) {
-  fs.copyFileSync(path.join(root, "pyproject.toml"), path.join(funcDir, "pyproject.toml"));
-}
+fs.writeFileSync(
+  path.join(funcDir, "pyproject.toml"),
+  `[project]
+name = "micheladas-api"
+version = "1.0.0"
+requires-python = ">=3.12"
+
+[tool.vercel]
+entrypoint = "index:handler"
+`,
+);
 copyRecursive(path.join(root, "backend"), path.join(funcDir, "backend"));
 
 fs.writeFileSync(
