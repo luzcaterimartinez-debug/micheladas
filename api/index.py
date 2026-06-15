@@ -1,56 +1,64 @@
 import base64
 import json
-import os
-import sys
 import traceback
 
-# En el bundle de Vercel, backend/ está junto a index.py.
-# En desarrollo local (api/index.py), backend/ está en la raíz del proyecto.
-_here = os.path.dirname(os.path.abspath(__file__))
-_bundle_backend = os.path.join(_here, "backend")
-_source_backend = os.path.join(os.path.dirname(_here), "backend")
+_app = None
+_client = None
 
-if os.path.isdir(_bundle_backend):
-    sys.path.insert(0, _bundle_backend)
-else:
-    sys.path.insert(0, _source_backend)
 
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from starlette.testclient import TestClient
+def _load_app():
+    global _app
+    if _app is not None:
+        return _app
 
-try:
-    from app.main import app
-except Exception as boot_error:
-    _boot_tb = traceback.format_exc()
-    app = FastAPI(title="Micheladas API — boot error")
+    import os
+    import sys
 
-    @app.api_route(
-        "/{full_path:path}",
-        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
-    )
-    async def boot_error_handler(full_path: str) -> JSONResponse:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "detail": "Error al iniciar la API",
-                "error": str(boot_error),
-                "traceback": _boot_tb,
-            },
+    here = os.path.dirname(os.path.abspath(__file__))
+    bundle_backend = os.path.join(here, "backend")
+    source_backend = os.path.join(os.path.dirname(here), "backend")
+    sys.path.insert(0, bundle_backend if os.path.isdir(bundle_backend) else source_backend)
+
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse
+
+    try:
+        from app.main import app as fastapi_app
+        _app = fastapi_app
+        return _app
+    except Exception as boot_error:
+        boot_tb = traceback.format_exc()
+        fallback = FastAPI(title="Micheladas API — boot error")
+
+        @fallback.api_route(
+            "/{full_path:path}",
+            methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
         )
+        async def boot_error_handler(full_path: str) -> JSONResponse:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": "Error al iniciar la API",
+                    "error": str(boot_error),
+                    "traceback": boot_tb,
+                },
+            )
 
-_client: TestClient | None = None
+        _app = fallback
+        return _app
 
 
-def _get_client() -> TestClient:
+def _get_client():
     global _client
     if _client is None:
-        _client = TestClient(app, raise_server_exceptions=False)
+        from starlette.testclient import TestClient
+
+        _client = TestClient(_load_app(), raise_server_exceptions=False)
     return _client
 
 
-def handler(event: dict, context) -> dict:
-    """Entrypoint Vercel — event["body"] es JSON con method, path, headers, body."""
+def handler(event, context):
+    """Entrypoint Vercel — event['body'] es JSON con method, path, headers, body."""
     try:
         payload = json.loads(event["body"])
     except (KeyError, TypeError, json.JSONDecodeError) as exc:
@@ -80,10 +88,16 @@ def handler(event: dict, context) -> dict:
         return {
             "statusCode": 500,
             "headers": {"content-type": "application/json"},
-            "body": json.dumps({"detail": "Error en la API", "error": str(exc)}),
+            "body": json.dumps(
+                {
+                    "detail": "Error en la API",
+                    "error": str(exc),
+                    "traceback": traceback.format_exc(),
+                }
+            ),
         }
 
-    out: dict = {
+    out = {
         "statusCode": response.status_code,
         "headers": dict(response.headers),
     }
