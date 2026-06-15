@@ -167,8 +167,8 @@ patchConfigRoutes();
 installPythonDeps(funcDir);
 
 const indexSource = fs.readFileSync(path.join(funcDir, "index.py"), "utf8");
-if (!indexSource.includes("def handler(") || !indexSource.includes("TestClient")) {
-  console.error("ERROR: api/index.py debe definir def handler() con adaptador Vercel.");
+if (!indexSource.includes("class handler(BaseHTTPRequestHandler)") || !indexSource.includes("TestClient")) {
+  console.error("ERROR: api/index.py debe definir class handler(BaseHTTPRequestHandler).");
   process.exit(1);
 }
 

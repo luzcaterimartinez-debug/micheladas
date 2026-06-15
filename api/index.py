@@ -1,6 +1,7 @@
 import base64
 import json
 import traceback
+from http.server import BaseHTTPRequestHandler
 
 _app = None
 _client = None
@@ -57,53 +58,71 @@ def _get_client():
     return _client
 
 
-def handler(event, context):
-    """Entrypoint Vercel — event['body'] es JSON con method, path, headers, body."""
-    try:
-        payload = json.loads(event["body"])
-    except (KeyError, TypeError, json.JSONDecodeError) as exc:
-        return {
-            "statusCode": 500,
-            "headers": {"content-type": "application/json"},
-            "body": json.dumps({"detail": "Evento inválido", "error": str(exc)}),
-        }
+def _json_response(handler: BaseHTTPRequestHandler, status: int, payload: dict) -> None:
+    body = json.dumps(payload).encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("content-type", "application/json")
+    handler.send_header("content-length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
 
-    method = str(payload.get("method", "GET")).upper()
-    path = str(payload.get("path", "/"))
-    headers = payload.get("headers") or {}
 
-    raw_body = payload.get("body", "")
-    if payload.get("encoding") == "base64" and raw_body:
-        content = base64.b64decode(raw_body)
-    elif isinstance(raw_body, str):
-        content = raw_body.encode("utf-8") if raw_body else b""
-    elif isinstance(raw_body, (bytes, bytearray)):
-        content = bytes(raw_body)
-    else:
-        content = b""
+class handler(BaseHTTPRequestHandler):
+    """Entrypoint Vercel — patrón oficial BaseHTTPRequestHandler."""
 
-    try:
-        response = _get_client().request(method, path, headers=headers, content=content)
-    except Exception as exc:
-        return {
-            "statusCode": 500,
-            "headers": {"content-type": "application/json"},
-            "body": json.dumps(
+    def log_message(self, format: str, *args) -> None:
+        return
+
+    def do_GET(self) -> None:
+        self._dispatch()
+
+    def do_POST(self) -> None:
+        self._dispatch()
+
+    def do_PUT(self) -> None:
+        self._dispatch()
+
+    def do_PATCH(self) -> None:
+        self._dispatch()
+
+    def do_DELETE(self) -> None:
+        self._dispatch()
+
+    def do_OPTIONS(self) -> None:
+        self._dispatch()
+
+    def do_HEAD(self) -> None:
+        self._dispatch()
+
+    def _dispatch(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            raw_body = self.rfile.read(length) if length > 0 else b""
+
+            response = _get_client().request(
+                self.command,
+                self.path,
+                headers=dict(self.headers),
+                content=raw_body,
+            )
+
+            body = response.content
+            self.send_response(response.status_code)
+            for key, value in response.headers.items():
+                if key.lower() == "content-length":
+                    continue
+                self.send_header(key, value)
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body)
+        except Exception as exc:
+            _json_response(
+                self,
+                500,
                 {
                     "detail": "Error en la API",
                     "error": str(exc),
                     "traceback": traceback.format_exc(),
-                }
-            ),
-        }
-
-    out = {
-        "statusCode": response.status_code,
-        "headers": dict(response.headers),
-    }
-    try:
-        out["body"] = response.content.decode("utf-8")
-    except UnicodeDecodeError:
-        out["body"] = base64.b64encode(response.content).decode("ascii")
-        out["encoding"] = "base64"
-    return out
+                },
+            )
