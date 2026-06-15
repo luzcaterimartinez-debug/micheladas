@@ -143,7 +143,7 @@ version = "1.0.0"
 requires-python = ">=3.12"
 
 [tool.vercel]
-entrypoint = "index:handler"
+entrypoint = "index:app"
 `,
 );
 copyRecursive(path.join(root, "backend"), path.join(funcDir, "backend"));
@@ -152,7 +152,7 @@ fs.writeFileSync(
   path.join(funcDir, ".vc-config.json"),
   `${JSON.stringify(
     {
-      handler: "index.handler",
+      handler: "index.app",
       runtime: "python3.12",
       environment: {},
       memory: 1024,
@@ -167,8 +167,8 @@ patchConfigRoutes();
 installPythonDeps(funcDir);
 
 const indexSource = fs.readFileSync(path.join(funcDir, "index.py"), "utf8");
-if (!indexSource.includes("def handler(") || !indexSource.includes("Mangum")) {
-  console.error("ERROR: api/index.py debe definir def handler() con Mangum.");
+if (!/\bapp\s*=/.test(indexSource) || indexSource.includes("Mangum")) {
+  console.error("ERROR: api/index.py debe exportar `app` (ASGI) sin Mangum.");
   process.exit(1);
 }
 

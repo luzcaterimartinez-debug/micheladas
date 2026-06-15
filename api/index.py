@@ -15,15 +15,14 @@ else:
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from mangum import Mangum
 
 try:
-    from app.main import app as asgi_app
+    from app.main import app
 except Exception as boot_error:
     _boot_tb = traceback.format_exc()
-    asgi_app = FastAPI(title="Micheladas API — boot error")
+    app = FastAPI(title="Micheladas API — boot error")
 
-    @asgi_app.api_route(
+    @app.api_route(
         "/{full_path:path}",
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     )
@@ -36,10 +35,3 @@ except Exception as boot_error:
                 "traceback": _boot_tb,
             },
         )
-
-_mangum = Mangum(asgi_app, lifespan="off")
-
-
-def handler(event, context):
-    """Entrypoint Lambda/Vercel — NO exportar `app` en este módulo."""
-    return _mangum(event, context)
