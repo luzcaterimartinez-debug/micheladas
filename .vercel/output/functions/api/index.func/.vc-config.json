@@ -1,7 +1,0 @@
-{
-  "handler": "index.handler",
-  "runtime": "python3.12",
-  "environment": {},
-  "memory": 1024,
-  "maxDuration": 30
-}
