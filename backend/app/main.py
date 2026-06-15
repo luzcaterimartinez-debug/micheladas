@@ -39,7 +39,7 @@ app.include_router(caja.router)
 
 @app.middleware("http")
 async def guard_production_config(request: Request, call_next):
-    if request.url.path == "/api/health":
+    if request.url.path in ("/api/health", "/api/ping", "/api/status"):
         return await call_next(request)
     config_errors = production_config_errors(settings)
     if config_errors:
@@ -48,6 +48,34 @@ async def guard_production_config(request: Request, call_next):
             content={"detail": "Configuración de producción incompleta", "config_errors": config_errors},
         )
     return await call_next(request)
+
+
+@app.get("/api/ping")
+def ping() -> dict[str, str | bool]:
+    """Smoke test — no requiere MySQL ni JWT."""
+    return {"ok": True, "api": "micheladas", "env": settings.app_env}
+
+
+@app.get("/api/status")
+def status(response: Response) -> dict[str, str | list[str] | bool]:
+    """Diagnóstico: config + MySQL (sin secretos)."""
+    config_errors = production_config_errors(settings)
+    db_ok, db_error = check_database()
+    payload: dict[str, str | list[str] | bool] = {
+        "api": "micheladas",
+        "env": settings.app_env,
+        "config_ok": len(config_errors) == 0,
+        "database": "ok" if db_ok else "error",
+        "mysql_host": settings.mysql_host,
+        "mysql_database": settings.mysql_database,
+    }
+    if config_errors:
+        payload["config_errors"] = config_errors
+        response.status_code = 503
+    elif not db_ok:
+        payload["database_error"] = db_error or "sin detalle"
+        response.status_code = 503
+    return payload
 
 
 @app.get("/api/health")
@@ -74,6 +102,8 @@ def health(response: Response) -> dict[str, str | list[str]]:
     }
     if db_error and not settings.is_production:
         payload["database_error"] = db_error
+    elif db_error and settings.is_production:
+        payload["mysql_host"] = settings.mysql_host
     if not db_ok:
         response.status_code = 503
     return payload

@@ -2,28 +2,28 @@ import os
 import sys
 import traceback
 
-# In the Vercel bundle, backend/ is placed next to index.py in the function root.
-# In local dev (api/index.py), backend/ is one level up at the project root.
-# We try the bundle layout first, then fall back to the source layout.
+# En el bundle de Vercel, backend/ está junto a index.py.
+# En desarrollo local (api/index.py), backend/ está en la raíz del proyecto.
 _here = os.path.dirname(os.path.abspath(__file__))
 _bundle_backend = os.path.join(_here, "backend")
 _source_backend = os.path.join(os.path.dirname(_here), "backend")
 
 if os.path.isdir(_bundle_backend):
-    sys.path.insert(0, _bundle_backend)   # Vercel bundle layout: backend/ next to index.py
+    sys.path.insert(0, _bundle_backend)
 else:
-    sys.path.insert(0, _source_backend)   # Source layout: api/../backend/
+    sys.path.insert(0, _source_backend)
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from mangum import Mangum
 
 try:
-    from app.main import app  # 'app' is the name Vercel's .vc-config.json handler expects
+    from app.main import app as asgi_app
 except Exception as boot_error:
     _boot_tb = traceback.format_exc()
-    app = FastAPI(title="Micheladas API — boot error")
+    asgi_app = FastAPI(title="Micheladas API — boot error")
 
-    @app.api_route(
+    @asgi_app.api_route(
         "/{full_path:path}",
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     )
@@ -36,3 +36,10 @@ except Exception as boot_error:
                 "traceback": _boot_tb,
             },
         )
+
+_mangum = Mangum(asgi_app, lifespan="off")
+
+
+def handler(event, context):
+    """Entrypoint Lambda/Vercel — NO exportar `app` en este módulo."""
+    return _mangum(event, context)

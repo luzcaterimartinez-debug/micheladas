@@ -166,6 +166,12 @@ fs.writeFileSync(
 patchConfigRoutes();
 installPythonDeps(funcDir);
 
+const indexSource = fs.readFileSync(path.join(funcDir, "index.py"), "utf8");
+if (!indexSource.includes("def handler(") || !indexSource.includes("Mangum")) {
+  console.error("ERROR: api/index.py debe definir def handler() con Mangum.");
+  process.exit(1);
+}
+
 const indexPy = path.join(funcDir, "index.py");
 if (!fs.existsSync(indexPy)) {
   console.error("ERROR: no se generó api/index.func/index.py");
