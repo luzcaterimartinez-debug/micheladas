@@ -1,10 +1,14 @@
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import logging
 
 from app.config import get_settings, production_config_errors
 from app.database import check_database
 from app.routers import admin, admin_menu, auth, caja, comandas, inventario, menu, mesas, nomina, reportes
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Micheladas API",
@@ -59,6 +63,10 @@ def health(response: Response) -> dict[str, str | list[str]]:
         }
 
     db_ok, db_error = check_database()
+    if db_ok:
+        logger.info("Health check: base de datos conectada (%s)", settings.mysql_database)
+    else:
+        logger.warning("Health check: base de datos no disponible (%s)", settings.mysql_database)
     payload: dict[str, str | list[str]] = {
         "status": "ok" if db_ok else "degraded",
         "database": "ok" if db_ok else "error",
