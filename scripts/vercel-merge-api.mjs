@@ -93,7 +93,7 @@ function installPythonDeps(funcDir) {
   execSync([py, ...args].join(" "), { cwd: funcDir, stdio: "inherit" });
 
   if (process.platform === "linux") {
-    execSync([py, "-c", "import fastapi; print('fastapi', fastapi.__version__)"].join(" "), {
+    execSync(`${py} -c "import fastapi; print('fastapi', fastapi.__version__)"`, {
       cwd: funcDir,
       stdio: "inherit",
     });
