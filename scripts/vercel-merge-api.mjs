@@ -54,6 +54,56 @@ function copyRecursive(src, dest) {
   }
 }
 
+function pythonCmd() {
+  for (const cmd of ["python3", "python"]) {
+    try {
+      execSync(`${cmd} --version`, { stdio: "ignore" });
+      return cmd;
+    } catch {
+      // try next
+    }
+  }
+  throw new Error("No se encontró python3 ni python en PATH");
+}
+
+function installPythonDeps(funcDir) {
+  const requirements = path.join(funcDir, "requirements.txt");
+  if (!fs.existsSync(requirements)) {
+    throw new Error(`Falta requirements.txt en ${funcDir}`);
+  }
+
+  const py = pythonCmd();
+  const args = ["-m", "pip", "install", "-r", "requirements.txt", "-t", ".", "--upgrade", "--no-cache-dir"];
+
+  // Empaquetar wheels Linux para Lambda cuando el build corre fuera de Vercel/Linux
+  if (process.platform !== "linux") {
+    args.push(
+      "--platform",
+      "manylinux2014_x86_64",
+      "--python-version",
+      "3.12",
+      "--implementation",
+      "cp",
+      "--only-binary",
+      ":all:",
+    );
+  }
+
+  console.log(`Instalando dependencias Python en ${path.relative(root, funcDir)} ...`);
+  execSync([py, ...args].join(" "), { cwd: funcDir, stdio: "inherit" });
+
+  if (process.platform === "linux") {
+    execSync([py, "-c", "import fastapi; print('fastapi', fastapi.__version__)"].join(" "), {
+      cwd: funcDir,
+      stdio: "inherit",
+    });
+  } else if (!fs.existsSync(path.join(funcDir, "fastapi"))) {
+    throw new Error("pip install no generó el paquete fastapi en el bundle");
+  } else {
+    console.log("Dependencias Python empaquetadas (wheels Linux para Lambda)");
+  }
+}
+
 function patchConfigRoutes() {
   const configPath = path.join(outputDir, "config.json");
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
@@ -106,6 +156,7 @@ fs.writeFileSync(
 );
 
 patchConfigRoutes();
+installPythonDeps(funcDir);
 
 const indexPy = path.join(funcDir, "index.py");
 if (!fs.existsSync(indexPy)) {

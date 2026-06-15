@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import logging
 from typing import Any, Generator
 
 import mysql.connector
@@ -7,11 +8,20 @@ from mysql.connector.cursor import MySQLCursorDict
 
 from app.config import get_settings
 
+logger = logging.getLogger(__name__)
+
 _pool: pooling.MySQLConnectionPool | None = None
+
+
+def _connection_target() -> str:
+    settings = get_settings()
+    return f"{settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}"
 
 
 def _build_pool() -> pooling.MySQLConnectionPool:
     settings = get_settings()
+    target = _connection_target()
+    logger.info("Inicializando pool MySQL → %s (usuario=%s)", target, settings.mysql_user)
     return pooling.MySQLConnectionPool(
         pool_name="micheladas_pool",
         pool_size=settings.mysql_pool_size,
@@ -39,6 +49,7 @@ def get_connection() -> MySQLConnection:
 
 def check_database() -> tuple[bool, str | None]:
     """Ping MySQL; returns (ok, error_message)."""
+    target = _connection_target()
     try:
         conn = get_connection()
         try:
@@ -46,10 +57,12 @@ def check_database() -> tuple[bool, str | None]:
             cursor.execute("SELECT 1")
             cursor.fetchone()
             cursor.close()
+            logger.info("Conexión MySQL OK → %s", target)
             return True, None
         finally:
             conn.close()
     except Exception as exc:
+        logger.error("Conexión MySQL falló → %s — %s", target, exc)
         return False, str(exc)
 
 
