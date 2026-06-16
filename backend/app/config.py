@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     mysql_user: str = "u659323332_micheladas"
     mysql_password: str = "Micheladas123*"
     mysql_database: str = "u659323332_micheladas"
-    mysql_pool_size: int = 5
+    mysql_pool_size: int = 2
     mysql_connection_timeout: int = 10
 
     query_cache_ttl_seconds: int = 30

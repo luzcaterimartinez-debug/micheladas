@@ -2,7 +2,7 @@ import type { Fase, FaseOpcion } from "@/lib/fases";
 import type { Addition, MicheladaType } from "@/lib/micheladas-store";
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
 import { getCachedMenu, setCachedMenu } from "@/lib/offline/local-cache";
-import { isAppOnline } from "@/lib/offline/network";
+import { markApiFailureFromStatus, shouldSyncWithServer } from "@/lib/offline/network";
 import {
   getFallbackMenu,
   normalizeMenuFromApi,
@@ -111,7 +111,7 @@ export async function fetchMenu(): Promise<MenuData> {
   const session = getStoredSession();
   if (!session) return getFallbackMenu();
 
-  if (!isAppOnline()) {
+  if (!shouldSyncWithServer()) {
     return getCachedMenu(getFallbackMenu());
   }
 
@@ -121,6 +121,7 @@ export async function fetchMenu(): Promise<MenuData> {
     });
 
     if (!res.ok) {
+      markApiFailureFromStatus(res.status);
       console.warn("Menú API:", parseApiError(await res.json().catch(() => ({})), res.status));
       return getCachedMenu(getFallbackMenu());
     }

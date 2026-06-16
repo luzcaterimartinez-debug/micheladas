@@ -1,3 +1,4 @@
+import mysql.connector
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -17,6 +18,15 @@ app = FastAPI(
 )
 
 settings = get_settings()
+
+
+@app.exception_handler(mysql.connector.Error)
+async def mysql_error_handler(_request: Request, exc: mysql.connector.Error) -> JSONResponse:
+    logger.error("MySQL error: %s", exc)
+    payload: dict[str, str] = {"detail": "Base de datos no disponible"}
+    if not settings.is_production:
+        payload["database_error"] = str(exc)
+    return JSONResponse(status_code=503, content=payload)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

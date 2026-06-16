@@ -1,3 +1,5 @@
+import { markApiFailureFromStatus } from "@/lib/offline/network";
+
 export type Rol = "admin" | "mesero" | "cocinero";
 
 export type AuthUser = {
@@ -69,6 +71,7 @@ export async function login(email: string, password: string): Promise<AuthSessio
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
+    markApiFailureFromStatus(res.status);
     throw new Error(parseApiError(data, res.status));
   }
 
@@ -133,7 +136,10 @@ export function parseApiError(data: unknown, status: number): string {
     }
   }
   if (status === 422) return "Datos inválidos. Revisa el correo y la contraseña.";
-  return "No se pudo iniciar sesión";
+  if (status === 503) return "Servidor no disponible (base de datos). Intenta más tarde.";
+  if (status >= 500) return "Error del servidor. Intenta más tarde.";
+  if (status === 401) return "Sesión expirada. Vuelve a iniciar sesión.";
+  return "No se pudo completar la solicitud";
 }
 
 export const ROL_LABELS: Record<Rol, string> = {

@@ -1,5 +1,13 @@
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
+import { markApiFailureFromStatus } from "@/lib/offline/network";
 import type { Comanda, Mesa, OrderItem } from "@/lib/micheladas-store";
+
+function assertOk(res: Response, data: unknown): asserts res is Response & { ok: true } {
+  if (!res.ok) {
+    markApiFailureFromStatus(res.status);
+    throw new Error(parseApiError(data, res.status));
+  }
+}
 
 function authHeaders(): HeadersInit {
   const session = getStoredSession();
@@ -63,7 +71,7 @@ export function mapComanda(raw: Record<string, unknown>): Comanda {
 export async function fetchMesas(): Promise<Mesa[]> {
   const res = await fetch(`${getApiUrl()}/api/mesas`, { headers: authHeaders() });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertOk(res, data);
   return (data as Record<string, unknown>[]).map(mapMesa);
 }
 
@@ -73,7 +81,7 @@ export async function marcarMesaAtendidaApi(mesaId: string): Promise<Mesa> {
     headers: authHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertOk(res, data);
   return mapMesa(data as Record<string, unknown>);
 }
 
@@ -90,7 +98,7 @@ export async function patchMesaApi(id: string, patch: Partial<Mesa>): Promise<Me
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertOk(res, data);
   return mapMesa(data as Record<string, unknown>);
 }
 
@@ -101,7 +109,7 @@ export async function createMesaApi(nombre: string, capacidad: number): Promise<
     body: JSON.stringify({ nombre, capacidad }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertOk(res, data);
   return mapMesa(data as Record<string, unknown>);
 }
 
@@ -112,6 +120,7 @@ export async function deleteMesaApi(id: string): Promise<void> {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    markApiFailureFromStatus(res.status);
     throw new Error(parseApiError(data, res.status));
   }
 }
@@ -126,7 +135,7 @@ export async function fetchComandas(opts?: {
   const q = params.toString() ? `?${params.toString()}` : "";
   const res = await fetch(`${getApiUrl()}/api/comandas${q}`, { headers: authHeaders() });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertOk(res, data);
   return (data as Record<string, unknown>[]).map(mapComanda);
 }
 
@@ -147,7 +156,7 @@ export async function createComandaApi(
     }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertOk(res, data);
   return mapComanda(data as Record<string, unknown>);
 }
 
@@ -161,7 +170,7 @@ export async function patchComandaApi(
     body: JSON.stringify(patch),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertOk(res, data);
   return mapComanda(data as Record<string, unknown>);
 }
 
@@ -172,6 +181,7 @@ export async function deleteComandaApi(id: string): Promise<void> {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    markApiFailureFromStatus(res.status);
     throw new Error(parseApiError(data, res.status));
   }
 }

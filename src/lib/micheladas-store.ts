@@ -272,12 +272,11 @@ export function useComandas() {
       setComandas([...data].sort(sortComandasByQueue));
       setError(null);
     } catch (err) {
-      if (isNetworkFailure(err)) {
-        setComandas([...cached].sort(sortComandasByQueue));
+      setComandas([...cached].sort(sortComandasByQueue));
+      if (isNetworkFailure(err) || !shouldSyncWithServer()) {
         setError(null);
       } else {
         setError(err instanceof Error ? err.message : "Error al cargar comandas");
-        setComandas([...cached].sort(sortComandasByQueue));
       }
     } finally {
       setLoading(false);
@@ -295,7 +294,7 @@ export function useComandas() {
 
     const interval = window.setInterval(() => {
       if (shouldSyncWithServer()) void reload();
-    }, 3000);
+    }, 10000);
 
     return () => {
       window.clearInterval(interval);
@@ -621,8 +620,12 @@ export function useInventory() {
       setItems(data);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar inventario");
       setItems(cached);
+      if (!shouldSyncWithServer() || isNetworkFailure(err)) {
+        setError(null);
+      } else {
+        setError(err instanceof Error ? err.message : "Error al cargar inventario");
+      }
     } finally {
       setLoading(false);
     }
@@ -637,7 +640,7 @@ export function useInventory() {
     }
     const interval = window.setInterval(() => {
       if (shouldSyncWithServer()) void reload();
-    }, 8000);
+    }, 15000);
     return () => window.clearInterval(interval);
   }, [reload]);
 

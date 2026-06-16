@@ -1,5 +1,13 @@
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
+import { markApiFailureFromStatus } from "@/lib/offline/network";
 import type { InventoryItem } from "@/lib/micheladas-store";
+
+function assertOk(res: Response, data: unknown): asserts res is Response & { ok: true } {
+  if (!res.ok) {
+    markApiFailureFromStatus(res.status);
+    throw new Error(parseApiError(data, res.status));
+  }
+}
 
 function authHeaders(): HeadersInit {
   const session = getStoredSession();
@@ -23,7 +31,7 @@ function mapItem(raw: Record<string, unknown>): InventoryItem {
 export async function fetchInventario(): Promise<InventoryItem[]> {
   const res = await fetch(`${getApiUrl()}/api/inventario`, { headers: authHeaders() });
   const data = await res.json().catch(() => []);
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertOk(res, data);
   return (data as Record<string, unknown>[]).map(mapItem);
 }
 
@@ -34,7 +42,7 @@ export async function patchInventarioStock(key: string, stock: number): Promise<
     body: JSON.stringify({ stock }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertOk(res, data);
   return mapItem(data as Record<string, unknown>);
 }
 
@@ -44,7 +52,7 @@ export async function resetInventarioApi(): Promise<InventoryItem[]> {
     headers: authHeaders(),
   });
   const data = await res.json().catch(() => []);
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertOk(res, data);
   return (data as Record<string, unknown>[]).map(mapItem);
 }
 
@@ -55,6 +63,7 @@ export async function deleteInventarioItem(key: string): Promise<void> {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    markApiFailureFromStatus(res.status);
     throw new Error(parseApiError(data, res.status));
   }
 }

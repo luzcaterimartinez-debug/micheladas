@@ -31,6 +31,11 @@ export function markApiReachable(): void {
   notifySyncChange();
 }
 
+/** Marca la API como caída ante errores 5xx o rate limit (evita polling que satura MySQL). */
+export function markApiFailureFromStatus(status: number): void {
+  if (status >= 500 || status === 429) markApiUnreachable();
+}
+
 export async function checkServerReachable(): Promise<boolean> {
   if (!isAppOnline()) {
     markApiUnreachable();
@@ -44,10 +49,12 @@ export async function checkServerReachable(): Promise<boolean> {
       cache: "no-store",
       signal: AbortSignal.timeout(5000),
     });
-    const ok = res.status === 200 || res.status === 503;
-    if (ok) markApiReachable();
-    else markApiUnreachable();
-    return ok;
+    if (res.ok) {
+      markApiReachable();
+      return true;
+    }
+    markApiFailureFromStatus(res.status);
+    return false;
   } catch {
     markApiUnreachable();
     return false;
