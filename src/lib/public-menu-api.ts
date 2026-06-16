@@ -1,18 +1,18 @@
 import { getApiUrl } from "@/lib/auth";
 import { getCachedMenu, setCachedMenu } from "@/lib/offline/local-cache";
 import { isAppOnline } from "@/lib/offline/network";
-import { FALLBACK_MENU, normalizeMenuFromApi, type MenuData } from "@/lib/menu-utils";
+import { getFallbackMenu, normalizeMenuFromApi, type MenuData } from "@/lib/menu-utils";
 
 export async function fetchPublicMenu(): Promise<MenuData> {
   if (!isAppOnline()) {
-    return getCachedMenu(FALLBACK_MENU);
+    return getCachedMenu(getFallbackMenu());
   }
 
   try {
     const res = await fetch(`${getApiUrl()}/api/menu/public`);
     if (!res.ok) {
       console.warn("Menú público no disponible, usando respaldo local");
-      return getCachedMenu(FALLBACK_MENU);
+      return getCachedMenu(getFallbackMenu());
     }
     const data = await res.json();
     const menu = normalizeMenuFromApi({
@@ -23,6 +23,6 @@ export async function fetchPublicMenu(): Promise<MenuData> {
     setCachedMenu(menu);
     return menu;
   } catch {
-    return getCachedMenu(FALLBACK_MENU);
+    return getCachedMenu(getFallbackMenu());
   }
 }

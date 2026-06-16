@@ -12,7 +12,7 @@ import {
   patchMesaApi,
 } from "@/lib/pos-api";
 import { patchInventarioStock } from "@/lib/inventory-api";
-import { FALLBACK_MENU } from "@/lib/menu-utils";
+import { getFallbackMenu } from "@/lib/menu-utils";
 import type { Comanda } from "@/lib/micheladas-store";
 
 import {
@@ -175,5 +175,3 @@ export function hasCachedMenu(): boolean {
 export function markMenuCached(): void {
   writeLocal(LS_SYNC_META, { ...readLocal(LS_SYNC_META, {}), menuCached: true });
 }
-
-export { FALLBACK_MENU };

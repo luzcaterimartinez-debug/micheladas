@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     mysql_host: str = "82.197.82.29"
     mysql_port: int = 3306
     mysql_user: str = "u659323332_micheladas"
-    mysql_password: str = "Michelandia123*"
+    mysql_password: str = "Micheladas123*"
     mysql_database: str = "u659323332_micheladas"
     mysql_pool_size: int = 5
     mysql_connection_timeout: int = 10

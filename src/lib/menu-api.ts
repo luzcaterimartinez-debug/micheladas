@@ -4,7 +4,7 @@ import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
 import { getCachedMenu, setCachedMenu } from "@/lib/offline/local-cache";
 import { isAppOnline } from "@/lib/offline/network";
 import {
-  FALLBACK_MENU,
+  getFallbackMenu,
   normalizeMenuFromApi,
   type MenuCategoria,
   type MenuData,
@@ -98,20 +98,21 @@ function parseMenuResponse(data: Record<string, unknown>): MenuData {
   const categorias = (data.categorias as Record<string, unknown>[] | undefined)?.map(mapCategoria);
   const productos = (data.productos as Record<string, unknown>[] | undefined)?.map(mapProducto);
   const adicionesRaw = (data.adiciones as Record<string, unknown>[] | undefined) ?? [];
+  const fallback = getFallbackMenu();
   const adiciones =
     adicionesRaw.length > 0
       ? adicionesRaw.map(mapAdicion)
-      : FALLBACK_MENU.adiciones;
+      : fallback.adiciones;
   const fases = (data.fases as Record<string, unknown>[] | undefined)?.map(mapFase);
   return normalizeMenuFromApi({ categorias, productos, adiciones, fases });
 }
 
 export async function fetchMenu(): Promise<MenuData> {
   const session = getStoredSession();
-  if (!session) return FALLBACK_MENU;
+  if (!session) return getFallbackMenu();
 
   if (!isAppOnline()) {
-    return getCachedMenu(FALLBACK_MENU);
+    return getCachedMenu(getFallbackMenu());
   }
 
   try {
@@ -121,14 +122,14 @@ export async function fetchMenu(): Promise<MenuData> {
 
     if (!res.ok) {
       console.warn("Menú API:", parseApiError(await res.json().catch(() => ({})), res.status));
-      return getCachedMenu(FALLBACK_MENU);
+      return getCachedMenu(getFallbackMenu());
     }
 
     const menu = parseMenuResponse(await res.json());
     setCachedMenu(menu);
     return menu;
   } catch {
-    return getCachedMenu(FALLBACK_MENU);
+    return getCachedMenu(getFallbackMenu());
   }
 }
 

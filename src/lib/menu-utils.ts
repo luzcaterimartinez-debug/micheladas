@@ -37,7 +37,9 @@ export function buildFallbackMenu(): MenuData {
   };
 }
 
-export const FALLBACK_MENU = buildFallbackMenu();
+export function getFallbackMenu(): MenuData {
+  return buildFallbackMenu();
+}
 
 export function flattenProductos(categorias: MenuCategoria[]): MicheladaType[] {
   return categorias.flatMap((c) => c.productos);
@@ -49,11 +51,12 @@ export function normalizeMenuFromApi(data: {
   adiciones?: Addition[];
   fases?: Fase[];
 }): MenuData {
-  const fases = data.fases ?? FALLBACK_MENU.fases;
+  const fallback = getFallbackMenu();
+  const fases = data.fases ?? fallback.fases;
   if (data.categorias?.length) {
     return {
       categorias: data.categorias,
-      adiciones: data.adiciones ?? FALLBACK_MENU.adiciones,
+      adiciones: data.adiciones ?? fallback.adiciones,
       fases,
     };
   }
@@ -66,9 +69,9 @@ export function normalizeMenuFromApi(data: {
           productos: data.productos,
         },
       ],
-      adiciones: data.adiciones ?? FALLBACK_MENU.adiciones,
+      adiciones: data.adiciones ?? fallback.adiciones,
       fases,
     };
   }
-  return FALLBACK_MENU;
+  return fallback;
 }

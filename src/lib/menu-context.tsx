@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { fetchMenu } from "@/lib/menu-api";
 import { getCachedMenu } from "@/lib/offline/local-cache";
 import {
-  FALLBACK_MENU,
+  getFallbackMenu,
   flattenProductos,
   type MenuCategoria,
   type MenuData,
@@ -25,7 +25,7 @@ type MenuContextValue = {
 const MenuContext = createContext<MenuContextValue | null>(null);
 
 export function MenuProvider({ children }: { children: ReactNode }) {
-  const [menu, setMenu] = useState<MenuData>(() => getCachedMenu(FALLBACK_MENU));
+  const [menu, setMenu] = useState<MenuData>(() => getCachedMenu(getFallbackMenu()));
   const [loading, setLoading] = useState(true);
 
   const refetch = useCallback(async () => {
@@ -67,13 +67,14 @@ export function MenuProvider({ children }: { children: ReactNode }) {
 export function useMenu() {
   const ctx = useContext(MenuContext);
   if (!ctx) {
-    const productos = flattenProductos(FALLBACK_MENU.categorias);
+    const fallback = getFallbackMenu();
+    const productos = flattenProductos(fallback.categorias);
     return {
-      categorias: FALLBACK_MENU.categorias,
+      categorias: fallback.categorias,
       productos,
-      adiciones: FALLBACK_MENU.adiciones,
-      fases: FALLBACK_MENU.fases,
-      faseOpciones: FALLBACK_MENU.fases.flatMap((f) => f.opciones),
+      adiciones: fallback.adiciones,
+      fases: fallback.fases,
+      faseOpciones: fallback.fases.flatMap((f) => f.opciones),
       loading: false,
       refetch: async () => {},
       getProducto: (id: string) => productos.find((p) => p.id === id),
