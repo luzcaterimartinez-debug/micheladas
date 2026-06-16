@@ -21,11 +21,11 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
 
-    mysql_host: str = "localhost"
+    mysql_host: str = "82.197.82.29"
     mysql_port: int = 3306
-    mysql_user: str = "root"
-    mysql_password: str = ""
-    mysql_database: str = "michelada"
+    mysql_user: str = "u659323332_micheladas"
+    mysql_password: str = "Michelandia123*"
+    mysql_database: str = "u659323332_micheladas"
     mysql_pool_size: int = 5
     mysql_connection_timeout: int = 10
 
@@ -38,7 +38,8 @@ class Settings(BaseSettings):
 
     cors_origins: str = (
         "http://localhost:8080,http://127.0.0.1:8080,"
-        "http://localhost:5173,http://127.0.0.1:5173"
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "https://micheladas-black.vercel.app"
     )
 
     @property
