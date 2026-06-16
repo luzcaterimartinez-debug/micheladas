@@ -37,6 +37,7 @@ COMANDAS_SELECT = """
   pago_efectivo, pago_tarjeta, pago_transferencia, pagado_en, cobrado_por
 """
 COMANDAS_CACHE_PREFIX = "comandas:"
+MESAS_CACHE_KEY = "mesas:list"
 
 
 def invalidate_mesas_cache() -> None:
