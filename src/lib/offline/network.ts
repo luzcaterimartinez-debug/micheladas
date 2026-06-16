@@ -8,7 +8,7 @@ let apiReachable = true;
 let lastUnreachableAt = 0;
 
 /** Tras un 503/5xx, esperar antes de volver a sincronizar (evita martillar MySQL). */
-const API_RECOVERY_COOLDOWN_MS = 45_000;
+const API_RECOVERY_COOLDOWN_MS = 30_000;
 
 export function isAppOnline(): boolean {
   return typeof navigator === "undefined" ? true : navigator.onLine;
@@ -34,6 +34,9 @@ export function markApiReachable(): void {
   if (apiReachable) return;
   apiReachable = true;
   notifySyncChange();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("michelada-api-recovered"));
+  }
 }
 
 /** Marca la API como caída ante errores 5xx o rate limit (evita polling que satura MySQL). */
@@ -91,6 +94,24 @@ export function isNetworkFailure(err: unknown): boolean {
       msg.includes("err_name_not_resolved");
     if (failed) markApiUnreachable();
     return failed;
+  }
+  return false;
+}
+
+/** Errores temporales del servidor — conservar la op en el outbox y reintentar. */
+export function isRetryableSyncError(err: unknown): boolean {
+  if (isNetworkFailure(err)) return true;
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    return (
+      msg.includes("servidor no disponible") ||
+      msg.includes("error del servidor") ||
+      msg.includes("base de datos") ||
+      msg.includes("503") ||
+      msg.includes("502") ||
+      msg.includes("504") ||
+      msg.includes("429")
+    );
   }
   return false;
 }

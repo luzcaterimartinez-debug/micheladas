@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getPendingCount } from "@/lib/offline/outbox";
-import { flushOutbox, initOfflineSync } from "@/lib/offline/sync-engine";
+import { initOfflineSync, runAutoSync } from "@/lib/offline/sync-engine";
 import {
   checkServerReachable,
   isApiReachable,
@@ -14,6 +14,7 @@ export function useOfflineSync() {
   const [serverReachable, setServerReachable] = useState(true);
   const [pending, setPending] = useState(() => getPendingCount());
   const [syncing, setSyncing] = useState(false);
+  const wasReachableRef = useRef(true);
 
   const refresh = useCallback(() => {
     setOnline(isAppOnline());
@@ -22,8 +23,13 @@ export function useOfflineSync() {
   }, []);
 
   const pingServer = useCallback(async () => {
+    const wasReachable = wasReachableRef.current;
     const ok = await checkServerReachable();
+    wasReachableRef.current = ok;
     setServerReachable(ok);
+    if (ok && !wasReachable) {
+      void runAutoSync();
+    }
     return ok;
   }, []);
 
@@ -32,7 +38,7 @@ export function useOfflineSync() {
     if (!reachable) return;
     setSyncing(true);
     try {
-      await flushOutbox();
+      await runAutoSync();
     } finally {
       setSyncing(false);
       refresh();

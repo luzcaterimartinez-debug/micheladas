@@ -26,7 +26,7 @@ import {
 } from "./local-cache";
 import {
   checkServerReachable,
-  isNetworkFailure,
+  isRetryableSyncError,
   LS_SYNC_META,
   markApiUnreachable,
   notifySyncChange,
@@ -34,9 +34,10 @@ import {
   shouldSyncWithServer,
   writeLocal,
 } from "./network";
-import { listOutbox, removeOp, type OutboxOp } from "./outbox";
+import { getPendingCount, listOutbox, removeOp, type OutboxOp } from "./outbox";
 
 let flushing = false;
+let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
 
 async function applyOp(op: OutboxOp): Promise<void> {
   switch (op.type) {
@@ -64,20 +65,35 @@ async function applyOp(op: OutboxOp): Promise<void> {
 export async function pullFreshData(): Promise<void> {
   if (!getStoredSession() || !shouldSyncWithServer()) return;
 
-  const [comandas, mesas, inventario, menu] = await Promise.all([
-    fetchComandas({ status: "pendiente,lista,entregada" }),
-    fetchMesas(),
-    fetchInventario(),
-    fetchMenu(),
-  ]);
+  try {
+    const [comandas, mesas, inventario, menu] = await Promise.all([
+      fetchComandas({ status: "pendiente,lista,entregada" }),
+      fetchMesas(),
+      fetchInventario(),
+      fetchMenu(),
+    ]);
 
-  setCachedComandas(comandas);
-  setCachedMesas(mesas);
-  setCachedInventario(inventario);
-  setCachedMenu(menu);
+    setCachedComandas(comandas);
+    setCachedMesas(mesas);
+    setCachedInventario(inventario);
+    setCachedMenu(menu);
 
-  writeLocal(LS_SYNC_META, { lastPullAt: Date.now() });
-  notifySyncChange();
+    writeLocal(LS_SYNC_META, { ...readLocal(LS_SYNC_META, {}), lastPullAt: Date.now() });
+    notifySyncChange();
+  } catch (err) {
+    if (isRetryableSyncError(err)) return;
+    console.warn("pullFreshData:", err);
+  }
+}
+
+/** Sube el outbox y refresca datos del servidor. */
+export async function runAutoSync(): Promise<{ synced: number; failed: number }> {
+  if (!getStoredSession() || !shouldSyncWithServer()) {
+    return { synced: 0, failed: 0 };
+  }
+  const result = await flushOutbox();
+  await pullFreshData();
+  return result;
 }
 
 export async function flushOutbox(): Promise<{ synced: number; failed: number }> {
@@ -97,15 +113,11 @@ export async function flushOutbox(): Promise<{ synced: number; failed: number }>
         removeOp(op.opId);
         synced += 1;
       } catch (err) {
-        if (isNetworkFailure(err)) break;
+        if (isRetryableSyncError(err)) break;
         console.warn("Sync op failed permanently:", op.type, err);
         removeOp(op.opId);
         failed += 1;
       }
-    }
-
-    if (synced > 0) {
-      await pullFreshData();
     }
 
     writeLocal(LS_SYNC_META, {
@@ -180,9 +192,13 @@ export function applyMesaAtendidaLocally(mesaId: string, mesasFallback: Mesa[]):
 export function initOfflineSync(): () => void {
   if (typeof window === "undefined") return () => {};
 
+  const onRecovered = () => {
+    void runAutoSync();
+  };
+
   const onOnline = () => {
     void checkServerReachable().then((ok) => {
-      if (ok) void flushOutbox();
+      if (ok) void runAutoSync();
     });
   };
 
@@ -190,18 +206,29 @@ export function initOfflineSync(): () => void {
     markApiUnreachable();
   };
 
+  window.addEventListener("michelada-api-recovered", onRecovered);
   window.addEventListener("online", onOnline);
   window.addEventListener("offline", onOffline);
 
   if (getStoredSession()) {
     void checkServerReachable().then((ok) => {
-      if (ok) void flushOutbox();
+      if (ok) void runAutoSync();
     });
   }
 
+  autoSyncInterval = window.setInterval(() => {
+    if (!getStoredSession() || !shouldSyncWithServer()) return;
+    if (getPendingCount() > 0) void runAutoSync();
+  }, 20_000);
+
   return () => {
+    window.removeEventListener("michelada-api-recovered", onRecovered);
     window.removeEventListener("online", onOnline);
     window.removeEventListener("offline", onOffline);
+    if (autoSyncInterval != null) {
+      window.clearInterval(autoSyncInterval);
+      autoSyncInterval = null;
+    }
   };
 }
 

@@ -466,6 +466,7 @@ export function useMesas() {
     }
 
     try {
+      await flushOutbox();
       const data = await fetchMesas();
       setCachedMesas(data);
       setMesas(data);
