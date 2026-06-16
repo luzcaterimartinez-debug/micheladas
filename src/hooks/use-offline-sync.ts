@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 
 import { getPendingCount } from "@/lib/offline/outbox";
 import { flushOutbox, initOfflineSync } from "@/lib/offline/sync-engine";
-import { checkServerReachable, isAppOnline, notifySyncChange } from "@/lib/offline/network";
+import {
+  checkServerReachable,
+  isApiReachable,
+  isAppOnline,
+  notifySyncChange,
+} from "@/lib/offline/network";
 
 export function useOfflineSync() {
   const [online, setOnline] = useState(() => isAppOnline());
@@ -12,6 +17,7 @@ export function useOfflineSync() {
 
   const refresh = useCallback(() => {
     setOnline(isAppOnline());
+    setServerReachable(isApiReachable());
     setPending(getPendingCount());
   }, []);
 

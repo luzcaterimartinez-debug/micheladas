@@ -16,7 +16,7 @@ import {
   setCachedInventario,
   setCachedMesas,
 } from "@/lib/offline/local-cache";
-import { isAppOnline, isNetworkFailure } from "@/lib/offline/network";
+import { isNetworkFailure, shouldSyncWithServer } from "@/lib/offline/network";
 import { enqueueOp } from "@/lib/offline/outbox";
 import {
   buildOptimisticComanda,
@@ -256,7 +256,7 @@ export function useComandas() {
     }
 
     const cached = getCachedComandas();
-    if (!isAppOnline()) {
+    if (!shouldSyncWithServer()) {
       setComandas([...cached].sort(sortComandasByQueue));
       setLoading(false);
       return;
@@ -272,8 +272,13 @@ export function useComandas() {
       setComandas([...data].sort(sortComandasByQueue));
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar comandas");
-      setComandas([...cached].sort(sortComandasByQueue));
+      if (isNetworkFailure(err)) {
+        setComandas([...cached].sort(sortComandasByQueue));
+        setError(null);
+      } else {
+        setError(err instanceof Error ? err.message : "Error al cargar comandas");
+        setComandas([...cached].sort(sortComandasByQueue));
+      }
     } finally {
       setLoading(false);
     }
@@ -282,10 +287,20 @@ export function useComandas() {
   useEffect(() => {
     void reload();
     if (!getStoredSession()) return;
+
+    const onSync = () => {
+      if (shouldSyncWithServer()) void reload();
+    };
+    window.addEventListener("michelada-sync-change", onSync);
+
     const interval = window.setInterval(() => {
-      if (isAppOnline()) void reload();
+      if (shouldSyncWithServer()) void reload();
     }, 3000);
-    return () => window.clearInterval(interval);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("michelada-sync-change", onSync);
+    };
   }, [reload]);
 
   return {
@@ -321,7 +336,7 @@ export function useComandas() {
         return nueva;
       };
 
-      if (!isAppOnline()) return queueOffline();
+      if (!shouldSyncWithServer()) return queueOffline();
 
       try {
         const nueva = await createComandaApi(c, clientId);
@@ -353,7 +368,7 @@ export function useComandas() {
         );
       };
 
-      if (!isAppOnline()) {
+      if (!shouldSyncWithServer()) {
         applyLocal();
         return;
       }
@@ -383,7 +398,7 @@ export function useComandas() {
         setComandas((prev) => prev.filter((c) => c.id !== id));
       };
 
-      if (!isAppOnline()) {
+      if (!shouldSyncWithServer()) {
         applyLocal();
         return;
       }
@@ -416,7 +431,7 @@ export function useComandas() {
         );
       };
 
-      if (!isAppOnline()) {
+      if (!shouldSyncWithServer()) {
         applyLocal();
         return;
       }
@@ -445,7 +460,7 @@ export function useMesas() {
     }
 
     const cached = getCachedMesas(DEFAULT_MESAS);
-    if (!isAppOnline()) {
+    if (!shouldSyncWithServer()) {
       setMesas(cached);
       setLoading(false);
       return;
@@ -465,10 +480,20 @@ export function useMesas() {
   useEffect(() => {
     void reload();
     if (!getStoredSession()) return;
+
+    const onSync = () => {
+      if (shouldSyncWithServer()) void reload();
+    };
+    window.addEventListener("michelada-sync-change", onSync);
+
     const interval = window.setInterval(() => {
-      if (isAppOnline()) void reload();
+      if (shouldSyncWithServer()) void reload();
     }, 10000);
-    return () => window.clearInterval(interval);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("michelada-sync-change", onSync);
+    };
   }, [reload]);
 
   return {
@@ -489,7 +514,7 @@ export function useMesas() {
         return updated;
       }
 
-      if (!isAppOnline()) return applyLocal();
+      if (!shouldSyncWithServer()) return applyLocal();
 
       try {
         const updated = await marcarMesaAtendidaApi(id);
@@ -522,7 +547,7 @@ export function useMesas() {
         setMesas(next);
       };
 
-      if (!isAppOnline()) {
+      if (!shouldSyncWithServer()) {
         applyLocal();
         return;
       }
@@ -546,7 +571,7 @@ export function useMesas() {
         setMesas(next);
         return;
       }
-      if (!isAppOnline()) throw new Error("Sin conexión: no se puede crear mesa nueva offline");
+      if (!shouldSyncWithServer()) throw new Error("Sin conexión: no se puede crear mesa nueva offline");
       const nueva = await createMesaApi(nombre, capacidad);
       setMesas((prev) => [...prev, nueva]);
       setCachedMesas([...getCachedMesas(DEFAULT_MESAS), nueva]);
@@ -558,7 +583,7 @@ export function useMesas() {
         setMesas(next);
         return;
       }
-      if (!isAppOnline()) throw new Error("Sin conexión: no se puede eliminar mesa offline");
+      if (!shouldSyncWithServer()) throw new Error("Sin conexión: no se puede eliminar mesa offline");
       await deleteMesaApi(id);
       setMesas((prev) => prev.filter((m) => m.id !== id));
       setCachedMesas(getCachedMesas(DEFAULT_MESAS).filter((m) => m.id !== id));
@@ -584,7 +609,7 @@ export function useInventory() {
     }
 
     const cached = getCachedInventario(DEFAULT_INVENTORY);
-    if (!isAppOnline()) {
+    if (!shouldSyncWithServer()) {
       setItems(cached);
       setLoading(false);
       return;
@@ -611,7 +636,7 @@ export function useInventory() {
       return () => window.removeEventListener("michelada-store-change", handler);
     }
     const interval = window.setInterval(() => {
-      if (isAppOnline()) void reload();
+      if (shouldSyncWithServer()) void reload();
     }, 8000);
     return () => window.clearInterval(interval);
   }, [reload]);
@@ -648,7 +673,7 @@ export function useInventory() {
         enqueueOp({ type: "inventario:patch", key, stock });
       };
 
-      if (!isAppOnline()) {
+      if (!shouldSyncWithServer()) {
         applyLocal();
         return;
       }
@@ -665,11 +690,11 @@ export function useInventory() {
       }
     },
     decrement: (key: string, qty: number) => {
-      if (getStoredSession() && isAppOnline()) return;
+      if (getStoredSession() && shouldSyncWithServer()) return;
       decrementLocal(key, qty);
     },
     decrementBatch: (totals: Record<string, number>) => {
-      if (getStoredSession() && isAppOnline()) return;
+      if (getStoredSession() && shouldSyncWithServer()) return;
       let next = getCachedInventario(DEFAULT_INVENTORY);
       for (const [key, qty] of Object.entries(totals)) {
         next = next.map((i) =>
@@ -685,7 +710,7 @@ export function useInventory() {
         setItems(DEFAULT_INVENTORY);
         return;
       }
-      if (!isAppOnline()) throw new Error("Sin conexión");
+      if (!shouldSyncWithServer()) throw new Error("Sin conexión");
       const data = await resetInventarioApi();
       setCachedInventario(data);
       setItems(data);
@@ -697,7 +722,7 @@ export function useInventory() {
         setItems(next);
         return;
       }
-      if (!isAppOnline()) throw new Error("Sin conexión");
+      if (!shouldSyncWithServer()) throw new Error("Sin conexión");
       const { deleteInventarioItem } = await import("@/lib/inventory-api");
       await deleteInventarioItem(key);
       const next = getCachedInventario(DEFAULT_INVENTORY).filter((i) => i.key !== key);

@@ -23,7 +23,16 @@ import {
   setCachedMenu,
   setCachedMesas,
 } from "./local-cache";
-import { isAppOnline, isNetworkFailure, LS_SYNC_META, notifySyncChange, readLocal, writeLocal } from "./network";
+import {
+  checkServerReachable,
+  isNetworkFailure,
+  LS_SYNC_META,
+  markApiUnreachable,
+  notifySyncChange,
+  readLocal,
+  shouldSyncWithServer,
+  writeLocal,
+} from "./network";
 import { listOutbox, removeOp, type OutboxOp } from "./outbox";
 
 let flushing = false;
@@ -52,7 +61,7 @@ async function applyOp(op: OutboxOp): Promise<void> {
 }
 
 export async function pullFreshData(): Promise<void> {
-  if (!getStoredSession() || !isAppOnline()) return;
+  if (!getStoredSession() || !shouldSyncWithServer()) return;
 
   const [comandas, mesas, inventario, menu] = await Promise.all([
     fetchComandas({ status: "pendiente,lista,entregada" }),
@@ -71,7 +80,7 @@ export async function pullFreshData(): Promise<void> {
 }
 
 export async function flushOutbox(): Promise<{ synced: number; failed: number }> {
-  if (!getStoredSession() || !isAppOnline() || flushing) {
+  if (!getStoredSession() || !shouldSyncWithServer() || flushing) {
     return { synced: 0, failed: 0 };
   }
 
@@ -171,16 +180,28 @@ export function initOfflineSync(): () => void {
   if (typeof window === "undefined") return () => {};
 
   const onOnline = () => {
-    void flushOutbox();
+    void checkServerReachable().then((ok) => {
+      if (ok) void flushOutbox();
+    });
+  };
+
+  const onOffline = () => {
+    markApiUnreachable();
   };
 
   window.addEventListener("online", onOnline);
+  window.addEventListener("offline", onOffline);
 
-  if (getStoredSession() && isAppOnline()) {
-    void flushOutbox();
+  if (getStoredSession()) {
+    void checkServerReachable().then((ok) => {
+      if (ok) void flushOutbox();
+    });
   }
 
-  return () => window.removeEventListener("online", onOnline);
+  return () => {
+    window.removeEventListener("online", onOnline);
+    window.removeEventListener("offline", onOffline);
+  };
 }
 
 export function getLastSyncMeta(): { lastSyncAt?: number; lastPullAt?: number } {
