@@ -9,12 +9,8 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
-import { OfflineSyncBanner } from "@/components/OfflineSyncBanner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-
-// Importar registro de PWA
-import { registerSW } from "virtual:pwa-register";
 
 function NotFoundComponent() {
   return (
@@ -88,33 +84,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Sistema de pedidos de micheladas" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "theme-color", content: "#1a1a2e" },
-      { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { name: "apple-mobile-web-app-title", content: "Micheladas" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
-      },
-      {
-        rel: "icon",
-        href: "/favicon.ico",
-        sizes: "any",
-      },
-      {
-        rel: "icon",
-        type: "image/png",
-        href: "/icon-192x192.png",
-      },
-      {
-        rel: "manifest",
-        href: "/manifest.webmanifest",
-      },
-      {
-        rel: "apple-touch-icon",
-        href: "/apple-touch-icon.png",
       },
     ],
   }),
@@ -141,24 +115,8 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
-  // Registrar service worker de PWA
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const updateSW = registerSW({
-        onNeedRefresh() {
-          console.log("New content available, please refresh");
-        },
-        onOfflineReady() {
-          console.log("App is ready to work offline");
-        },
-      });
-      return () => updateSW();
-    }
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
-      <OfflineSyncBanner />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
