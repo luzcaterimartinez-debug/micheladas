@@ -13,7 +13,7 @@ import {
 } from "@/lib/pos-api";
 import { patchInventarioStock } from "@/lib/inventory-api";
 import { getFallbackMenu } from "@/lib/menu-utils";
-import type { Comanda } from "@/lib/micheladas-store";
+import type { Comanda, Mesa } from "@/lib/micheladas-store";
 
 import {
   getCachedComandas,
@@ -145,6 +145,26 @@ export function patchComandaInCache(id: string, patch: Partial<Comanda>): void {
 
 export function removeComandaFromCache(id: string): void {
   setCachedComandas(getCachedComandas().filter((c) => c.id !== id));
+}
+
+/** Libera mesa y marca comandas activas como entregada (optimista / offline). */
+export function applyMesaAtendidaLocally(mesaId: string, mesasFallback: Mesa[]): Mesa {
+  const mesas = getCachedMesas(mesasFallback).map((m) =>
+    m.id === mesaId ? { ...m, estado: "libre" as const, cliente: undefined } : m,
+  );
+  setCachedMesas(mesas);
+
+  setCachedComandas(
+    getCachedComandas().map((c) =>
+      c.mesaId === mesaId && (c.status === "pendiente" || c.status === "lista")
+        ? { ...c, status: "entregada" as const }
+        : c,
+    ),
+  );
+
+  const mesa = mesas.find((m) => m.id === mesaId);
+  if (!mesa) throw new Error("Mesa no encontrada");
+  return mesa;
 }
 
 export function initOfflineSync(): () => void {

@@ -24,6 +24,7 @@ import {
   mergeComandaInCache,
   patchComandaInCache,
   removeComandaFromCache,
+  applyMesaAtendidaLocally,
 } from "@/lib/offline/sync-engine";
 import {
   createComandaApi,
@@ -475,24 +476,18 @@ export function useMesas() {
     loading,
     reload,
     marcarAtendida: async (id: string) => {
-      if (!getStoredSession()) {
-        const next = getCachedMesas(DEFAULT_MESAS).map((m) =>
-          m.id === id ? { ...m, estado: "libre" as const, cliente: undefined } : m,
-        );
-        setCachedMesas(next);
-        setMesas(next);
-        return next.find((m) => m.id === id)!;
-      }
-
       const applyLocal = () => {
-        const next = getCachedMesas(DEFAULT_MESAS).map((m) =>
-          m.id === id ? { ...m, estado: "libre" as const, cliente: undefined } : m,
-        );
-        setCachedMesas(next);
+        const updated = applyMesaAtendidaLocally(id, DEFAULT_MESAS);
         enqueueOp({ type: "mesa:atendida", mesaId: id });
-        setMesas(next);
-        return next.find((m) => m.id === id)!;
+        setMesas(getCachedMesas(DEFAULT_MESAS));
+        return updated;
       };
+
+      if (!getStoredSession()) {
+        const updated = applyMesaAtendidaLocally(id, DEFAULT_MESAS);
+        setMesas(getCachedMesas(DEFAULT_MESAS));
+        return updated;
+      }
 
       if (!isAppOnline()) return applyLocal();
 
