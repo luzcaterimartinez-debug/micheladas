@@ -5,6 +5,10 @@ export const LS_OUTBOX = "michelada_outbox_v1";
 export const LS_SYNC_META = "michelada_sync_meta_v1";
 
 let apiReachable = true;
+let lastUnreachableAt = 0;
+
+/** Tras un 503/5xx, esperar antes de volver a sincronizar (evita martillar MySQL). */
+const API_RECOVERY_COOLDOWN_MS = 45_000;
 
 export function isAppOnline(): boolean {
   return typeof navigator === "undefined" ? true : navigator.onLine;
@@ -22,6 +26,7 @@ export function shouldSyncWithServer(): boolean {
 export function markApiUnreachable(): void {
   if (!apiReachable) return;
   apiReachable = false;
+  lastUnreachableAt = Date.now();
   notifySyncChange();
 }
 
@@ -41,6 +46,13 @@ export async function checkServerReachable(): Promise<boolean> {
     markApiUnreachable();
     return false;
   }
+  if (
+    !apiReachable &&
+    lastUnreachableAt > 0 &&
+    Date.now() - lastUnreachableAt < API_RECOVERY_COOLDOWN_MS
+  ) {
+    return false;
+  }
   const base = getApiUrl();
   const url = base ? `${base}/api/health` : "/api/health";
   try {
@@ -49,11 +61,13 @@ export async function checkServerReachable(): Promise<boolean> {
       cache: "no-store",
       signal: AbortSignal.timeout(5000),
     });
-    if (res.ok) {
+    const data = (await res.json().catch(() => null)) as { database?: string } | null;
+    const dbOk = res.ok && data?.database === "ok";
+    if (dbOk) {
       markApiReachable();
       return true;
     }
-    markApiFailureFromStatus(res.status);
+    markApiFailureFromStatus(res.status || 503);
     return false;
   } catch {
     markApiUnreachable();

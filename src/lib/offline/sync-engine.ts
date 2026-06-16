@@ -17,6 +17,7 @@ import type { Comanda, Mesa } from "@/lib/micheladas-store";
 
 import {
   getCachedComandas,
+  getCachedMesas,
   nextLocalFolio,
   setCachedComandas,
   setCachedInventario,
