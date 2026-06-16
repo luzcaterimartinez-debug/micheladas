@@ -23,8 +23,10 @@ const SKIP_DIRS = new Set([
   "node_modules",
   "backups",
   "tests",
+  "scripts",
+  "database",
 ]);
-const SKIP_FILES = new Set([".env"]);
+const SKIP_FILES = new Set([".env", ".gitignore", "README.md", "pytest.ini"]);
 
 function rmRecursive(target) {
   if (!fs.existsSync(target)) return;
@@ -134,7 +136,11 @@ rmRecursive(path.join(outputDir, "functions/api/[...path].func"));
 fs.mkdirSync(funcDir, { recursive: true });
 
 fs.copyFileSync(path.join(root, "api/index.py"), path.join(funcDir, "index.py"));
-fs.copyFileSync(path.join(root, "api/requirements.txt"), path.join(funcDir, "requirements.txt"));
+
+// Usar requirements.txt optimizado para Vercel si existe, si no usar el original
+const vercelRequirements = path.join(root, "api/requirements-vercel.txt");
+const sourceRequirements = fs.existsSync(vercelRequirements) ? vercelRequirements : path.join(root, "api/requirements.txt");
+fs.copyFileSync(sourceRequirements, path.join(funcDir, "requirements.txt"));
 fs.writeFileSync(
   path.join(funcDir, "pyproject.toml"),
   `[project]
