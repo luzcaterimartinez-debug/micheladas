@@ -147,4 +147,23 @@ describe("buildOrderDeductions", () => {
     expect(totals.limon).toBe(4);
     expect(totals.cerveza).toBeUndefined();
   });
+
+  it("multiplica descuentos por quantity del ítem", () => {
+    const cart: OrderItem[] = [
+      {
+        id: "1",
+        micheladaId: "clasica_mediana",
+        micheladaName: "Clásica",
+        basePrice: 70,
+        quantity: 2,
+        selectedToppings: ["tajin"],
+        additions: [],
+        total: 140,
+      },
+    ];
+    const totals = buildOrderDeductions(cart, adiciones, productos, faseCatalog);
+    expect(totals.cerveza).toBe(2);
+    expect(totals.limon).toBe(4);
+    expect(totals.tajin).toBe(2);
+  });
 });

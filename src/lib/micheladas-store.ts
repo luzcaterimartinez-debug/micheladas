@@ -80,6 +80,8 @@ export type OrderItem = {
   /** Legacy: comandas antiguas; los productos nuevos no usan tamaño como variante. */
   size?: string | null;
   basePrice: number;
+  /** Unidades iguales de este ítem (default 1). */
+  quantity?: number;
   selectedToppings: string[]; // topping ids
   additions: { id: string; name: string; price: number }[];
   notes?: string;
@@ -736,7 +738,20 @@ export function useInventory() {
   };
 }
 
+export function orderItemQuantity(item: OrderItem): number {
+  const q = item.quantity ?? 1;
+  return q > 0 ? Math.floor(q) : 1;
+}
+
 export function calcItemTotal(basePrice: number, additions: OrderItem["additions"]) {
   const adds = additions.reduce((sum, a) => sum + a.price, 0);
   return basePrice + adds;
+}
+
+export function calcItemLineTotal(
+  basePrice: number,
+  additions: OrderItem["additions"],
+  quantity = 1,
+): number {
+  return calcItemTotal(basePrice, additions) * Math.max(1, quantity);
 }

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { queueLabel } from "@/lib/comanda-queue";
-import { faseOpcionNames, orderItemSubtitle, printComanda, timeAgo } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel, orderItemSubtitle, printComanda, timeAgo } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda } from "@/lib/micheladas-store";
 
@@ -86,7 +86,7 @@ export function BarraComandaCard({ comanda: c, onMarkLista, onMarkEntregada, com
                 className="rounded-lg bg-muted/50 p-3 border-l-4 border-primary"
               >
                 <p className={`font-bold ${compact ? "text-base" : "text-lg"}`}>
-                  {it.micheladaName}
+                  {orderItemLabel(it)}
                 </p>
                 {subtitle && (
                   <p className="text-sm text-muted-foreground">{subtitle}</p>

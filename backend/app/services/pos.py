@@ -93,6 +93,7 @@ def _row_to_item(row: dict[str, Any]) -> OrderItemOut:
         micheladaName=str(row["producto_nombre"]),
         size=row["tamano"],
         basePrice=float(row["precio_base"]),
+        quantity=int(row.get("cantidad") or 1),
         selectedToppings=[str(t) for t in _parse_json_list(row.get("toppings_json"))],
         additions=additions,
         notes=row.get("notas") or None,
@@ -104,7 +105,7 @@ def _load_items(cursor: Any, comanda_id: str) -> list[OrderItemOut]:
     rows = fetch_all(
         cursor,
         """
-        SELECT id, producto_id, producto_nombre, tamano, precio_base,
+        SELECT id, producto_id, producto_nombre, tamano, precio_base, cantidad,
                toppings_json, adiciones_json, notas, total
         FROM comanda_items
         WHERE comanda_id = %s
@@ -506,9 +507,9 @@ def create_comanda(body: ComandaCreate, mesero_id: int | None) -> ComandaOut:
             cursor.execute(
                 """
                 INSERT INTO comanda_items (
-                  id, comanda_id, producto_id, producto_nombre, tamano, precio_base,
+                  id, comanda_id, producto_id, producto_nombre, tamano, precio_base, cantidad,
                   toppings_json, adiciones_json, notas, total, orden
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     item.id or str(uuid.uuid4()),
@@ -517,6 +518,7 @@ def create_comanda(body: ComandaCreate, mesero_id: int | None) -> ComandaOut:
                     item.micheladaName,
                     item.size,
                     item.basePrice,
+                    item.quantity,
                     json.dumps(item.selectedToppings),
                     json.dumps([a.model_dump() for a in item.additions]),
                     item.notes,

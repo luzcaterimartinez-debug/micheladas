@@ -17,13 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { faseOpcionNames } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
 import { printComandaOnSend } from "@/hooks/use-auto-print-comandas";
 import { getStoredSession } from "@/lib/auth";
 import { buildOrderDeductions } from "@/lib/inventory-deduction";
 import { useMenu } from "@/lib/menu-context";
+import { QuantityStepper } from "@/components/QuantityStepper";
 import {
-  calcItemTotal,
+  calcItemLineTotal,
   useComandas,
   useInventory,
   useMesas,
@@ -36,6 +37,7 @@ export function OrderBuilder() {
   const [toppings, setToppings] = useState<string[]>([]);
   const [additions, setAdditions] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [itemQuantity, setItemQuantity] = useState(1);
   const [cliente, setCliente] = useState("");
   const [mesaId, setMesaId] = useState<string>("__none__");
   const [cart, setCart] = useState<OrderItem[]>([]);
@@ -51,13 +53,17 @@ export function OrderBuilder() {
     [adiciones, additions],
   );
 
-  const currentTotal = michelada ? calcItemTotal(michelada.price, selectedAdditions) : 0;
+  const currentUnitTotal = michelada ? calcItemLineTotal(michelada.price, selectedAdditions, 1) : 0;
+  const currentTotal = michelada
+    ? calcItemLineTotal(michelada.price, selectedAdditions, itemQuantity)
+    : 0;
   const cartTotal = cart.reduce((s, i) => s + i.total, 0);
 
   function resetBuilder() {
     setToppings([]);
     setAdditions([]);
     setNotes("");
+    setItemQuantity(1);
   }
 
   function addToCart() {
@@ -67,6 +73,7 @@ export function OrderBuilder() {
       micheladaId: michelada.id,
       micheladaName: michelada.name,
       basePrice: michelada.price,
+      quantity: itemQuantity,
       selectedToppings: [...toppings],
       additions: selectedAdditions,
       notes: notes.trim() || undefined,
@@ -74,7 +81,11 @@ export function OrderBuilder() {
     };
     setCart((c) => [...c, item]);
     resetBuilder();
-    toast.success(`${michelada.name} agregada`);
+    toast.success(
+      itemQuantity > 1
+        ? `${itemQuantity}× ${michelada.name} agregadas`
+        : `${michelada.name} agregada`,
+    );
   }
 
   async function sendOrder() {
@@ -251,12 +262,19 @@ export function OrderBuilder() {
           </CardContent>
         </Card>
 
-        <div className="flex items-center justify-between rounded-xl border bg-card p-4">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl border bg-card p-4">
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Cantidad</p>
+            <QuantityStepper value={itemQuantity} onChange={setItemQuantity} size="sm" />
+            <p className="text-xs text-muted-foreground">
+              ${currentUnitTotal} c/u
+            </p>
+          </div>
+          <div className="text-right">
             <p className="text-sm text-muted-foreground">Total de esta michelada</p>
             <p className="text-2xl font-bold">${currentTotal}</p>
           </div>
-          <Button size="lg" onClick={addToCart}>
+          <Button size="lg" onClick={addToCart} className="sm:self-end">
             <Plus className="h-4 w-4 mr-1" /> Agregar al pedido
           </Button>
         </div>
@@ -309,7 +327,7 @@ export function OrderBuilder() {
                   <li key={it.id} className="rounded-lg border p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium text-sm">{it.micheladaName}</p>
+                        <p className="font-medium text-sm">{orderItemLabel(it)}</p>
                         {it.selectedToppings.length > 0 && (
                           <p className="text-xs text-muted-foreground mt-1">
                             Fases:{" "}

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { queueLabel } from "@/lib/comanda-queue";
-import { faseOpcionNames, orderItemSubtitle, printComanda } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel, orderItemSubtitle, printComanda } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,7 @@ function OrderItemRow({
     <li className="py-3.5 first:pt-0">
       <div className="flex justify-between gap-4 items-baseline">
         <div className="min-w-0">
-          <p className="font-medium text-[15px] leading-snug">{item.micheladaName}</p>
+          <p className="font-medium text-[15px] leading-snug">{orderItemLabel(item)}</p>
           {subtitle && (
             <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
           )}

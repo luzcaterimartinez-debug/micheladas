@@ -1,10 +1,12 @@
 import { MapPin, ShoppingCart, Trash2, User } from "lucide-react";
 
+import { QuantityStepper } from "@/components/QuantityStepper";
 import { Button } from "@/components/ui/button";
 import { MeseroStepHeader, ThemedPanel, ThemedPanelHeader } from "@/components/michelandia/michelandia-ui";
 import { formatMenuPrice } from "@/lib/michelandia-theme";
-import { faseOpcionNames, orderItemSubtitle } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel, orderItemSubtitle } from "@/lib/comanda-display";
 import type { Mesa, MicheladaType, OrderItem } from "@/lib/micheladas-store";
+import { orderItemQuantity } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
 
 const TOUCH = "touch-manipulation active:scale-[0.98] transition-all duration-150";
@@ -16,16 +18,19 @@ type Props = {
   mesa?: Mesa;
   cliente?: string;
   onRemoveItem: (id: string) => void;
+  onUpdateQuantity: (id: string, quantity: number) => void;
 };
 
 function CartItemRow({
   item,
   productos,
   onRemove,
+  onUpdateQuantity,
 }: {
   item: OrderItem;
   productos: MicheladaType[];
   onRemove: () => void;
+  onUpdateQuantity: (quantity: number) => void;
 }) {
   const tops = faseOpcionNames(item.micheladaId, item.selectedToppings, productos);
   const subtitle = orderItemSubtitle(item);
@@ -33,6 +38,7 @@ function CartItemRow({
     ...tops,
     ...item.additions.map((a) => (a.price > 0 ? `${a.name} +${formatMenuPrice(a.price)}` : a.name)),
   ];
+  const qty = orderItemQuantity(item);
 
   return (
     <div className="flex gap-3 px-4 py-3.5 first:pt-4 last:pb-4">
@@ -40,9 +46,9 @@ function CartItemRow({
         <div className="flex justify-between gap-3 items-baseline">
           <div className="min-w-0">
             <p className="font-bold text-[15px] leading-snug tracking-tight truncate text-slate-900">
-              {item.micheladaName}
+              {orderItemLabel(item)}
             </p>
-            {subtitle && (
+            {subtitle && qty === 1 && item.size && (
               <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
             )}
           </div>
@@ -60,6 +66,13 @@ function CartItemRow({
             {item.notes}
           </p>
         )}
+        <div className="mt-3">
+          <QuantityStepper
+            size="sm"
+            value={qty}
+            onChange={onUpdateQuantity}
+          />
+        </div>
       </div>
       <Button
         type="button"
@@ -82,16 +95,17 @@ export function MeseroPasoCarrito({
   mesa,
   cliente,
   onRemoveItem,
+  onUpdateQuantity,
 }: Props) {
   const clienteLabel = cliente?.trim();
-  const count = cart.length;
+  const count = cart.reduce((sum, it) => sum + orderItemQuantity(it), 0);
 
   return (
     <div className="space-y-4">
       <MeseroStepHeader
         stepLabel="Paso final"
         title="Tu pedido"
-        description="Revisa los ítems y envía la comanda a barra cuando esté listo."
+        description="Revisa los ítems, ajusta cantidades y envía la comanda a barra cuando esté listo."
       />
 
       {(mesa || clienteLabel) && (
@@ -121,7 +135,7 @@ export function MeseroPasoCarrito({
         </div>
       ) : (
         <ThemedPanel themeId="adiciones">
-          <ThemedPanelHeader themeId="adiciones" title="Resumen" subtitle={`${count} ítem${count === 1 ? "" : "s"}`} />
+          <ThemedPanelHeader themeId="adiciones" title="Resumen" subtitle={`${count} bebida${count === 1 ? "" : "s"}`} />
           <div className="divide-y divide-slate-100">
             {cart.map((it) => (
               <CartItemRow
@@ -129,6 +143,7 @@ export function MeseroPasoCarrito({
                 item={it}
                 productos={productos}
                 onRemove={() => onRemoveItem(it.id)}
+                onUpdateQuantity={(quantity) => onUpdateQuantity(it.id, quantity)}
               />
             ))}
             <div className="bg-amber-50 px-4 py-3.5 flex items-center justify-between gap-3">

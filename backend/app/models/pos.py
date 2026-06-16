@@ -17,6 +17,7 @@ class OrderItemOut(BaseModel):
     micheladaName: str
     size: str | None = None
     basePrice: float
+    quantity: int = Field(default=1, ge=1, le=99)
     selectedToppings: list[str] = Field(default_factory=list)
     additions: list[AdicionItem] = Field(default_factory=list)
     notes: str | None = None
@@ -29,6 +30,7 @@ class OrderItemIn(BaseModel):
     micheladaName: str
     size: str | None = None
     basePrice: float
+    quantity: int = Field(default=1, ge=1, le=99)
     selectedToppings: list[str] = Field(default_factory=list)
     additions: list[AdicionItem] = Field(default_factory=list)
     notes: str | None = None

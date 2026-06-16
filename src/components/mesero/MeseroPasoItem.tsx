@@ -1,5 +1,6 @@
 import { MapPin, Plus, User } from "lucide-react";
 
+import { QuantityStepper } from "@/components/QuantityStepper";
 import { Button } from "@/components/ui/button";
 import {
   MeseroStepHeader,
@@ -20,6 +21,8 @@ type Props = {
   additions: AdditionLine[];
   notes?: string;
   itemTotal: number;
+  quantity: number;
+  onQuantityChange: (quantity: number) => void;
   mesa?: Mesa;
   cliente?: string;
   onAddToCart: () => void;
@@ -31,6 +34,8 @@ export function MeseroPasoItem({
   additions,
   notes,
   itemTotal,
+  quantity,
+  onQuantityChange,
   mesa,
   cliente,
   onAddToCart,
@@ -77,11 +82,19 @@ export function MeseroPasoItem({
               {notes.trim()}
             </p>
           )}
-          <div className="flex items-center justify-between gap-3 pt-2 border-t border-dashed border-slate-200">
-            <span className="text-sm font-bold text-slate-600">Total ítem</span>
-            <span className="text-2xl font-black tabular-nums text-slate-900">
-              {formatMenuPrice(itemTotal)}
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2 border-t border-dashed border-slate-200">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">
+                Cantidad
+              </p>
+              <QuantityStepper value={quantity} onChange={onQuantityChange} />
+            </div>
+            <div className="text-right">
+              <span className="text-sm font-bold text-slate-600 block">Total ítem</span>
+              <span className="text-2xl font-black tabular-nums text-slate-900">
+                {formatMenuPrice(itemTotal)}
+              </span>
+            </div>
           </div>
         </div>
       </ThemedPanel>

@@ -38,7 +38,7 @@ import { buildOrderDeductions } from "@/lib/inventory-deduction";
 import { getComandasListas, getMesaActivity } from "@/lib/pos-utils";
 import { useMenu } from "@/lib/menu-context";
 import {
-  calcItemTotal,
+  calcItemLineTotal,
   useComandas,
   useInventory,
   useMesas,
@@ -69,6 +69,7 @@ export function MeseroOrderWizard() {
   const [toppings, setToppings] = useState<string[]>([]);
   const [additionIds, setAdditionIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [itemQuantity, setItemQuantity] = useState(1);
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [sending, setSending] = useState(false);
 
@@ -95,7 +96,7 @@ export function MeseroOrderWizard() {
     [adiciones, additionIds],
   );
 
-  const itemTotal = michelada ? calcItemTotal(michelada.price, selectedAdditions) : 0;
+  const itemTotal = michelada ? calcItemLineTotal(michelada.price, selectedAdditions, itemQuantity) : 0;
   const cartTotal = cart.reduce((s, i) => s + i.total, 0);
   const mesaSeleccionada = mesas.find((m) => m.id === mesaId);
   const comandasListas = useMemo(() => getComandasListas(comandas), [comandas]);
@@ -134,6 +135,7 @@ export function MeseroOrderWizard() {
     setToppings([]);
     setAdditionIds([]);
     setNotes("");
+    setItemQuantity(1);
   }
 
   function selectCategoria(id: string) {
@@ -156,6 +158,7 @@ export function MeseroOrderWizard() {
       micheladaId: michelada.id,
       micheladaName: michelada.name,
       basePrice: michelada.price,
+      quantity: itemQuantity,
       selectedToppings: [...toppings],
       additions: selectedAdditions,
       notes: notes.trim() || undefined,
@@ -164,7 +167,11 @@ export function MeseroOrderWizard() {
     setCart((c) => [...c, item]);
     resetItemBuilder();
     setSelectedId("");
-    toast.success(`${michelada.name} agregada`);
+    toast.success(
+      itemQuantity > 1
+        ? `${itemQuantity}× ${michelada.name} agregadas`
+        : `${michelada.name} agregada`,
+    );
     setCurrentStep("carrito");
   }
 
@@ -426,6 +433,8 @@ export function MeseroOrderWizard() {
           additions={selectedAdditions}
           notes={notes}
           itemTotal={itemTotal}
+          quantity={itemQuantity}
+          onQuantityChange={setItemQuantity}
           mesa={mesaSeleccionada}
           cliente={cliente}
           onAddToCart={addToCart}
@@ -440,6 +449,19 @@ export function MeseroOrderWizard() {
           mesa={mesaSeleccionada}
           cliente={cliente}
           onRemoveItem={(id) => setCart((c) => c.filter((x) => x.id !== id))}
+          onUpdateQuantity={(id, quantity) =>
+            setCart((c) =>
+              c.map((it) =>
+                it.id === id
+                  ? {
+                      ...it,
+                      quantity,
+                      total: calcItemLineTotal(it.basePrice, it.additions, quantity),
+                    }
+                  : it,
+              ),
+            )
+          }
         />
       )}
       </div>

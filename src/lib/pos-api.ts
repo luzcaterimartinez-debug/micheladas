@@ -35,6 +35,7 @@ function mapOrderItem(raw: Record<string, unknown>): OrderItem {
     micheladaName: String(raw.micheladaName),
     size: raw.size != null && raw.size !== "" ? String(raw.size) : undefined,
     basePrice: Number(raw.basePrice),
+    quantity: raw.quantity != null ? Number(raw.quantity) : 1,
     selectedToppings: (raw.selectedToppings as string[]) ?? [],
     additions: (raw.additions as OrderItem["additions"]) ?? [],
     notes: raw.notes != null ? String(raw.notes) : undefined,

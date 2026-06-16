@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { queueLabel, sortComandasByQueue } from "@/lib/comanda-queue";
-import { faseOpcionNames, printComanda } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel, printComanda } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import { useComandas, type Comanda } from "@/lib/micheladas-store";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
@@ -62,7 +62,7 @@ export function ComandasList() {
                 {c.items.map((it) => (
                   <li key={it.id} className="border-l-2 border-primary/40 pl-3">
                     <div className="flex justify-between font-medium">
-                      <span>{it.micheladaName}</span>
+                      <span>{orderItemLabel(it)}</span>
                       <span>${it.total}</span>
                     </div>
                     {it.selectedToppings.length > 0 && (

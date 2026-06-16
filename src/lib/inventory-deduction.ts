@@ -61,24 +61,25 @@ export function buildOrderDeductions(
   const totals: Record<string, number> = {};
 
   for (const it of cart) {
+    const itemQty = Math.max(1, it.quantity ?? 1);
     const producto = productos.find((p) => p.id === it.micheladaId);
     const productOpciones = producto?.faseOpciones ?? [];
     const allOpciones = [...faseCatalog, ...productOpciones];
 
     for (const line of consumoForProduct(producto, it.micheladaId)) {
-      add(totals, line.clave, line.cantidad);
+      add(totals, line.clave, line.cantidad * itemQty);
     }
 
     for (const opcionId of it.selectedToppings) {
       const d = opcionDeduction(opcionId, allOpciones);
-      if (d) add(totals, d.key, d.qty);
+      if (d) add(totals, d.key, d.qty * itemQty);
     }
 
     for (const a of it.additions) {
       const def = adicionesCatalog.find((d) => d.id === a.id);
       const key = def?.stockKey ?? a.id;
       const qty = def?.cantidad ?? 1;
-      add(totals, key, qty);
+      add(totals, key, qty * itemQty);
     }
   }
 

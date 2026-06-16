@@ -1,10 +1,17 @@
 import { queueLabel } from "@/lib/comanda-queue";
-import { MICHELADAS, type Comanda, type MicheladaType, type OrderItem } from "@/lib/micheladas-store";
+import { MICHELADAS, orderItemQuantity, type Comanda, type MicheladaType, type OrderItem } from "@/lib/micheladas-store";
 
-/** Subtítulo bajo el nombre (solo comandas antiguas con campo size). */
+/** Subtítulo bajo el nombre (tamaño legacy o cantidad). */
 export function orderItemSubtitle(item: OrderItem): string | null {
-  const s = item.size?.trim();
-  return s || null;
+  const size = item.size?.trim();
+  const qty = orderItemQuantity(item);
+  if (qty > 1) return `${qty} unidades`;
+  return size || null;
+}
+
+export function orderItemLabel(item: OrderItem): string {
+  const qty = orderItemQuantity(item);
+  return qty > 1 ? `${qty}× ${item.micheladaName}` : item.micheladaName;
 }
 
 export function faseOpcionNames(
@@ -30,10 +37,11 @@ export function renderComandaTicket(
     .map((it) => {
       const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos).join(", ");
       const adds = it.additions.map((a) => a.name).join(", ");
+      const label = orderItemLabel(it);
       return `
         <div style="margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;font-weight:bold">
-            <span>${it.micheladaName}${it.size ? ` · ${it.size}` : ""}</span><span>$${it.total}</span>
+            <span>${label}${it.size && orderItemQuantity(it) === 1 ? ` · ${it.size}` : ""}</span><span>$${it.total}</span>
           </div>
           ${tops ? `<div style="font-size:11px">Toppings: ${tops}</div>` : ""}
           ${adds ? `<div style="font-size:11px">Adiciones: ${adds}</div>` : ""}

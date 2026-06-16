@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS comanda_items (
   producto_nombre VARCHAR(120) NOT NULL,
   tamano VARCHAR(50) NULL,
   precio_base DECIMAL(10, 2) NOT NULL,
+  cantidad INT NOT NULL DEFAULT 1,
   toppings_json JSON NOT NULL,
   adiciones_json JSON NOT NULL,
   notas VARCHAR(500) NULL,

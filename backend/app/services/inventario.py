@@ -171,7 +171,12 @@ def load_producto_consumo(cursor: Any, producto_id: str) -> list[tuple[str, floa
     return [(str(r["inventario_clave"]), float(r["cantidad"])) for r in rows]
 
 
-def _deduct_fase_opciones(cursor: Any, opcion_ids: list[str], totals: dict[str, float]) -> None:
+def _deduct_fase_opciones(
+    cursor: Any,
+    opcion_ids: list[str],
+    totals: dict[str, float],
+    item_qty: float = 1,
+) -> None:
     for opcion_id in opcion_ids:
         row = fetch_one(
             cursor,
@@ -184,12 +189,12 @@ def _deduct_fase_opciones(cursor: Any, opcion_ids: list[str], totals: dict[str, 
         )
         if row and row.get("inventario_clave"):
             clave = str(row["inventario_clave"])
-            qty = float(row["cantidad"] or 1)
-            totals[clave] += qty
+            opcion_qty = float(row["cantidad"] or 1)
+            totals[clave] += opcion_qty * item_qty
             continue
         inv = fetch_one(cursor, "SELECT clave FROM inventario WHERE clave = %s", (opcion_id,))
         if inv:
-            totals[str(opcion_id)] += 1.0
+            totals[str(opcion_id)] += 1.0 * item_qty
 
 
 def _sync_producto_consumo(cursor: Any) -> None:
@@ -204,6 +209,7 @@ def apply_order_deductions(cursor: Any, items: list[OrderItemIn]) -> None:
     totals: dict[str, float] = defaultdict(float)
 
     for item in items:
+        item_qty = max(1, int(getattr(item, "quantity", 1) or 1))
         rows = fetch_all(
             cursor,
             """
@@ -215,12 +221,12 @@ def apply_order_deductions(cursor: Any, items: list[OrderItemIn]) -> None:
         )
         if rows:
             for row in rows:
-                totals[str(row["inventario_clave"])] += float(row["cantidad"])
+                totals[str(row["inventario_clave"])] += float(row["cantidad"]) * item_qty
         else:
             for clave, cantidad in _consumo_por_producto(item.micheladaId):
-                totals[clave] += cantidad
+                totals[clave] += cantidad * item_qty
 
-        _deduct_fase_opciones(cursor, item.selectedToppings, totals)
+        _deduct_fase_opciones(cursor, item.selectedToppings, totals, item_qty)
 
         for adicion in item.additions:
             ad_row = fetch_one(
@@ -231,13 +237,13 @@ def apply_order_deductions(cursor: Any, items: list[OrderItemIn]) -> None:
             stock_key = ad_row.get("stock_key") if ad_row else None
             if not stock_key and adicion.id:
                 stock_key = adicion.id
-            qty = float(ad_row["cantidad"] or 1) if ad_row else 1.0
-            if stock_key and qty > 0:
+            ad_qty = float(ad_row["cantidad"] or 1) if ad_row else 1.0
+            if stock_key and ad_qty > 0:
                 inv = fetch_one(
                     cursor, "SELECT clave FROM inventario WHERE clave = %s", (stock_key,)
                 )
                 if inv:
-                    totals[str(stock_key)] += qty
+                    totals[str(stock_key)] += ad_qty * item_qty
 
     for clave, qty in totals.items():
         if qty <= 0:
