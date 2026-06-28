@@ -117,7 +117,10 @@ export function ComandaViewDialog({
   function handlePrintTicket() {
     if (comanda.items.length === 0) return;
     flushSync(() => setOpen(false));
-    if (!printComandaDialogNow(comanda, productos)) {
+    const result = printComandaDialogNow(comanda, productos);
+    if (result === "rawbt") {
+      toast.success("Ticket enviado a la impresora");
+    } else if (result === false) {
       toast.error("No se pudo abrir la impresión. Revisa permisos del navegador.");
     }
   }

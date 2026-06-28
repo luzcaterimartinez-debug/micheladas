@@ -60,7 +60,7 @@ export function printComandaOnSend(
   _preOpenedPopup?: Window | null,
 ): boolean {
   if (typeof window === "undefined") return false;
-  return printComandaDialogNow(comanda, productos);
+  return printComandaDialogNow(comanda, productos) !== false;
 }
 
 export function printComandaIfNew(
