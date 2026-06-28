@@ -41,13 +41,10 @@ export function isPrintStationMarked(): boolean {
   return localStorage.getItem(PRINT_STATION_KEY) !== "0";
 }
 
-/** RawBT en Android: imprime por Bluetooth sin diálogo del navegador. */
+/** RawBT en Android: solo si el usuario lo activó (requiere app instalada). */
 export function isRawBtPreferred(): boolean {
   if (typeof window === "undefined") return false;
-  const stored = localStorage.getItem(RAWBT_KEY);
-  if (stored === "0") return false;
-  if (stored === "1") return true;
-  return /Android/i.test(navigator.userAgent);
+  return localStorage.getItem(RAWBT_KEY) === "1";
 }
 
 export function setRawBtEnabled(enabled: boolean): void {

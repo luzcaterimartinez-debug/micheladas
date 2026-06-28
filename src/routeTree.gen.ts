@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TicketRouteImport } from './routes/ticket'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ImpresionRouteImport } from './routes/impresion'
 import { Route as CartaRouteImport } from './routes/carta'
@@ -16,6 +17,11 @@ import { Route as BarraRouteImport } from './routes/barra'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TicketRoute = TicketRouteImport.update({
+  id: '/ticket',
+  path: '/ticket',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/carta': typeof CartaRoute
   '/impresion': typeof ImpresionRoute
   '/login': typeof LoginRoute
+  '/ticket': typeof TicketRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/carta': typeof CartaRoute
   '/impresion': typeof ImpresionRoute
   '/login': typeof LoginRoute
+  '/ticket': typeof TicketRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,12 +79,20 @@ export interface FileRoutesById {
   '/carta': typeof CartaRoute
   '/impresion': typeof ImpresionRoute
   '/login': typeof LoginRoute
+  '/ticket': typeof TicketRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/barra' | '/carta' | '/impresion' | '/login'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/barra'
+    | '/carta'
+    | '/impresion'
+    | '/login'
+    | '/ticket'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/barra' | '/carta' | '/impresion' | '/login'
+  to: '/' | '/admin' | '/barra' | '/carta' | '/impresion' | '/login' | '/ticket'
   id:
     | '__root__'
     | '/'
@@ -85,6 +101,7 @@ export interface FileRouteTypes {
     | '/carta'
     | '/impresion'
     | '/login'
+    | '/ticket'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -94,10 +111,18 @@ export interface RootRouteChildren {
   CartaRoute: typeof CartaRoute
   ImpresionRoute: typeof ImpresionRoute
   LoginRoute: typeof LoginRoute
+  TicketRoute: typeof TicketRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/ticket': {
+      id: '/ticket'
+      path: '/ticket'
+      fullPath: '/ticket'
+      preLoaderRoute: typeof TicketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -150,6 +175,7 @@ const rootRouteChildren: RootRouteChildren = {
   CartaRoute: CartaRoute,
   ImpresionRoute: ImpresionRoute,
   LoginRoute: LoginRoute,
+  TicketRoute: TicketRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

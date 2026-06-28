@@ -119,10 +119,11 @@ export function ComandaViewDialog({
     flushSync(() => setOpen(false));
     const result = printComandaDialogNow(comanda, productos);
     if (result === "rawbt") {
-      toast.success("Ticket enviado a la impresora");
+      toast.success("Ticket enviado a la impresora Bluetooth");
     } else if (result === false) {
-      toast.error("No se pudo abrir la impresión. Revisa permisos del navegador.");
+      toast.error("No se pudo abrir la impresión.");
     }
+    // result === "browser" en tablet: navega a /ticket automáticamente
   }
 
   function handleConfirm() {

@@ -1,7 +1,8 @@
 import { queueLabel } from "@/lib/comanda-queue";
 import { enqueuePrint } from "@/lib/print-queue";
 import { DEFAULT_PRINTER, isRawBtPreferred } from "@/lib/printer-config";
-import { tryPrintRawBt } from "@/lib/rawbt-print";
+import { tryPrintRawBt, tryPrintRawBtFromUserGesture } from "@/lib/rawbt-print";
+import { navigateToTicketPrintPage } from "@/lib/ticket-print-session";
 import { MICHELADAS, orderItemQuantity, type Comanda, type MicheladaType, type OrderItem } from "@/lib/micheladas-store";
 
 /** Subtítulo bajo el nombre (tamaño legacy o cantidad). */
@@ -240,16 +241,13 @@ const PRINT_FRAME_ID = "michelada-print-frame";
 const PRINT_OVERLAY_ID = "michelada-print-overlay";
 const PRINT_STYLE_ID = "michelada-print-style";
 
-function parseTicketHtml(fullHtml: string): { body: string; css: string } {
-  const parsed = new DOMParser().parseFromString(fullHtml, "text/html");
-  return {
-    body: parsed.body.innerHTML,
-    css: parsed.querySelector("style")?.textContent ?? "",
-  };
+function isMobileBrowser(): boolean {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 }
 
-function isMobileBrowser(): boolean {
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+/** En tablet/móvil: página dedicada /ticket (Chrome no imprime bien la SPA). */
+function tryPrintViaTicketPage(fullHtml: string): boolean {
+  return navigateToTicketPrintPage(fullHtml, location.pathname + location.search, true);
 }
 
 /** Ventana nueva con solo el ticket (más fiable en clic del usuario). */
@@ -357,10 +355,12 @@ function tryPrintViaBlobWindow(fullHtml: string): boolean {
   }
 }
 
-/** Overlay en la página: oculta toda la UI y deja solo el ticket al imprimir. */
+/** Overlay en la página (solo escritorio como respaldo). */
 function tryPrintViaOverlay(fullHtml: string): boolean {
   try {
-    const { body, css } = parseTicketHtml(fullHtml);
+    const parsed = new DOMParser().parseFromString(fullHtml, "text/html");
+    const body = parsed.body.innerHTML;
+    const css = parsed.querySelector("style")?.textContent ?? "";
     const w = DEFAULT_PRINTER.paperMm;
 
     document.getElementById(PRINT_STYLE_ID)?.remove();
@@ -500,7 +500,7 @@ function tryPrintViaIframe(fullHtml: string): boolean {
 }
 
 /**
- * Imprime solo el ticket. Orden: RawBT → ventana nueva → blob → overlay → iframe.
+ * Tablet/móvil → /ticket. Escritorio → ventana nueva / overlay / iframe.
  */
 function runPrintTicket(fullHtml: string, plainText?: string, skipRawBt = false): boolean {
   if (typeof window === "undefined" || typeof document === "undefined") return false;
@@ -509,13 +509,8 @@ function runPrintTicket(fullHtml: string, plainText?: string, skipRawBt = false)
     return true;
   }
 
-  const mobile = isMobileBrowser();
-
-  if (mobile) {
-    if (tryPrintViaBlankWindow(fullHtml)) return true;
-    if (tryPrintViaBlobWindow(fullHtml)) return true;
-    if (tryPrintViaOverlay(fullHtml)) return true;
-    return tryPrintViaIframe(fullHtml);
+  if (isMobileBrowser()) {
+    return tryPrintViaTicketPage(fullHtml);
   }
 
   if (tryPrintViaBlankWindow(fullHtml)) return true;
@@ -545,8 +540,16 @@ export function printComandaDialogNow(
 ): PrintTicketResult {
   const html = renderComandaTicket(c, productos);
   const plain = renderComandaTicketPlainText(c, productos);
-  if (plain && isRawBtPreferred() && tryPrintRawBt(plain)) return "rawbt";
-  return runPrintTicket(html, plain) ? "browser" : false;
+
+  if (plain && isRawBtPreferred() && tryPrintRawBtFromUserGesture(plain)) {
+    return "rawbt";
+  }
+
+  if (isMobileBrowser()) {
+    return tryPrintViaTicketPage(html) ? "browser" : false;
+  }
+
+  return runPrintTicket(html, plain, true) ? "browser" : false;
 }
 
 export function printComanda(

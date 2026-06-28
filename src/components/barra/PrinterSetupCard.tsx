@@ -76,7 +76,7 @@ export function PrinterSetupCard({ className }: Props) {
         </label>
         {IS_ANDROID && (
           <label className="flex items-center justify-between gap-2 text-xs font-medium cursor-pointer">
-            <span>Usar RawBT (Bluetooth automático)</span>
+            <span>Usar RawBT (Bluetooth sin Chrome)</span>
             <Switch
               checked={rawBt}
               onCheckedChange={(v) => {
