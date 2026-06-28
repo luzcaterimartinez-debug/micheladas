@@ -1,5 +1,6 @@
 import { Beer, LogOut } from "lucide-react";
 
+import { PwaInstallButton } from "@/components/PwaInstallButton";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -55,6 +56,7 @@ export function AdminMobileHeader({
             <p className="text-xs text-muted-foreground truncate">{userName}</p>
           </div>
         </button>
+        <PwaInstallButton size="icon" variant="outline" label="Instalar app" />
         <Button
           type="button"
           variant="outline"

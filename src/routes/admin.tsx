@@ -13,6 +13,7 @@ import { AdminReportes } from "@/components/admin/AdminReportes";
 import { AdminNomina } from "@/components/admin/AdminNomina";
 import { AdminCaja } from "@/components/admin/AdminCaja";
 import { AdminMobileHeader, AdminMobileNav } from "@/components/admin/AdminMobileNav";
+import { PwaInstallButton } from "@/components/PwaInstallButton";
 import { MenuProvider } from "@/lib/menu-context";
 import { ComandasList } from "@/components/ComandasList";
 import { InventoryPanel } from "@/components/InventoryPanel";
@@ -100,7 +101,8 @@ function AdminPanel() {
               );
             })}
           </nav>
-          <div className="p-3 border-t">
+          <div className="p-3 border-t space-y-2">
+            <PwaInstallButton variant="outline" size="sm" className="w-full" />
             <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleLogout}>
               <LogOut className="h-4 w-4" />
               Salir

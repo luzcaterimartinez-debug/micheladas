@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PwaInstallButton } from "@/components/PwaInstallButton";
 import { Toaster } from "@/components/ui/sonner";
 import { getStoredSession, login } from "@/lib/auth";
 import { homePathForRole } from "@/lib/auth-routes";
@@ -151,6 +152,9 @@ function LoginPage() {
                   )}
                 </Button>
               </form>
+              <div className="mt-4 flex justify-center">
+                <PwaInstallButton variant="outline" size="sm" className="rounded-xl border-slate-300" />
+              </div>
               <p className="mt-5 text-center text-xs text-slate-500 leading-relaxed">
                 
               </p>

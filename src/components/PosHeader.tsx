@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Beer, LogOut } from "lucide-react";
 
+import { PwaInstallButton } from "@/components/PwaInstallButton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -89,6 +90,12 @@ export function PosHeader({
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {badge}
+          <PwaInstallButton
+            size="icon"
+            variant="ghost"
+            light={isMichelandia}
+            label="Instalar app"
+          />
           {(userName || roleLabel) && (
             <div className="hidden sm:block text-right max-w-[9rem] mr-0.5">
               {userName && (
