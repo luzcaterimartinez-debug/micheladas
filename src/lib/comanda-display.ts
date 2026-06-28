@@ -244,7 +244,6 @@ const PRINT_STYLE_ID = "michelada-print-style";
  * visible (p. ej. mesas); inyectamos el ticket en el documento con @media print.
  */
 function runPrint(html: string, _silent: boolean) {
-  document.getElementById(PRINT_ROOT_ID)?.remove();
   document.getElementById(PRINT_STYLE_ID)?.remove();
 
   const parsed = new DOMParser().parseFromString(html, "text/html");
@@ -255,7 +254,6 @@ function runPrint(html: string, _silent: boolean) {
   const style = document.createElement("style");
   style.id = PRINT_STYLE_ID;
   style.textContent = `
-    ${ticketCss}
     @media screen {
       #${PRINT_ROOT_ID} {
         position: fixed;
@@ -268,10 +266,12 @@ function runPrint(html: string, _silent: boolean) {
       }
     }
     @media print {
-      body > *:not(#${PRINT_ROOT_ID}) {
+      ${ticketCss}
+      
+      body > * {
         display: none !important;
       }
-      #${PRINT_ROOT_ID} {
+      body > #${PRINT_ROOT_ID} {
         display: block !important;
         position: static !important;
         width: ${w}mm !important;
@@ -285,14 +285,21 @@ function runPrint(html: string, _silent: boolean) {
     }
   `;
 
-  const root = document.createElement("div");
-  root.id = PRINT_ROOT_ID;
-  root.setAttribute("aria-hidden", "true");
+  let root = document.getElementById(PRINT_ROOT_ID);
+  if (!root) {
+    root = document.createElement("div");
+    root.id = PRINT_ROOT_ID;
+    root.setAttribute("aria-hidden", "true");
+    document.body.appendChild(root);
+  }
   root.innerHTML = ticketHtml;
 
   const cleanup = () => {
     setTimeout(() => {
-      root.remove();
+      const r = document.getElementById(PRINT_ROOT_ID);
+      if (r) {
+        r.innerHTML = "";
+      }
       style.remove();
     }, 2500);
   };
@@ -307,8 +314,7 @@ function runPrint(html: string, _silent: boolean) {
   };
 
   document.head.appendChild(style);
-  document.body.appendChild(root);
-  requestAnimationFrame(() => setTimeout(doPrint, 200));
+  requestAnimationFrame(() => setTimeout(doPrint, 300));
 }
 
 export function printComanda(
