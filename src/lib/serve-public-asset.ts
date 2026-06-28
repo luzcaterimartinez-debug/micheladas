@@ -7,12 +7,14 @@ const PUBLIC_FILES = new Set([
   "/icon-192x192.png",
   "/icon-512x512.png",
   "/manifest.webmanifest",
+  "/sw.js",
 ]);
 
 const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
   ".png": "image/png",
   ".webmanifest": "application/manifest+json",
+  ".js": "application/javascript",
 };
 
 export async function servePublicAsset(request: Request): Promise<Response | null> {
