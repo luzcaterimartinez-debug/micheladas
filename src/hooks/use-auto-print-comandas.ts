@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 
 import { printComanda } from "@/lib/comanda-display";
+import {
+  isAutoPrintEnabled,
+  isPrintStation,
+  setAutoPrintEnabled,
+  setPrintStation,
+} from "@/lib/printer-config";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 
+export { isAutoPrintEnabled, setAutoPrintEnabled, setPrintStation };
+
 const PRINTED_KEY = "micheladas_printed_comandas";
-const AUTO_PRINT_KEY = "micheladas_auto_print";
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -30,16 +37,6 @@ function savePrintedIds(ids: Set<string>): void {
   );
 }
 
-export function isAutoPrintEnabled(): boolean {
-  if (typeof window === "undefined") return true;
-  const raw = localStorage.getItem(AUTO_PRINT_KEY);
-  return raw !== "0";
-}
-
-export function setAutoPrintEnabled(enabled: boolean): void {
-  localStorage.setItem(AUTO_PRINT_KEY, enabled ? "1" : "0");
-}
-
 export function markComandaPrinted(id: string): void {
   if (typeof window === "undefined") return;
   const ids = loadPrintedIds();
@@ -48,12 +45,13 @@ export function markComandaPrinted(id: string): void {
   savePrintedIds(ids);
 }
 
-/** Imprime al enviar pedido y evita reimpresión en la estación de barra (mismo navegador). */
+/** @deprecated La impresión la hace solo la estación /barra o /impresion vía useAutoPrintComandas. */
 export function printComandaOnSend(
   comanda: Comanda,
   productos: MicheladaType[],
 ): void {
   if (typeof window === "undefined") return;
+  if (!isPrintStation()) return;
   printComanda(comanda, productos, { silent: true });
   markComandaPrinted(comanda.id);
 }
@@ -75,7 +73,7 @@ export function useAutoPrintComandas(
   const [printedCount, setPrintedCount] = useState(0);
 
   useEffect(() => {
-    if (!enabled || typeof window === "undefined") return;
+    if (!enabled || typeof window === "undefined" || !isPrintStation()) return;
 
     const pendientes = comandas.filter((c) => c.status === "pendiente");
     for (const c of pendientes) {

@@ -8,8 +8,10 @@ import { BarraComandaCard } from "@/components/barra/BarraComandaCard";
 import {
   isAutoPrintEnabled,
   setAutoPrintEnabled,
+  setPrintStation,
   useAutoPrintComandas,
 } from "@/hooks/use-auto-print-comandas";
+import { usePrintStationPoll } from "@/hooks/use-print-station-poll";
 import { useMenu } from "@/lib/menu-context";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,17 +61,20 @@ function ColumnHeader({
 }
 
 export function BarraPanel({ userName, onLogout }: BarraPanelProps) {
-  const { comandas, updateStatus } = useComandas();
+  const { comandas, updateStatus, reload } = useComandas();
   const { productos } = useMenu();
   const [autoPrint, setAutoPrint] = useState(isAutoPrintEnabled);
   const [mobileTab, setMobileTab] = useState<FilterTab>("activas");
   const [showHistorial, setShowHistorial] = useState(false);
+
+  usePrintStationPoll(reload, autoPrint);
 
   const { lastPrinted, printedCount } = useAutoPrintComandas(comandas, productos, autoPrint);
 
   function toggleAutoPrint(v: boolean) {
     setAutoPrintEnabled(v);
     setAutoPrint(v);
+    if (v) setPrintStation(true);
   }
 
   const pendientes = useMemo(

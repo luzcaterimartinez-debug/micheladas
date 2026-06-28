@@ -28,7 +28,6 @@ import { MeseroPasoItem } from "@/components/mesero/MeseroPasoItem";
 import { MeseroPasoFase } from "@/components/mesero/MeseroPasoFase";
 import { MeseroPasoMesa } from "@/components/mesero/MeseroPasoMesa";
 import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
-import { printComandaOnSend } from "@/hooks/use-auto-print-comandas";
 import { faseOpcionNames } from "@/lib/comanda-display";
 import { isFasePaso, opcionesForFase, parseFaseIdFromPaso } from "@/lib/fases";
 import { getStoredSession } from "@/lib/auth";
@@ -198,11 +197,10 @@ export function MeseroOrderWizard() {
       } else {
         void reloadInventario();
       }
-      printComandaOnSend(c, productos);
       toast.success(
         queued
-          ? `Turno ${c.queueOrder} · Comanda #${c.folio} guardada localmente. Ticket impreso.`
-          : `Turno ${c.queueOrder} · Comanda #${c.folio} enviada. Ticket impreso.`,
+          ? `Turno ${c.queueOrder} · Comanda #${c.folio} guardada localmente.`
+          : `Turno ${c.queueOrder} · Comanda #${c.folio} enviada a barra.`,
       );
       void reloadMesas();
       setCart([]);

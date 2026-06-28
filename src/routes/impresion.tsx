@@ -4,14 +4,17 @@ import { useState } from "react";
 import { Toaster } from "sonner";
 
 import { BarraAutoPrintBanner } from "@/components/barra/BarraAutoPrintBanner";
+import { PrinterSetupCard } from "@/components/barra/PrinterSetupCard";
 import { Button } from "@/components/ui/button";
 import { clearSession, validateSession } from "@/lib/auth";
 import { queueLabel } from "@/lib/comanda-queue";
 import {
   isAutoPrintEnabled,
   setAutoPrintEnabled,
+  setPrintStation,
   useAutoPrintComandas,
 } from "@/hooks/use-auto-print-comandas";
+import { usePrintStationPoll } from "@/hooks/use-print-station-poll";
 import { MenuProvider, useMenu } from "@/lib/menu-context";
 import { useComandas } from "@/lib/micheladas-store";
 
@@ -52,15 +55,18 @@ function ImpresionRoute() {
 }
 
 function ImpresionPanel({ userName, onLogout }: { userName: string; onLogout: () => void }) {
-  const { comandas, loading } = useComandas();
+  const { comandas, loading, reload } = useComandas();
   const { productos } = useMenu();
   const [autoPrint, setAutoPrint] = useState(isAutoPrintEnabled);
+
+  usePrintStationPoll(reload, autoPrint);
 
   const { lastPrinted, printedCount } = useAutoPrintComandas(comandas, productos, autoPrint);
 
   function toggleAutoPrint(v: boolean) {
     setAutoPrintEnabled(v);
     setAutoPrint(v);
+    if (v) setPrintStation(true);
   }
 
   const pendientes = comandas.filter((c) => c.status === "pendiente").length;
@@ -89,6 +95,8 @@ function ImpresionPanel({ userName, onLogout }: { userName: string; onLogout: ()
           printedCount={printedCount}
         />
 
+        <PrinterSetupCard />
+
         <div className="rounded-xl border p-6 text-center space-y-2">
           {loading ? (
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
@@ -106,8 +114,9 @@ function ImpresionPanel({ userName, onLogout }: { userName: string; onLogout: ()
         </div>
 
         <p className="text-xs text-muted-foreground text-center leading-relaxed px-2">
-          Deja esta pantalla abierta en la PC de barra con la impresora predeterminada configurada.
-          Cuando el mesero envía desde su celular, el ticket sale aquí automáticamente.
+          Deja esta pantalla abierta en la PC de barra con la AON MPR-200 como impresora
+          predeterminada. Cuando el mesero envía desde su celular, el ticket sale aquí en unos
+          segundos.
         </p>
       </main>
     </div>

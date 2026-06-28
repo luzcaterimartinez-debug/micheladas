@@ -41,8 +41,8 @@ export function BarraAutoPrintBanner({
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {enabled
-              ? "Los pedidos del mesero se imprimen aquí (PC con impresora). El celular solo envía."
-              : "Activa esto en la computadora de barra conectada a la impresora."}
+              ? "Pedidos nuevos se imprimen en la AON MPR-200 (58 mm) de esta PC."
+              : "Activa en la PC de barra con la MPR-200 conectada por USB."}
           </p>
           {lastPrinted && enabled && (
             <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
