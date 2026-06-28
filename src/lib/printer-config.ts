@@ -7,6 +7,13 @@ export const DEFAULT_PRINTER = {
 
 const AUTO_PRINT_KEY = "micheladas_auto_print";
 const PRINT_STATION_KEY = "micheladas_print_station";
+const RAWBT_KEY = "micheladas_rawbt";
+
+export function isPrintRoute(): boolean {
+  if (typeof window === "undefined") return false;
+  const path = window.location.pathname;
+  return path === "/impresion" || path === "/barra";
+}
 
 export function isAutoPrintEnabled(): boolean {
   if (typeof window === "undefined") return true;
@@ -20,8 +27,7 @@ export function setAutoPrintEnabled(enabled: boolean): void {
 /** Solo en /impresion o /barra (nunca en la pantalla del mesero). */
 export function isPrintStation(): boolean {
   if (typeof window === "undefined") return false;
-  const path = window.location.pathname;
-  if (path !== "/impresion" && path !== "/barra") return false;
+  if (!isPrintRoute()) return false;
   return localStorage.getItem(PRINT_STATION_KEY) !== "0";
 }
 
@@ -31,5 +37,18 @@ export function setPrintStation(enabled: boolean): void {
 
 export function isPrintStationMarked(): boolean {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem(PRINT_STATION_KEY) === "1";
+  return localStorage.getItem(PRINT_STATION_KEY) !== "0";
+}
+
+/** RawBT en Android: imprime por Bluetooth sin diálogo del navegador. */
+export function isRawBtPreferred(): boolean {
+  if (typeof window === "undefined") return false;
+  const stored = localStorage.getItem(RAWBT_KEY);
+  if (stored === "0") return false;
+  if (stored === "1") return true;
+  return /Android/i.test(navigator.userAgent);
+}
+
+export function setRawBtEnabled(enabled: boolean): void {
+  localStorage.setItem(RAWBT_KEY, enabled ? "1" : "0");
 }

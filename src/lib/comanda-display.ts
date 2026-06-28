@@ -1,5 +1,7 @@
 import { queueLabel } from "@/lib/comanda-queue";
-import { DEFAULT_PRINTER } from "@/lib/printer-config";
+import { enqueuePrint } from "@/lib/print-queue";
+import { DEFAULT_PRINTER, isRawBtPreferred } from "@/lib/printer-config";
+import { tryPrintRawBt } from "@/lib/rawbt-print";
 import { MICHELADAS, orderItemQuantity, type Comanda, type MicheladaType, type OrderItem } from "@/lib/micheladas-store";
 
 /** Subtítulo bajo el nombre (tamaño legacy o cantidad). */
@@ -180,6 +182,60 @@ export function renderTestTicket(): string {
   </div></body></html>`;
 }
 
+const LINE = "--------------------------------";
+
+export function renderComandaTicketPlainText(
+  c: Comanda,
+  productos: MicheladaType[] = MICHELADAS,
+): string {
+  const turno = c.queueOrder > 0 ? c.queueOrder : c.folio;
+  const hora = new Date(c.createdAt).toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const lines: string[] = [
+    "MICHELANDIA · BARRA",
+    "",
+    queueLabel(turno).toUpperCase(),
+    `Folio #${c.folio}`,
+    LINE,
+    `Cliente: ${c.cliente}`,
+  ];
+  if (c.mesa) lines.push(`Mesa: ${c.mesa}`);
+  lines.push(`Hora: ${hora}`, LINE);
+
+  for (const it of c.items) {
+    const label = orderItemLabel(it);
+    lines.push(`${label}  $${it.total}`);
+    const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos);
+    if (tops.length) lines.push(`  + ${tops.join(", ")}`);
+    const adds = it.additions.map((a) => a.name);
+    if (adds.length) lines.push(`  Adic: ${adds.join(", ")}`);
+    if (it.notes) lines.push(`  * ${it.notes}`);
+  }
+
+  lines.push(LINE, `TOTAL  $${c.total}`, "", DEFAULT_PRINTER.model);
+  return lines.join("\n");
+}
+
+export function renderTestTicketPlainText(): string {
+  const now = new Date().toLocaleString("es-MX");
+  return [
+    "MICHELANDIA",
+    "",
+    "PRUEBA",
+    LINE,
+    `Impresora: ${DEFAULT_PRINTER.model}`,
+    `Papel: ${DEFAULT_PRINTER.paperMm} mm`,
+    now,
+    LINE,
+    "Impresion automatica OK",
+  ].join("\n");
+}
+
 const PRINT_ROOT_ID = "michelada-print-root";
 const PRINT_STYLE_ID = "michelada-print-style";
 
@@ -260,11 +316,32 @@ export function printComanda(
   productos: MicheladaType[] = MICHELADAS,
   opts?: { silent?: boolean },
 ) {
-  runPrint(renderComandaTicket(c, productos), Boolean(opts?.silent));
+  const silent = Boolean(opts?.silent);
+  const html = renderComandaTicket(c, productos);
+  const plain = renderComandaTicketPlainText(c, productos);
+  const useRawBt = isRawBtPreferred() && /Android/i.test(navigator.userAgent);
+
+  enqueuePrint(
+    () => {
+      if (useRawBt && tryPrintRawBt(plain)) return;
+      runPrint(html, silent);
+    },
+    { skipWait: useRawBt },
+  );
 }
 
 export function printTestTicket(): void {
-  runPrint(renderTestTicket(), true);
+  const html = renderTestTicket();
+  const plain = renderTestTicketPlainText();
+  const useRawBt = isRawBtPreferred() && /Android/i.test(navigator.userAgent);
+
+  enqueuePrint(
+    () => {
+      if (useRawBt && tryPrintRawBt(plain)) return;
+      runPrint(html, true);
+    },
+    { skipWait: useRawBt },
+  );
 }
 
 export function timeAgo(ts: number): string {

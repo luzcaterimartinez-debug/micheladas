@@ -12,6 +12,7 @@ import {
   useAutoPrintComandas,
 } from "@/hooks/use-auto-print-comandas";
 import { usePrintStationPoll } from "@/hooks/use-print-station-poll";
+import { usePrintStationBootstrap } from "@/hooks/use-print-station-bootstrap";
 import { useMenu } from "@/lib/menu-context";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -67,6 +68,7 @@ export function BarraPanel({ userName, onLogout }: BarraPanelProps) {
   const [mobileTab, setMobileTab] = useState<FilterTab>("activas");
   const [showHistorial, setShowHistorial] = useState(false);
 
+  usePrintStationBootstrap();
   usePrintStationPoll(reload, autoPrint);
 
   const { lastPrinted, printedCount } = useAutoPrintComandas(comandas, productos, autoPrint);

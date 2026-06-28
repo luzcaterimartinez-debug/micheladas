@@ -1,6 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
-import { printComanda } from "@/lib/comanda-display";
+import {
+  COMANDA_NUEVA_EVENT,
+  loadPrintedIds,
+  printComandaIfNew,
+} from "@/lib/comanda-print";
 import {
   isAutoPrintEnabled,
   isPrintStation,
@@ -10,51 +14,7 @@ import {
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 
 export { isAutoPrintEnabled, setAutoPrintEnabled, setPrintStation };
-
-const PRINTED_KEY = "micheladas_printed_comandas";
-
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function loadPrintedIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = localStorage.getItem(PRINTED_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw) as { date?: string; ids?: string[] };
-    if (parsed.date !== todayKey() || !Array.isArray(parsed.ids)) return new Set();
-    return new Set(parsed.ids);
-  } catch {
-    return new Set();
-  }
-}
-
-function savePrintedIds(ids: Set<string>): void {
-  localStorage.setItem(
-    PRINTED_KEY,
-    JSON.stringify({ date: todayKey(), ids: [...ids] }),
-  );
-}
-
-export function markComandaPrinted(id: string): void {
-  if (typeof window === "undefined") return;
-  const ids = loadPrintedIds();
-  if (ids.has(id)) return;
-  ids.add(id);
-  savePrintedIds(ids);
-}
-
-/** @deprecated La impresión la hace solo la estación /barra o /impresion vía useAutoPrintComandas. */
-export function printComandaOnSend(
-  comanda: Comanda,
-  productos: MicheladaType[],
-): void {
-  if (typeof window === "undefined") return;
-  if (!isPrintStation()) return;
-  printComanda(comanda, productos, { silent: true });
-  markComandaPrinted(comanda.id);
-}
+export { printComandaOnSend, markComandaPrinted } from "@/lib/comanda-print";
 
 export type LastPrinted = {
   folio: number;
@@ -62,6 +22,20 @@ export type LastPrinted = {
   cliente: string;
   at: number;
 };
+
+function recordPrint(
+  c: Comanda,
+  setLastPrinted: (v: LastPrinted) => void,
+  setPrintedCount: Dispatch<SetStateAction<number>>,
+): void {
+  setLastPrinted({
+    folio: c.folio,
+    queueOrder: c.queueOrder,
+    cliente: c.cliente,
+    at: Date.now(),
+  });
+  setPrintedCount((n) => n + 1);
+}
 
 export function useAutoPrintComandas(
   comandas: Comanda[],
@@ -72,24 +46,32 @@ export function useAutoPrintComandas(
   const [lastPrinted, setLastPrinted] = useState<LastPrinted | null>(null);
   const [printedCount, setPrintedCount] = useState(0);
 
+  const tryPrint = (c: Comanda) => {
+    if (!enabled || !isPrintStation()) return;
+    if (printComandaIfNew(c, productos, printedIds.current)) {
+      recordPrint(c, setLastPrinted, setPrintedCount);
+    }
+  };
+
   useEffect(() => {
     if (!enabled || typeof window === "undefined" || !isPrintStation()) return;
 
-    const pendientes = comandas.filter((c) => c.status === "pendiente");
-    for (const c of pendientes) {
-      if (printedIds.current.has(c.id)) continue;
-      printedIds.current.add(c.id);
-      savePrintedIds(printedIds.current);
-      printComanda(c, productos, { silent: true });
-      setLastPrinted({
-        folio: c.folio,
-        queueOrder: c.queueOrder,
-        cliente: c.cliente,
-        at: Date.now(),
-      });
-      setPrintedCount((n) => n + 1);
+    for (const c of comandas.filter((x) => x.status === "pendiente")) {
+      tryPrint(c);
     }
   }, [comandas, enabled, productos]);
+
+  useEffect(() => {
+    if (!enabled || !isPrintStation()) return;
+
+    const onNueva = (e: Event) => {
+      const c = (e as CustomEvent<Comanda>).detail;
+      if (c) tryPrint(c);
+    };
+
+    window.addEventListener(COMANDA_NUEVA_EVENT, onNueva);
+    return () => window.removeEventListener(COMANDA_NUEVA_EVENT, onNueva);
+  }, [enabled, productos]);
 
   return { lastPrinted, printedCount };
 }

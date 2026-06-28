@@ -27,6 +27,7 @@ import { MeseroPasoCarrito } from "@/components/mesero/MeseroPasoCarrito";
 import { MeseroPasoItem } from "@/components/mesero/MeseroPasoItem";
 import { MeseroPasoFase } from "@/components/mesero/MeseroPasoFase";
 import { MeseroPasoMesa } from "@/components/mesero/MeseroPasoMesa";
+import { printComandaOnSend } from "@/hooks/use-auto-print-comandas";
 import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
 import { faseOpcionNames } from "@/lib/comanda-display";
 import { isFasePaso, opcionesForFase, parseFaseIdFromPaso } from "@/lib/fases";
@@ -197,6 +198,7 @@ export function MeseroOrderWizard() {
       } else {
         void reloadInventario();
       }
+      printComandaOnSend(c, productos);
       toast.success(
         queued
           ? `Turno ${c.queueOrder} · Comanda #${c.folio} guardada localmente.`

@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { Loader2, LogOut, PrinterCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
 
 import { BarraAutoPrintBanner } from "@/components/barra/BarraAutoPrintBanner";
@@ -15,6 +15,7 @@ import {
   useAutoPrintComandas,
 } from "@/hooks/use-auto-print-comandas";
 import { usePrintStationPoll } from "@/hooks/use-print-station-poll";
+import { usePrintStationBootstrap } from "@/hooks/use-print-station-bootstrap";
 import { MenuProvider, useMenu } from "@/lib/menu-context";
 import { useComandas } from "@/lib/micheladas-store";
 
@@ -58,6 +59,14 @@ function ImpresionPanel({ userName, onLogout }: { userName: string; onLogout: ()
   const { comandas, loading, reload } = useComandas();
   const { productos } = useMenu();
   const [autoPrint, setAutoPrint] = useState(isAutoPrintEnabled);
+
+  usePrintStationBootstrap();
+
+  useEffect(() => {
+    setAutoPrintEnabled(true);
+    setPrintStation(true);
+    setAutoPrint(true);
+  }, []);
 
   usePrintStationPoll(reload, autoPrint);
 

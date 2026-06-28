@@ -7,6 +7,7 @@ import {
   resetInventarioApi,
 } from "@/lib/inventory-api";
 import { nextQueueOrderForToday, sortComandasByQueue } from "@/lib/comanda-queue";
+import { notifyComandaNueva } from "@/lib/comanda-print";
 import {
   getCachedComandas,
   getCachedInventario,
@@ -324,6 +325,7 @@ export function useComandas() {
         const all = [...prev, nueva].sort(sortComandasByQueue);
         setCachedComandas(all);
         setComandas(all);
+        notifyComandaNueva(nueva);
         return nueva;
       }
 
@@ -334,6 +336,7 @@ export function useComandas() {
         enqueueOp({ type: "comanda:create", clientId, payload: c });
         mergeComandaInCache(nueva);
         setComandas((prev) => [...prev, nueva].sort(sortComandasByQueue));
+        notifyComandaNueva(nueva);
         return nueva;
       };
 
@@ -345,6 +348,7 @@ export function useComandas() {
         setComandas((prev) =>
           [...prev.filter((x) => x.id !== nueva.id), nueva].sort(sortComandasByQueue),
         );
+        notifyComandaNueva(nueva);
         return nueva;
       } catch (err) {
         if (isNetworkFailure(err)) return queueOffline();
