@@ -27,7 +27,7 @@ import { MeseroPasoCarrito } from "@/components/mesero/MeseroPasoCarrito";
 import { MeseroPasoItem } from "@/components/mesero/MeseroPasoItem";
 import { MeseroPasoFase } from "@/components/mesero/MeseroPasoFase";
 import { MeseroPasoMesa } from "@/components/mesero/MeseroPasoMesa";
-import { printComandaOnSend } from "@/lib/comanda-print";
+import { printComandaOnSend, openPrintPopup } from "@/lib/comanda-print";
 import { buildOptimisticComanda } from "@/lib/offline/sync-engine";
 import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
 import { faseOpcionNames } from "@/lib/comanda-display";
@@ -212,8 +212,12 @@ export function MeseroOrderWizard() {
     const clientId = crypto.randomUUID();
     const ticket = buildOptimisticComanda(payload, clientId);
 
-    // Imprimir en el mismo clic (antes de cualquier await) — requerido en móvil
-    printComandaOnSend(ticket, productos);
+    // IMPORTANTE: abrir el popup ANTES de cualquier await — en móvil,
+    // window.open() solo funciona sin bloqueo dentro del gesto del usuario.
+    const printPopup = openPrintPopup();
+
+    // Imprimir en el mismo clic (antes de cualquier await)
+    printComandaOnSend(ticket, productos, printPopup);
     setConfirmOpen(false);
 
     void (async () => {

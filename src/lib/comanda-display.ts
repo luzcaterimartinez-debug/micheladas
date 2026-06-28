@@ -236,119 +236,91 @@ export function renderTestTicketPlainText(): string {
   ].join("\n");
 }
 
-const PRINT_ROOT_ID = "michelada-print-root";
-const PRINT_STYLE_ID = "michelada-print-style";
+
 
 /**
- * Imprime solo el ticket. En móvil/tablet, iframe.print() suele mandar la pantalla
- * visible (p. ej. mesas); inyectamos el ticket en el documento con @media print.
+ * Abre una ventana popup vacía SINCRÓNICAMENTE dentro del gesto del usuario
+ * (antes de cualquier await/setTimeout) para evitar que el bloqueador de popups
+ * la bloquee. Luego se rellena con el HTML del ticket y se llama print().
  */
-function runPrint(html: string, _silent: boolean) {
-  document.getElementById(PRINT_STYLE_ID)?.remove();
-
-  const parsed = new DOMParser().parseFromString(html, "text/html");
-  const ticketHtml = parsed.body.innerHTML;
-  const ticketCss = parsed.querySelector("style")?.textContent ?? "";
+export function openPrintPopup(): Window | null {
+  if (typeof window === "undefined") return null;
   const w = DEFAULT_PRINTER.paperMm;
-
-  const style = document.createElement("style");
-  style.id = PRINT_STYLE_ID;
-  style.textContent = `
-    @media screen {
-      #${PRINT_ROOT_ID} {
-        position: fixed;
-        left: -10000px;
-        top: 0;
-        width: ${w}mm;
-        opacity: 0;
-        pointer-events: none;
-        z-index: -1;
-      }
-    }
-    @media print {
-      ${ticketCss}
-      
-      body > * {
-        display: none !important;
-      }
-      body > #${PRINT_ROOT_ID} {
-        display: block !important;
-        position: static !important;
-        width: ${w}mm !important;
-        max-width: ${w}mm !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        opacity: 1 !important;
-        color: #000 !important;
-        background: #fff !important;
-      }
-    }
-  `;
-
-  let root = document.getElementById(PRINT_ROOT_ID);
-  if (!root) {
-    root = document.createElement("div");
-    root.id = PRINT_ROOT_ID;
-    root.setAttribute("aria-hidden", "true");
-    document.body.appendChild(root);
-  }
-  root.innerHTML = ticketHtml;
-
-  const cleanup = () => {
-    setTimeout(() => {
-      const r = document.getElementById(PRINT_ROOT_ID);
-      if (r) {
-        r.innerHTML = "";
-      }
-      style.remove();
-    }, 2500);
-  };
-
-  const doPrint = () => {
-    const onAfterPrint = () => {
-      window.removeEventListener("afterprint", onAfterPrint);
-      cleanup();
-    };
-    window.addEventListener("afterprint", onAfterPrint);
-    window.setTimeout(() => {
-      window.removeEventListener("afterprint", onAfterPrint);
-      cleanup();
-    }, 60_000);
-    try {
-      window.focus();
-      window.print();
-    } catch {
-      cleanup();
-    }
-  };
-
-  document.head.appendChild(style);
-  requestAnimationFrame(() => setTimeout(doPrint, 100));
+  return window.open(
+    "",
+    "_blank",
+    `width=${w * 4},height=600,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`,
+  );
 }
 
-/** Imprime de inmediato con diálogo (debe llamarse en el clic del usuario). */
+/**
+ * Escribe el HTML del ticket en el popup ya abierto y llama print().
+ * Si popup es null (fue bloqueado), intenta abrir una ventana de fallback.
+ */
+function runPrint(html: string, _silent: boolean, preOpenedPopup?: Window | null) {
+  const popup = preOpenedPopup ?? null;
+
+  const doWriteAndPrint = (win: Window) => {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+
+    const doPrint = () => {
+      try {
+        win.print();
+      } finally {
+        setTimeout(() => {
+          try { win.close(); } catch { /* ignorar */ }
+        }, 1500);
+      }
+    };
+
+    if (win.document.readyState === "complete") {
+      setTimeout(doPrint, 350);
+    } else {
+      win.addEventListener("load", () => setTimeout(doPrint, 350));
+      setTimeout(doPrint, 800); // seguro si el load ya ocurrió
+    }
+  };
+
+  if (popup && !popup.closed) {
+    doWriteAndPrint(popup);
+    return;
+  }
+
+  // Popup bloqueado — intentar abrir de todas formas (puede fallar en móvil)
+  const win = window.open("", "_blank");
+  if (win) {
+    doWriteAndPrint(win);
+  }
+}
+
+/** Imprime de inmediato con diálogo usando un popup pre-abierto en el clic del usuario. */
 export function printComandaDialogNow(
   c: Comanda,
   productos: MicheladaType[] = MICHELADAS,
+  preOpenedPopup?: Window | null,
 ): void {
-  runPrint(renderComandaTicket(c, productos), false);
+  runPrint(renderComandaTicket(c, productos), false, preOpenedPopup);
 }
 
 export function printComanda(
   c: Comanda,
   productos: MicheladaType[] = MICHELADAS,
-  opts?: { silent?: boolean; dialog?: boolean },
+  opts?: { silent?: boolean; dialog?: boolean; popup?: Window | null },
 ) {
   const forceDialog = opts?.dialog === true;
   const silent = Boolean(opts?.silent);
   const html = renderComandaTicket(c, productos);
   const plain = renderComandaTicketPlainText(c, productos);
   const useRawBt = !forceDialog && /Android/i.test(navigator.userAgent);
+  const preOpenedPopup = opts?.popup;
 
   enqueuePrint(
     () => {
       if (useRawBt && tryPrintRawBt(plain)) return;
-      runPrint(html, silent);
+      runPrint(html, silent, preOpenedPopup);
     },
     { skipWait: useRawBt },
   );

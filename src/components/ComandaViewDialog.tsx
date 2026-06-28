@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { queueLabel } from "@/lib/comanda-queue";
-import { faseOpcionNames, orderItemLabel, orderItemSubtitle, printComandaDialogNow } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel, orderItemSubtitle, printComandaDialogNow, openPrintPopup } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
@@ -231,7 +231,10 @@ export function ComandaViewDialog({
                   variant="ghost"
                   size="sm"
                   className="gap-1.5 text-muted-foreground"
-                  onClick={() => printComandaDialogNow(comanda, productos)}
+                  onClick={() => {
+                    const popup = openPrintPopup();
+                    printComandaDialogNow(comanda, productos, popup);
+                  }}
                   disabled={comanda.items.length === 0}
                 >
                   <Printer className="h-4 w-4" />
