@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { queueLabel, sortComandasByQueue } from "@/lib/comanda-queue";
-import { faseOpcionNames, orderItemLabel, printComanda } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import { useComandas, type Comanda } from "@/lib/micheladas-store";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
-import { Printer, Check, Clock, Trash2, Package } from "lucide-react";
+import { Check, Clock, Trash2, Package } from "lucide-react";
 
 const STATUS_META: Record<Comanda["status"], { label: string; cls: string; icon: typeof Clock }> = {
   pendiente: { label: "Pendiente", cls: "bg-accent text-accent-foreground", icon: Clock },
@@ -99,9 +99,7 @@ export function ComandasList() {
                     Entregar
                   </Button>
                 )}
-                <Button size="sm" variant="outline" onClick={() => printComanda(c, productos)}>
-                  <Printer className="h-4 w-4 mr-1" /> Ticket
-                </Button>
+                <ComandaViewDialog comanda={c} trigger="print" label="Ticket" size="sm" variant="outline" />
                 <Button
                   size="sm"
                   variant="ghost"

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Eye, Loader2, Printer } from "lucide-react";
+import { ClipboardList, Eye, Loader2, Printer } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +43,8 @@ type Props = {
   onConfirm?: () => void | Promise<void>;
   confirming?: boolean;
   hideTrigger?: boolean;
+  /** Botón que abre el diálogo: ojo (ver) o impresora (imprimir). */
+  trigger?: "view" | "print";
 };
 
 function OrderItemRow({
@@ -94,6 +97,7 @@ export function ComandaViewDialog({
   onConfirm,
   confirming = false,
   hideTrigger = false,
+  trigger = "view",
 }: Props) {
   const { productos } = useMenu();
   const [internalOpen, setInternalOpen] = useState(false);
@@ -106,6 +110,15 @@ export function ComandaViewDialog({
 
   const isConfirm = mode === "confirm";
   const isPreview = comanda.folio <= 0;
+  const TriggerIcon = trigger === "print" ? Printer : Eye;
+  const triggerLabel = label ?? (trigger === "print" ? "Imprimir" : "Ver comanda");
+
+  function handlePrintTicket() {
+    if (comanda.items.length === 0) return;
+    if (!printComandaDialogNow(comanda, productos)) {
+      toast.error("No se pudo abrir la impresión. Revisa permisos del navegador.");
+    }
+  }
 
   function handleConfirm() {
     if (!onConfirm || comanda.items.length === 0 || confirming) return;
@@ -122,8 +135,8 @@ export function ComandaViewDialog({
           className={cn("gap-1.5", className)}
           onClick={() => setOpen(true)}
         >
-          <Eye className="h-4 w-4" />
-          {!iconOnly && label}
+          <TriggerIcon className="h-4 w-4" />
+          {!iconOnly && triggerLabel}
         </Button>
       )}
 
@@ -200,49 +213,56 @@ export function ComandaViewDialog({
             <Separator />
 
             {isConfirm ? (
-              <DialogFooter className="flex-col-reverse sm:flex-row gap-2 p-0 sm:justify-end">
+              <DialogFooter className="flex-col gap-2 p-0 sm:flex-col">
                 <Button
                   type="button"
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                  onClick={() => setOpen(false)}
-                  disabled={confirming}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  className="w-full sm:w-auto gap-2"
-                  onClick={handleConfirm}
+                  className="w-full gap-2"
+                  variant="default"
+                  onClick={handlePrintTicket}
                   disabled={confirming || comanda.items.length === 0}
                 >
-                  {confirming ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Printer className="h-4 w-4" />
-                  )}
-                  {confirming ? "Enviando…" : "Confirmar e imprimir"}
+                  <Printer className="h-4 w-4" />
+                  Imprimir comanda
                 </Button>
+                <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    onClick={() => setOpen(false)}
+                    disabled={confirming}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    className="w-full sm:w-auto gap-2"
+                    onClick={handleConfirm}
+                    disabled={confirming || comanda.items.length === 0}
+                  >
+                    {confirming ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ClipboardList className="h-4 w-4" />
+                    )}
+                    {confirming ? "Enviando…" : "Enviar a barra"}
+                  </Button>
+                </div>
               </DialogFooter>
             ) : (
-              <DialogFooter className="flex-row gap-2 p-0 sm:justify-end">
+              <DialogFooter className="flex-col-reverse sm:flex-row gap-2 p-0 sm:justify-end">
+                <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(false)}>
+                  Cerrar
+                </Button>
                 <Button
                   type="button"
-                  variant="ghost"
                   size="sm"
-                  className="gap-1.5 text-muted-foreground"
-                  onClick={() => {
-                    if (!printComandaDialogNow(comanda, productos)) {
-                      window.alert("No se pudo abrir la impresión. Revisa permisos del navegador.");
-                    }
-                  }}
+                  className="gap-1.5"
+                  onClick={handlePrintTicket}
                   disabled={comanda.items.length === 0}
                 >
                   <Printer className="h-4 w-4" />
-                  Imprimir
-                </Button>
-                <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(false)}>
-                  Cerrar
+                  Imprimir comanda
                 </Button>
               </DialogFooter>
             )}

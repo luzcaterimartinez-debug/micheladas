@@ -27,8 +27,6 @@ import { MeseroPasoCarrito } from "@/components/mesero/MeseroPasoCarrito";
 import { MeseroPasoItem } from "@/components/mesero/MeseroPasoItem";
 import { MeseroPasoFase } from "@/components/mesero/MeseroPasoFase";
 import { MeseroPasoMesa } from "@/components/mesero/MeseroPasoMesa";
-import { printComandaOnSend } from "@/lib/comanda-print";
-import { buildOptimisticComanda } from "@/lib/offline/sync-engine";
 import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
 import { faseOpcionNames } from "@/lib/comanda-display";
 import { isFasePaso, opcionesForFase, parseFaseIdFromPaso } from "@/lib/fases";
@@ -210,12 +208,7 @@ export function MeseroOrderWizard() {
       total: cartTotal,
     };
     const clientId = crypto.randomUUID();
-    const ticket = buildOptimisticComanda(payload, clientId);
 
-    const printed = printComandaOnSend(ticket, productos);
-    if (!printed) {
-      toast.error("No se pudo abrir la impresión. Intenta de nuevo.");
-    }
     setConfirmOpen(false);
 
     void (async () => {

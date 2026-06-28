@@ -1,11 +1,11 @@
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
-import { Check, Clock, Package, Printer } from "lucide-react";
+import { Check, Clock, Package } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { queueLabel } from "@/lib/comanda-queue";
-import { faseOpcionNames, orderItemLabel, orderItemSubtitle, printComanda, timeAgo } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel, orderItemSubtitle, timeAgo } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda } from "@/lib/micheladas-store";
 
@@ -135,9 +135,7 @@ export function BarraComandaCard({ comanda: c, onMarkLista, onMarkEntregada, com
               Entregada
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => printComanda(c, productos)}>
-            <Printer className="h-4 w-4" />
-          </Button>
+          <ComandaViewDialog comanda={c} trigger="print" iconOnly size="sm" variant="outline" />
         </div>
       </CardContent>
     </Card>

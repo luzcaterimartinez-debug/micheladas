@@ -18,8 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
-import { printComandaOnSend } from "@/lib/comanda-print";
-import { buildOptimisticComanda } from "@/lib/offline/sync-engine";
 import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
 import { getStoredSession } from "@/lib/auth";
 import { buildOrderDeductions } from "@/lib/inventory-deduction";
@@ -128,12 +126,7 @@ export function OrderBuilder() {
       total: cartTotal,
     };
     const clientId = crypto.randomUUID();
-    const ticket = buildOptimisticComanda(payload, clientId);
 
-    const printed = printComandaOnSend(ticket, productos);
-    if (!printed) {
-      toast.error("No se pudo abrir la impresión. Intenta de nuevo.");
-    }
     setConfirmOpen(false);
 
     void (async () => {
