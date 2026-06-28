@@ -44,6 +44,8 @@ type Props = {
   onConfirm?: () => void | Promise<void>;
   confirming?: boolean;
   hideTrigger?: boolean;
+  /** Ocultar botón de impresión (p. ej. confirmación antes de enviar). */
+  hidePrint?: boolean;
   /** Botón que abre el diálogo: ojo (ver) o impresora (imprimir). */
   trigger?: "view" | "print";
 };
@@ -98,6 +100,7 @@ export function ComandaViewDialog({
   onConfirm,
   confirming = false,
   hideTrigger = false,
+  hidePrint = false,
   trigger = "view",
 }: Props) {
   const { productos } = useMenu();
@@ -219,57 +222,47 @@ export function ComandaViewDialog({
             <Separator />
 
             {isConfirm ? (
-              <DialogFooter className="flex-col gap-2 p-0 sm:flex-col">
+              <DialogFooter className="flex-col-reverse sm:flex-row gap-2 p-0 sm:justify-end">
                 <Button
                   type="button"
-                  className="w-full gap-2"
-                  variant="default"
-                  onClick={handlePrintTicket}
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => setOpen(false)}
+                  disabled={confirming}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto gap-2"
+                  onClick={handleConfirm}
                   disabled={confirming || comanda.items.length === 0}
                 >
-                  <Printer className="h-4 w-4" />
-                  Imprimir comanda
+                  {confirming ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ClipboardList className="h-4 w-4" />
+                  )}
+                  {confirming ? "Enviando…" : "Enviar a barra"}
                 </Button>
-                <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full sm:w-auto"
-                    onClick={() => setOpen(false)}
-                    disabled={confirming}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="button"
-                    className="w-full sm:w-auto gap-2"
-                    onClick={handleConfirm}
-                    disabled={confirming || comanda.items.length === 0}
-                  >
-                    {confirming ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <ClipboardList className="h-4 w-4" />
-                    )}
-                    {confirming ? "Enviando…" : "Enviar a barra"}
-                  </Button>
-                </div>
               </DialogFooter>
             ) : (
               <DialogFooter className="flex-col-reverse sm:flex-row gap-2 p-0 sm:justify-end">
                 <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(false)}>
                   Cerrar
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={handlePrintTicket}
-                  disabled={comanda.items.length === 0}
-                >
-                  <Printer className="h-4 w-4" />
-                  Imprimir comanda
-                </Button>
+                {!hidePrint && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={handlePrintTicket}
+                    disabled={comanda.items.length === 0}
+                  >
+                    <Printer className="h-4 w-4" />
+                    Imprimir comanda
+                  </Button>
+                )}
               </DialogFooter>
             )}
           </div>

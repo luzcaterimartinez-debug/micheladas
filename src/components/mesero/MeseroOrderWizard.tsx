@@ -72,6 +72,8 @@ export function MeseroOrderWizard() {
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [sending, setSending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"confirm" | "view">("confirm");
+  const [dialogComanda, setDialogComanda] = useState<Comanda | null>(null);
 
   const categoriasActivas = useMemo(
     () => categorias.filter((c) => c.activo !== false && c.productos.length > 0),
@@ -194,7 +196,14 @@ export function MeseroOrderWizard() {
       toast.error("Agrega al menos una michelada");
       return;
     }
+    setDialogComanda(previewComanda);
+    setDialogMode("confirm");
     setConfirmOpen(true);
+  }
+
+  function handleConfirmDialogChange(open: boolean) {
+    setConfirmOpen(open);
+    if (!open) setDialogMode("confirm");
   }
 
   function confirmAndSendOrder() {
@@ -209,8 +218,6 @@ export function MeseroOrderWizard() {
     };
     const clientId = crypto.randomUUID();
 
-    setConfirmOpen(false);
-
     void (async () => {
       setSending(true);
       try {
@@ -222,7 +229,9 @@ export function MeseroOrderWizard() {
         } else {
           void reloadInventario();
         }
-        setConfirmOpen(false);
+        setDialogComanda(c);
+        setDialogMode("view");
+        setConfirmOpen(true);
         toast.success(
           queued
             ? `Turno ${c.queueOrder} · Comanda #${c.folio} guardada.`
@@ -581,13 +590,14 @@ export function MeseroOrderWizard() {
       )}
 
       <ComandaViewDialog
-        comanda={previewComanda}
-        mode="confirm"
+        comanda={dialogComanda ?? previewComanda}
+        mode={dialogMode}
         open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        onOpenChange={handleConfirmDialogChange}
         onConfirm={confirmAndSendOrder}
         confirming={sending}
         hideTrigger
+        hidePrint
       />
     </div>
   );

@@ -44,6 +44,8 @@ export function OrderBuilder() {
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [sending, setSending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"confirm" | "view">("confirm");
+  const [dialogComanda, setDialogComanda] = useState<Comanda | null>(null);
 
   const activeId = selectedId || productos[0]?.id || "";
   const michelada = productos.find((m) => m.id === activeId);
@@ -112,7 +114,14 @@ export function OrderBuilder() {
       toast.error("Agrega al menos una michelada");
       return;
     }
+    setDialogComanda(previewComanda);
+    setDialogMode("confirm");
     setConfirmOpen(true);
+  }
+
+  function handleConfirmDialogChange(open: boolean) {
+    setConfirmOpen(open);
+    if (!open) setDialogMode("confirm");
   }
 
   function confirmAndSendOrder() {
@@ -127,8 +136,6 @@ export function OrderBuilder() {
     };
     const clientId = crypto.randomUUID();
 
-    setConfirmOpen(false);
-
     void (async () => {
       setSending(true);
       try {
@@ -138,7 +145,9 @@ export function OrderBuilder() {
         } else {
           void reloadInventario();
         }
-        setConfirmOpen(false);
+        setDialogComanda(c);
+        setDialogMode("view");
+        setConfirmOpen(true);
         toast.success(
           `${c.queueOrder ? `Turno ${c.queueOrder} · ` : ""}Comanda #${c.folio} enviada a barra.`,
         );
@@ -412,13 +421,14 @@ export function OrderBuilder() {
       </Card>
 
       <ComandaViewDialog
-        comanda={previewComanda}
-        mode="confirm"
+        comanda={dialogComanda ?? previewComanda}
+        mode={dialogMode}
         open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        onOpenChange={handleConfirmDialogChange}
         onConfirm={confirmAndSendOrder}
         confirming={sending}
         hideTrigger
+        hidePrint
       />
     </div>
   );
