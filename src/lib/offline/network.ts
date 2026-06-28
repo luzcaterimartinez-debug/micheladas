@@ -91,7 +91,9 @@ export function isNetworkFailure(err: unknown): boolean {
       msg.includes("network") ||
       msg.includes("load failed") ||
       msg.includes("name not resolved") ||
-      msg.includes("err_name_not_resolved");
+      msg.includes("err_name_not_resolved") ||
+      msg.includes("timeout") ||
+      msg.includes("aborted");
     if (failed) markApiUnreachable();
     return failed;
   }

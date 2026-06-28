@@ -1,4 +1,5 @@
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
+import { fetchWithTimeout } from "@/lib/api-fetch";
 import { markApiFailureFromStatus } from "@/lib/offline/network";
 import type { Comanda, Mesa, OrderItem } from "@/lib/micheladas-store";
 
@@ -144,7 +145,7 @@ export async function createComandaApi(
   input: Omit<Comanda, "id" | "folio" | "queueOrder" | "createdAt" | "status">,
   clientId?: string,
 ): Promise<Comanda> {
-  const res = await fetch(`${getApiUrl()}/api/comandas`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}/api/comandas`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({

@@ -14,7 +14,7 @@ import {
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 
 export { isAutoPrintEnabled, setAutoPrintEnabled, setPrintStation };
-export { printComandaOnSend, markComandaPrinted } from "@/lib/comanda-print";
+export { printComandaOnSend, markComandaPrinted, shouldPrintOnSend } from "@/lib/comanda-print";
 
 export type LastPrinted = {
   folio: number;

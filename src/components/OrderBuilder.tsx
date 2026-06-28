@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { printComandaOnSend } from "@/hooks/use-auto-print-comandas";
+import { printComandaOnSend } from "@/lib/comanda-print";
 import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
 import { getStoredSession } from "@/lib/auth";
 import { buildOrderDeductions } from "@/lib/inventory-deduction";

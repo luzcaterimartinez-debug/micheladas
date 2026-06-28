@@ -24,10 +24,11 @@ export function setAutoPrintEnabled(enabled: boolean): void {
   localStorage.setItem(AUTO_PRINT_KEY, enabled ? "1" : "0");
 }
 
-/** Solo en /impresion o /barra (nunca en la pantalla del mesero). */
+/** Solo en /impresion o /barra con impresión automática activa. */
 export function isPrintStation(): boolean {
   if (typeof window === "undefined") return false;
   if (!isPrintRoute()) return false;
+  if (!isAutoPrintEnabled()) return false;
   return localStorage.getItem(PRINT_STATION_KEY) !== "0";
 }
 

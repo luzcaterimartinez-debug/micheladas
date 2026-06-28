@@ -1,6 +1,6 @@
 import { queueLabel } from "@/lib/comanda-queue";
 import { enqueuePrint } from "@/lib/print-queue";
-import { DEFAULT_PRINTER, isRawBtPreferred } from "@/lib/printer-config";
+import { DEFAULT_PRINTER } from "@/lib/printer-config";
 import { tryPrintRawBt } from "@/lib/rawbt-print";
 import { MICHELADAS, orderItemQuantity, type Comanda, type MicheladaType, type OrderItem } from "@/lib/micheladas-store";
 
@@ -319,7 +319,7 @@ export function printComanda(
   const silent = Boolean(opts?.silent);
   const html = renderComandaTicket(c, productos);
   const plain = renderComandaTicketPlainText(c, productos);
-  const useRawBt = isRawBtPreferred() && /Android/i.test(navigator.userAgent);
+  const useRawBt = /Android/i.test(navigator.userAgent);
 
   enqueuePrint(
     () => {
@@ -333,7 +333,7 @@ export function printComanda(
 export function printTestTicket(): void {
   const html = renderTestTicket();
   const plain = renderTestTicketPlainText();
-  const useRawBt = isRawBtPreferred() && /Android/i.test(navigator.userAgent);
+  const useRawBt = /Android/i.test(navigator.userAgent);
 
   enqueuePrint(
     () => {

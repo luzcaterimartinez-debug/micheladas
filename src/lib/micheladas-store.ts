@@ -17,7 +17,7 @@ import {
   setCachedInventario,
   setCachedMesas,
 } from "@/lib/offline/local-cache";
-import { isNetworkFailure, shouldSyncWithServer } from "@/lib/offline/network";
+import { isNetworkFailure, isRetryableSyncError, shouldSyncWithServer } from "@/lib/offline/network";
 import { enqueueOp } from "@/lib/offline/outbox";
 import {
   buildOptimisticComanda,
@@ -351,7 +351,7 @@ export function useComandas() {
         notifyComandaNueva(nueva);
         return nueva;
       } catch (err) {
-        if (isNetworkFailure(err)) return queueOffline();
+        if (isNetworkFailure(err) || isRetryableSyncError(err)) return queueOffline();
         throw err;
       }
     },

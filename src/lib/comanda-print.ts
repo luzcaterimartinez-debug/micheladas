@@ -1,5 +1,5 @@
 import { printComanda } from "@/lib/comanda-display";
-import { isAutoPrintEnabled, isPrintStation, isRawBtPreferred } from "@/lib/printer-config";
+import { isAutoPrintEnabled, isPrintRoute } from "@/lib/printer-config";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 
 export const COMANDA_NUEVA_EVENT = "michelada-comanda-nueva";
@@ -47,21 +47,22 @@ export function notifyComandaNueva(comanda: Comanda): void {
   window.dispatchEvent(new CustomEvent(COMANDA_NUEVA_EVENT, { detail: comanda }));
 }
 
-/** ¿Este equipo debe imprimir al pulsar "Enviar a barra"? */
+/** ¿Imprimir ticket al enviar desde este equipo? */
 export function shouldPrintOnSend(): boolean {
   if (!isAutoPrintEnabled()) return false;
-  if (isPrintStation()) return true;
-  if (isRawBtPreferred() && /Android/i.test(navigator.userAgent)) return true;
+  if (isPrintRoute()) return true;
+  if (/Android/i.test(navigator.userAgent)) return true;
   return false;
 }
 
-/** Imprime al enviar (tablet con RawBT o estación /impresion en la misma sesión). */
-export function printComandaOnSend(comanda: Comanda, productos: MicheladaType[]): void {
-  if (typeof window === "undefined") return;
-  if (!shouldPrintOnSend()) return;
-  if (isComandaPrinted(comanda.id)) return;
+/** Imprime al enviar si este equipo tiene impresora o es estación de barra. */
+export function printComandaOnSend(comanda: Comanda, productos: MicheladaType[]): boolean {
+  if (typeof window === "undefined") return false;
+  if (!shouldPrintOnSend()) return false;
+  if (isComandaPrinted(comanda.id)) return false;
   markComandaPrinted(comanda.id);
   printComanda(comanda, productos, { silent: true });
+  return true;
 }
 
 export function printComandaIfNew(
