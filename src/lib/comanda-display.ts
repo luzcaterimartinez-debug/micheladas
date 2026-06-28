@@ -236,96 +236,59 @@ export function renderTestTicketPlainText(): string {
   ].join("\n");
 }
 
-
-
 const PRINT_FRAME_ID = "michelada-print-frame";
-const PRINT_GLOBAL_STYLE_ID = "michelada-print-global-style";
 
 /**
- * Carga el ticket en un iframe y usa @media print para ocultar el resto de la app.
- * Así solo sale el ticket, no la pantalla del mesero.
+ * Carga el ticket en un iframe oculto e imprime directamente desde
+ * el contentWindow del iframe. Así el diálogo de impresión solo ve
+ * el ticket, nunca la pantalla de la app.
  */
 function runPrintTicket(fullHtml: string): boolean {
   if (typeof window === "undefined" || typeof document === "undefined") return false;
 
   try {
+    // Elimina cualquier iframe previo que haya quedado huérfano
     document.getElementById(PRINT_FRAME_ID)?.remove();
-    document.getElementById(PRINT_GLOBAL_STYLE_ID)?.remove();
-
-    const w = DEFAULT_PRINTER.paperMm;
-
-    const style = document.createElement("style");
-    style.id = PRINT_GLOBAL_STYLE_ID;
-    style.textContent = `
-      @media screen {
-        #${PRINT_FRAME_ID} {
-          position: fixed !important;
-          left: -10000px !important;
-          top: 0 !important;
-          width: ${w}mm !important;
-          height: 1px !important;
-          border: none !important;
-          opacity: 0 !important;
-          pointer-events: none !important;
-        }
-      }
-      @media print {
-        @page { size: ${w}mm auto; margin: 0; }
-        html, body {
-          width: ${w}mm !important;
-          max-width: ${w}mm !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: #fff !important;
-        }
-        body > *:not(#${PRINT_FRAME_ID}) {
-          display: none !important;
-          visibility: hidden !important;
-        }
-        #${PRINT_FRAME_ID} {
-          display: block !important;
-          position: static !important;
-          width: ${w}mm !important;
-          max-width: ${w}mm !important;
-          height: auto !important;
-          min-height: 0 !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-          border: none !important;
-          overflow: visible !important;
-        }
-      }
-    `;
 
     const iframe = document.createElement("iframe");
     iframe.id = PRINT_FRAME_ID;
     iframe.setAttribute("title", "Ticket comanda");
     iframe.setAttribute("aria-hidden", "true");
 
-    document.head.appendChild(style);
+    // Ocultar visualmente fuera de pantalla
+    Object.assign(iframe.style, {
+      position: "fixed",
+      left: "-10000px",
+      top: "0",
+      width: `${DEFAULT_PRINTER.paperMm}mm`,
+      height: "1px",
+      border: "none",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+
     document.body.appendChild(iframe);
 
     const win = iframe.contentWindow;
     if (!win) {
-      style.remove();
       iframe.remove();
       return false;
     }
 
-    const cleanup = () => {
-      style.remove();
-      iframe.remove();
-    };
+    const cleanup = () => iframe.remove();
 
     const doPrint = () => {
       try {
-        window.focus();
-        window.print();
+        // ✅ Imprimir desde el contentWindow del iframe, no desde window
+        win.focus();
+        win.print();
       } catch {
         cleanup();
         return;
       }
-      window.addEventListener("afterprint", cleanup, { once: true });
+      // afterprint dispara en el iframe, no en la ventana principal
+      win.addEventListener("afterprint", cleanup, { once: true });
+      // Fallback por si afterprint no dispara (algunos navegadores)
       window.setTimeout(cleanup, 90_000);
     };
 
@@ -333,12 +296,11 @@ function runPrintTicket(fullHtml: string): boolean {
     win.document.write(fullHtml);
     win.document.close();
 
-    const schedule = () => window.setTimeout(doPrint, 250);
-
+    // Esperar a que el iframe cargue antes de imprimir
     if (win.document.readyState === "complete") {
-      schedule();
+      window.setTimeout(doPrint, 250);
     } else {
-      iframe.onload = schedule;
+      iframe.onload = () => window.setTimeout(doPrint, 250);
     }
 
     return true;
