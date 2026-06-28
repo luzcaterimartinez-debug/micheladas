@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import { ClipboardList, Eye, Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
 
@@ -115,6 +116,7 @@ export function ComandaViewDialog({
 
   function handlePrintTicket() {
     if (comanda.items.length === 0) return;
+    flushSync(() => setOpen(false));
     if (!printComandaDialogNow(comanda, productos)) {
       toast.error("No se pudo abrir la impresión. Revisa permisos del navegador.");
     }

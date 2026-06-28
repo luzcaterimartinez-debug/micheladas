@@ -238,70 +238,83 @@ export function renderTestTicketPlainText(): string {
 
 
 
-const PRINT_ROOT_ID = "michelada-print-root";
-const PRINT_STYLE_ID = "michelada-print-style";
+const PRINT_FRAME_ID = "michelada-print-frame";
+const PRINT_GLOBAL_STYLE_ID = "michelada-print-global-style";
 
 /**
- * Imprime el ticket en la misma pestaña (sin popup).
- * Funciona en celular, tablet y PC; evita bloqueadores de ventanas.
+ * Carga el ticket en un iframe y usa @media print para ocultar el resto de la app.
+ * Así solo sale el ticket, no la pantalla del mesero.
  */
-function runPrintInPage(html: string): boolean {
+function runPrintTicket(fullHtml: string): boolean {
   if (typeof window === "undefined" || typeof document === "undefined") return false;
 
   try {
-    document.getElementById(PRINT_STYLE_ID)?.remove();
+    document.getElementById(PRINT_FRAME_ID)?.remove();
+    document.getElementById(PRINT_GLOBAL_STYLE_ID)?.remove();
 
-    const parsed = new DOMParser().parseFromString(html, "text/html");
-    const ticketHtml = parsed.body.innerHTML;
-    const ticketCss = parsed.querySelector("style")?.textContent ?? "";
     const w = DEFAULT_PRINTER.paperMm;
 
     const style = document.createElement("style");
-    style.id = PRINT_STYLE_ID;
+    style.id = PRINT_GLOBAL_STYLE_ID;
     style.textContent = `
-      ${ticketCss}
       @media screen {
-        #${PRINT_ROOT_ID} {
-          position: fixed;
-          left: -10000px;
-          top: 0;
-          width: ${w}mm;
-          opacity: 0;
-          pointer-events: none;
-          z-index: -1;
+        #${PRINT_FRAME_ID} {
+          position: fixed !important;
+          left: -10000px !important;
+          top: 0 !important;
+          width: ${w}mm !important;
+          height: 1px !important;
+          border: none !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
         }
       }
       @media print {
-        body > *:not(#${PRINT_ROOT_ID}) {
-          display: none !important;
-        }
-        #${PRINT_ROOT_ID} {
-          display: block !important;
-          position: static !important;
+        @page { size: ${w}mm auto; margin: 0; }
+        html, body {
           width: ${w}mm !important;
           max-width: ${w}mm !important;
           margin: 0 !important;
           padding: 0 !important;
-          opacity: 1 !important;
-          color: #000 !important;
           background: #fff !important;
+        }
+        body > *:not(#${PRINT_FRAME_ID}) {
+          display: none !important;
+          visibility: hidden !important;
+        }
+        #${PRINT_FRAME_ID} {
+          display: block !important;
+          position: static !important;
+          width: ${w}mm !important;
+          max-width: ${w}mm !important;
+          height: auto !important;
+          min-height: 0 !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          border: none !important;
+          overflow: visible !important;
         }
       }
     `;
 
-    let root = document.getElementById(PRINT_ROOT_ID);
-    if (!root) {
-      root = document.createElement("div");
-      root.id = PRINT_ROOT_ID;
-      root.setAttribute("aria-hidden", "true");
-      document.body.appendChild(root);
+    const iframe = document.createElement("iframe");
+    iframe.id = PRINT_FRAME_ID;
+    iframe.setAttribute("title", "Ticket comanda");
+    iframe.setAttribute("aria-hidden", "true");
+
+    document.head.appendChild(style);
+    document.body.appendChild(iframe);
+
+    const win = iframe.contentWindow;
+    if (!win) {
+      style.remove();
+      iframe.remove();
+      return false;
     }
-    root.innerHTML = ticketHtml;
 
     const cleanup = () => {
-      const r = document.getElementById(PRINT_ROOT_ID);
-      if (r) r.innerHTML = "";
       style.remove();
+      iframe.remove();
     };
 
     const doPrint = () => {
@@ -310,40 +323,46 @@ function runPrintInPage(html: string): boolean {
         window.print();
       } catch {
         cleanup();
-        return false;
+        return;
       }
-      return true;
+      window.addEventListener("afterprint", cleanup, { once: true });
+      window.setTimeout(cleanup, 90_000);
     };
 
-    document.head.appendChild(style);
-    window.addEventListener("afterprint", () => cleanup(), { once: true });
-    window.setTimeout(() => cleanup(), 120_000);
+    win.document.open();
+    win.document.write(fullHtml);
+    win.document.close();
 
-    requestAnimationFrame(() => {
-      setTimeout(doPrint, 120);
-    });
+    const schedule = () => window.setTimeout(doPrint, 250);
+
+    if (win.document.readyState === "complete") {
+      schedule();
+    } else {
+      iframe.onload = schedule;
+    }
+
     return true;
   } catch {
     return false;
   }
 }
 
-/** @deprecated Usar runPrintInPage — los popups suelen bloquearse en móvil. */
+/** @deprecated Los popups suelen bloquearse en móvil. */
 export function openPrintPopup(): Window | null {
   return null;
 }
 
 function runPrint(html: string, _silent: boolean, _preOpenedPopup?: Window | null) {
-  runPrintInPage(html);
+  runPrintTicket(html);
 }
 
-/** Imprime de inmediato con diálogo (llamar en el clic del usuario). */
+/** Imprime el ticket con diálogo del sistema (llamar en el clic del usuario). */
 export function printComandaDialogNow(
   c: Comanda,
   productos: MicheladaType[] = MICHELADAS,
   _preOpenedPopup?: Window | null,
 ): boolean {
-  return runPrintInPage(renderComandaTicket(c, productos));
+  return runPrintTicket(renderComandaTicket(c, productos));
 }
 
 export function printComanda(
@@ -368,7 +387,7 @@ export function printComanda(
 }
 
 export function printTestTicket(): void {
-  runPrintInPage(renderTestTicket());
+  runPrintTicket(renderTestTicket());
 }
 
 export function timeAgo(ts: number): string {
