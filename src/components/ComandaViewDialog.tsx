@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, Printer } from "lucide-react";
+import { Eye, Loader2, Printer } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +35,13 @@ type Props = {
   className?: string;
   label?: string;
   iconOnly?: boolean;
+  /** Vista normal o confirmación antes de enviar a barra. */
+  mode?: "view" | "confirm";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onConfirm?: () => void | Promise<void>;
+  confirming?: boolean;
+  hideTrigger?: boolean;
 };
 
 function OrderItemRow({
@@ -81,23 +88,45 @@ export function ComandaViewDialog({
   className,
   label = "Ver comanda",
   iconOnly = false,
+  mode = "view",
+  open: controlledOpen,
+  onOpenChange,
+  onConfirm,
+  confirming = false,
+  hideTrigger = false,
 }: Props) {
   const { productos } = useMenu();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (v: boolean) => {
+    if (confirming) return;
+    if (isControlled) onOpenChange?.(v);
+    else setInternalOpen(v);
+  };
+
+  const isConfirm = mode === "confirm";
   const isPreview = comanda.folio <= 0;
+
+  async function handleConfirm() {
+    if (!onConfirm || comanda.items.length === 0) return;
+    await onConfirm();
+  }
 
   return (
     <>
-      <Button
-        type="button"
-        size={size}
-        variant={variant}
-        className={cn("gap-1.5", className)}
-        onClick={() => setOpen(true)}
-      >
-        <Eye className="h-4 w-4" />
-        {!iconOnly && label}
-      </Button>
+      {!hideTrigger && (
+        <Button
+          type="button"
+          size={size}
+          variant={variant}
+          className={cn("gap-1.5", className)}
+          onClick={() => setOpen(true)}
+        >
+          <Eye className="h-4 w-4" />
+          {!iconOnly && label}
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md gap-0 p-0 overflow-hidden max-h-[min(88vh,640px)] flex flex-col sm:rounded-xl">
@@ -105,26 +134,31 @@ export function ComandaViewDialog({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <DialogTitle className="text-lg font-semibold tracking-tight leading-tight">
-                  {isPreview
-                    ? "Vista previa"
-                    : `${queueLabel(comanda.queueOrder)} · Folio #${comanda.folio}`}
+                  {isConfirm
+                    ? "Confirmar pedido"
+                    : isPreview
+                      ? "Vista previa"
+                      : `${queueLabel(comanda.queueOrder)} · Folio #${comanda.folio}`}
                 </DialogTitle>
                 <p className="text-sm text-muted-foreground mt-1 truncate">{comanda.cliente}</p>
               </div>
-              {!isPreview && (
+              {!isPreview && !isConfirm && (
                 <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 pt-0.5">
                   <span className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[comanda.status])} />
                   {STATUS_LABEL[comanda.status]}
                 </span>
               )}
-              {isPreview && (
+              {isPreview && !isConfirm && (
                 <span className="text-xs text-muted-foreground shrink-0">Borrador</span>
+              )}
+              {isConfirm && (
+                <span className="text-xs text-muted-foreground shrink-0">Revisar antes de enviar</span>
               )}
             </div>
 
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
               {comanda.mesa && <span>Mesa {comanda.mesa}</span>}
-              {!isPreview && (
+              {!isPreview && !isConfirm && (
                 <span>
                   {new Date(comanda.createdAt).toLocaleString("es-MX", {
                     day: "numeric",
@@ -162,22 +196,49 @@ export function ComandaViewDialog({
 
             <Separator />
 
-            <DialogFooter className="flex-row gap-2 p-0 sm:justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 text-muted-foreground"
-                onClick={() => printComanda(comanda, productos)}
-                disabled={comanda.items.length === 0}
-              >
-                <Printer className="h-4 w-4" />
-                Imprimir
-              </Button>
-              <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(false)}>
-                Cerrar
-              </Button>
-            </DialogFooter>
+            {isConfirm ? (
+              <DialogFooter className="flex-col-reverse sm:flex-row gap-2 p-0 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => setOpen(false)}
+                  disabled={confirming}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto gap-2"
+                  onClick={() => void handleConfirm()}
+                  disabled={confirming || comanda.items.length === 0}
+                >
+                  {confirming ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Printer className="h-4 w-4" />
+                  )}
+                  {confirming ? "Enviando…" : "Confirmar e imprimir"}
+                </Button>
+              </DialogFooter>
+            ) : (
+              <DialogFooter className="flex-row gap-2 p-0 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-muted-foreground"
+                  onClick={() => printComanda(comanda, productos, { dialog: true })}
+                  disabled={comanda.items.length === 0}
+                >
+                  <Printer className="h-4 w-4" />
+                  Imprimir
+                </Button>
+                <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(false)}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            )}
           </div>
         </DialogContent>
       </Dialog>

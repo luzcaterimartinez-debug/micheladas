@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ComandaViewDialog } from "@/components/ComandaViewDialog";
 import { printComandaOnSend } from "@/lib/comanda-print";
 import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
 import { getStoredSession } from "@/lib/auth";
@@ -28,6 +29,7 @@ import {
   useComandas,
   useInventory,
   useMesas,
+  type Comanda,
   type OrderItem,
 } from "@/lib/micheladas-store";
 
@@ -41,6 +43,8 @@ export function OrderBuilder() {
   const [cliente, setCliente] = useState("");
   const [mesaId, setMesaId] = useState<string>("__none__");
   const [cart, setCart] = useState<OrderItem[]>([]);
+  const [sending, setSending] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const activeId = selectedId || productos[0]?.id || "";
   const michelada = productos.find((m) => m.id === activeId);
@@ -58,6 +62,22 @@ export function OrderBuilder() {
     ? calcItemLineTotal(michelada.price, selectedAdditions, itemQuantity)
     : 0;
   const cartTotal = cart.reduce((s, i) => s + i.total, 0);
+  const mesaNombre = mesaId !== "__none__" ? mesas.find((m) => m.id === mesaId)?.nombre : undefined;
+
+  const previewComanda = useMemo(
+    (): Comanda => ({
+      id: "preview",
+      folio: 0,
+      queueOrder: 0,
+      cliente: cliente.trim() || "Cliente",
+      mesa: mesaNombre,
+      items: cart,
+      total: cartTotal,
+      createdAt: Date.now(),
+      status: "pendiente",
+    }),
+    [cliente, mesaNombre, cart, cartTotal],
+  );
 
   function resetBuilder() {
     setToppings([]);
@@ -88,13 +108,18 @@ export function OrderBuilder() {
     );
   }
 
-  async function sendOrder() {
+  function openSendConfirm() {
     if (cart.length === 0) {
       toast.error("Agrega al menos una michelada");
       return;
     }
+    setConfirmOpen(true);
+  }
+
+  async function confirmAndSendOrder() {
     const nombre = cliente.trim() || "Cliente";
-    const mesa = mesaId !== "__none__" ? mesas.find((m) => m.id === mesaId)?.nombre : undefined;
+    const mesa = mesaNombre;
+    setSending(true);
     try {
       const c = await addComanda({
         cliente: nombre,
@@ -108,15 +133,18 @@ export function OrderBuilder() {
       } else {
         void reloadInventario();
       }
-      printComandaOnSend(c, productos);
+      setConfirmOpen(false);
       toast.success(
         `${c.queueOrder ? `Turno ${c.queueOrder} · ` : ""}Comanda #${c.folio} enviada a barra.`,
       );
+      window.setTimeout(() => printComandaOnSend(c, productos), 300);
       setCart([]);
       setCliente("");
       setMesaId("__none__");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo enviar");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -367,11 +395,26 @@ export function OrderBuilder() {
             <span className="text-muted-foreground">Total</span>
             <span className="text-2xl font-bold">${cartTotal}</span>
           </div>
-          <Button className="w-full" size="lg" onClick={() => void sendOrder()}>
-            Enviar pedido y generar comanda
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={openSendConfirm}
+            disabled={cart.length === 0 || sending}
+          >
+            {sending ? "Enviando…" : "Enviar pedido y generar comanda"}
           </Button>
         </CardContent>
       </Card>
+
+      <ComandaViewDialog
+        comanda={previewComanda}
+        mode="confirm"
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onConfirm={confirmAndSendOrder}
+        confirming={sending}
+        hideTrigger
+      />
     </div>
   );
 }

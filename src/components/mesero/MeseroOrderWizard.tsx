@@ -72,6 +72,7 @@ export function MeseroOrderWizard() {
   const [itemQuantity, setItemQuantity] = useState(1);
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [sending, setSending] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const categoriasActivas = useMemo(
     () => categorias.filter((c) => c.activo !== false && c.productos.length > 0),
@@ -99,6 +100,20 @@ export function MeseroOrderWizard() {
   const itemTotal = michelada ? calcItemLineTotal(michelada.price, selectedAdditions, itemQuantity) : 0;
   const cartTotal = cart.reduce((s, i) => s + i.total, 0);
   const mesaSeleccionada = mesas.find((m) => m.id === mesaId);
+  const previewComanda = useMemo(
+    (): Comanda => ({
+      id: "preview",
+      folio: 0,
+      queueOrder: 0,
+      cliente: cliente.trim() || "Cliente",
+      mesa: mesaSeleccionada?.nombre,
+      items: cart,
+      total: cartTotal,
+      createdAt: Date.now(),
+      status: "pendiente",
+    }),
+    [cliente, mesaSeleccionada?.nombre, cart, cartTotal],
+  );
   const comandasListas = useMemo(() => getComandasListas(comandas), [comandas]);
   const mesaDetalle = mesas.find((m) => m.id === mesaDetalleId);
 
@@ -175,11 +190,15 @@ export function MeseroOrderWizard() {
     setCurrentStep("carrito");
   }
 
-  async function sendOrder() {
+  function openSendConfirm() {
     if (cart.length === 0) {
       toast.error("Agrega al menos una michelada");
       return;
     }
+    setConfirmOpen(true);
+  }
+
+  async function confirmAndSendOrder() {
     const nombre = cliente.trim() || "Cliente";
     const mesa = mesaSeleccionada?.nombre;
     setSending(true);
@@ -198,12 +217,13 @@ export function MeseroOrderWizard() {
       } else {
         void reloadInventario();
       }
-      printComandaOnSend(c, productos);
+      setConfirmOpen(false);
       toast.success(
         queued
           ? `Turno ${c.queueOrder} · Comanda #${c.folio} guardada.`
           : `Turno ${c.queueOrder} · Comanda #${c.folio} enviada a barra.`,
       );
+      window.setTimeout(() => printComandaOnSend(c, productos), 300);
       void reloadMesas();
       setCart([]);
       setCliente("");
@@ -528,17 +548,7 @@ export function MeseroOrderWizard() {
             </Button>
             {cart.length > 0 && (
               <ComandaViewDialog
-                comanda={{
-                  id: "preview",
-                  folio: 0,
-                  queueOrder: 0,
-                  cliente: cliente.trim() || "Cliente",
-                  mesa: mesaSeleccionada?.nombre,
-                  items: cart,
-                  total: cartTotal,
-                  createdAt: Date.now(),
-                  status: "pendiente",
-                } satisfies Comanda}
+                comanda={previewComanda}
                 size="default"
                 variant="outline"
                 className={cn("w-full h-11 rounded-xl font-bold border-slate-800/20 bg-white/80", TOUCH_BTN)}
@@ -551,7 +561,7 @@ export function MeseroOrderWizard() {
                 "w-full gap-2 h-14 rounded-xl text-base font-bold bg-slate-900 hover:bg-slate-800 text-white",
                 TOUCH_BTN,
               )}
-              onClick={() => void sendOrder()}
+              onClick={openSendConfirm}
               disabled={cart.length === 0 || sending}
             >
               {sending ? (
@@ -564,6 +574,16 @@ export function MeseroOrderWizard() {
           </div>
         </MichelandiaFooterBar>
       )}
+
+      <ComandaViewDialog
+        comanda={previewComanda}
+        mode="confirm"
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onConfirm={confirmAndSendOrder}
+        confirming={sending}
+        hideTrigger
+      />
     </div>
   );
 }
