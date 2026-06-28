@@ -1,4 +1,4 @@
-import { printComandaDialogNow, printComanda } from "@/lib/comanda-display";
+import { openComandaTicketView, printComanda } from "@/lib/comanda-display";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 
 export const COMANDA_NUEVA_EVENT = "michelada-comanda-nueva";
@@ -52,7 +52,7 @@ export function shouldPrintOnSend(): boolean {
 }
 
 /**
- * Imprime al confirmar envío a barra (mismo clic del usuario).
+ * Abre el ticket en /ticket (mismo flujo que imprimir manualmente).
  */
 export function printComandaOnSend(
   comanda: Comanda,
@@ -60,7 +60,7 @@ export function printComandaOnSend(
   _preOpenedPopup?: Window | null,
 ): boolean {
   if (typeof window === "undefined") return false;
-  return printComandaDialogNow(comanda, productos) !== false;
+  return openComandaTicketView(comanda, productos, false);
 }
 
 export function printComandaIfNew(

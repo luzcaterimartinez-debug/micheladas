@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { flushSync } from "react-dom";
 import { ClipboardList, Eye, Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { queueLabel } from "@/lib/comanda-queue";
-import { faseOpcionNames, orderItemLabel, orderItemSubtitle, printComandaDialogNow } from "@/lib/comanda-display";
+import { faseOpcionNames, openComandaTicketView, orderItemLabel, orderItemSubtitle } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
@@ -117,16 +116,12 @@ export function ComandaViewDialog({
   const TriggerIcon = trigger === "print" ? Printer : Eye;
   const triggerLabel = label ?? (trigger === "print" ? "Imprimir" : "Ver comanda");
 
-  function handlePrintTicket() {
+  function openTicketPage() {
     if (comanda.items.length === 0) return;
-    flushSync(() => setOpen(false));
-    const result = printComandaDialogNow(comanda, productos);
-    if (result === "rawbt") {
-      toast.success("Ticket enviado a la impresora Bluetooth");
-    } else if (result === false) {
-      toast.error("No se pudo abrir la impresión.");
+    setOpen(false);
+    if (!openComandaTicketView(comanda, productos, false)) {
+      toast.error("No se pudo abrir la comanda.");
     }
-    // result === "browser" en tablet: navega a /ticket automáticamente
   }
 
   function handleConfirm() {
@@ -142,7 +137,7 @@ export function ComandaViewDialog({
           size={size}
           variant={variant}
           className={cn("gap-1.5", className)}
-          onClick={() => setOpen(true)}
+          onClick={() => (trigger === "print" ? openTicketPage() : setOpen(true))}
         >
           <TriggerIcon className="h-4 w-4" />
           {!iconOnly && triggerLabel}
@@ -256,7 +251,7 @@ export function ComandaViewDialog({
                     type="button"
                     size="sm"
                     className="gap-1.5"
-                    onClick={handlePrintTicket}
+                    onClick={openTicketPage}
                     disabled={comanda.items.length === 0}
                   >
                     <Printer className="h-4 w-4" />

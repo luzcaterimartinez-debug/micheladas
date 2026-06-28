@@ -237,17 +237,21 @@ export function renderTestTicketPlainText(): string {
   ].join("\n");
 }
 
-const PRINT_FRAME_ID = "michelada-print-frame";
-const PRINT_OVERLAY_ID = "michelada-print-overlay";
-const PRINT_STYLE_ID = "michelada-print-style";
+const ticketReturnUrl = () =>
+  typeof window !== "undefined" ? location.pathname + location.search : "/";
 
-function isMobileBrowser(): boolean {
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+/** Abre /ticket con el ticket 58 mm (revisar; imprimir solo si el usuario lo pide). */
+export function openComandaTicketView(
+  c: Comanda,
+  productos: MicheladaType[] = MICHELADAS,
+  autoPrint = false,
+): boolean {
+  return openComandaTicketPage(renderComandaTicket(c, productos), ticketReturnUrl(), { autoPrint });
 }
 
-/** En tablet/móvil: página dedicada /ticket (Chrome no imprime bien la SPA). */
-function tryPrintViaTicketPage(fullHtml: string): boolean {
-  return openComandaTicketPage(fullHtml, location.pathname + location.search, { autoPrint: true });
+/** Abre /ticket con HTML de ticket (p. ej. prueba de impresora). */
+export function openComandaTicketHtml(html: string, autoPrint = false): boolean {
+  return openComandaTicketPage(html, ticketReturnUrl(), { autoPrint });
 }
 
 /** Abre el ticket 58 mm para revisar/enviar (sin imprimir automático). */
@@ -257,280 +261,23 @@ export function openComandaTicketForSend(
   pendingOrder: PendingBarraOrder,
   cartRestore?: MeseroCartRestore,
 ): boolean {
-  return openComandaTicketPage(renderComandaTicket(c, productos), location.pathname + location.search, {
+  return openComandaTicketPage(renderComandaTicket(c, productos), ticketReturnUrl(), {
     autoPrint: false,
     pendingOrder,
     cartRestore,
   });
 }
 
-/** Ventana nueva con solo el ticket (más fiable en clic del usuario). */
-function tryPrintViaBlankWindow(fullHtml: string): boolean {
-  try {
-    const printWin = window.open("", "_blank", "noopener,noreferrer");
-    if (!printWin) return false;
-
-    let printed = false;
-    const cleanup = () => {
-      window.setTimeout(() => {
-        try {
-          if (!printWin.closed) printWin.close();
-        } catch {
-          /* ventana ya cerrada */
-        }
-      }, 500);
-    };
-
-    const doPrint = () => {
-      if (printed) return;
-      printed = true;
-      try {
-        printWin.focus();
-        printWin.print();
-      } catch {
-        cleanup();
-        return;
-      }
-      printWin.addEventListener("afterprint", cleanup, { once: true });
-      window.setTimeout(cleanup, 120_000);
-    };
-
-    printWin.document.open();
-    printWin.document.write(fullHtml);
-    printWin.document.close();
-
-    if (printWin.document.readyState === "complete") {
-      window.setTimeout(doPrint, 150);
-    } else {
-      printWin.addEventListener("load", () => window.setTimeout(doPrint, 150), { once: true });
-      window.setTimeout(doPrint, 600);
-    }
-
-    return true;
-  } catch {
-    return false;
+function dispatchToTicketOrRawBt(
+  html: string,
+  plain: string,
+  opts: { autoPrint: boolean; userGesture?: boolean },
+): boolean {
+  if (isRawBtPreferred()) {
+    const ok = opts.userGesture ? tryPrintRawBtFromUserGesture(plain) : tryPrintRawBt(plain);
+    if (ok) return true;
   }
-}
-
-/** Blob URL como respaldo si document.write falla. */
-function tryPrintViaBlobWindow(fullHtml: string): boolean {
-  try {
-    const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const printWin = window.open(url, "_blank", "noopener,noreferrer");
-    if (!printWin) {
-      URL.revokeObjectURL(url);
-      return false;
-    }
-
-    let printed = false;
-    const cleanup = () => {
-      URL.revokeObjectURL(url);
-      window.setTimeout(() => {
-        try {
-          if (!printWin.closed) printWin.close();
-        } catch {
-          /* */
-        }
-      }, 500);
-    };
-
-    const doPrint = () => {
-      if (printed) return;
-      printed = true;
-      try {
-        printWin.focus();
-        printWin.print();
-      } catch {
-        cleanup();
-        return;
-      }
-      printWin.addEventListener("afterprint", cleanup, { once: true });
-      window.setTimeout(cleanup, 120_000);
-    };
-
-    const waitReady = (attempt = 0) => {
-      try {
-        if (printWin.document?.readyState === "complete") {
-          window.setTimeout(doPrint, 100);
-          return;
-        }
-      } catch {
-        /* */
-      }
-      if (attempt < 30) window.setTimeout(() => waitReady(attempt + 1), 50);
-      else window.setTimeout(doPrint, 100);
-    };
-    waitReady();
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Overlay en la página (solo escritorio como respaldo). */
-function tryPrintViaOverlay(fullHtml: string): boolean {
-  try {
-    const parsed = new DOMParser().parseFromString(fullHtml, "text/html");
-    const body = parsed.body.innerHTML;
-    const css = parsed.querySelector("style")?.textContent ?? "";
-    const w = DEFAULT_PRINTER.paperMm;
-
-    document.getElementById(PRINT_STYLE_ID)?.remove();
-    document.getElementById(PRINT_OVERLAY_ID)?.remove();
-
-    const style = document.createElement("style");
-    style.id = PRINT_STYLE_ID;
-    style.textContent = `
-      ${css}
-      @media screen {
-        #${PRINT_OVERLAY_ID} {
-          position: fixed !important;
-          left: -10000px !important;
-          top: 0 !important;
-          width: ${w}mm !important;
-          opacity: 0 !important;
-          pointer-events: none !important;
-          z-index: -1 !important;
-        }
-      }
-      @media print {
-        @page { size: ${w}mm auto; margin: 0; }
-        html, body {
-          width: ${w}mm !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: #fff !important;
-        }
-        body > *:not(#${PRINT_OVERLAY_ID}),
-        [data-radix-portal],
-        [data-sonner-toaster] {
-          display: none !important;
-          visibility: hidden !important;
-        }
-        #${PRINT_OVERLAY_ID} {
-          display: block !important;
-          position: static !important;
-          width: ${w}mm !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-        }
-        #${PRINT_OVERLAY_ID} * {
-          visibility: visible !important;
-        }
-      }
-    `;
-
-    const overlay = document.createElement("div");
-    overlay.id = PRINT_OVERLAY_ID;
-    overlay.setAttribute("aria-hidden", "true");
-    overlay.innerHTML = body;
-
-    document.head.appendChild(style);
-    document.body.appendChild(overlay);
-
-    const cleanup = () => {
-      style.remove();
-      overlay.remove();
-    };
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        try {
-          window.focus();
-          window.print();
-        } catch {
-          cleanup();
-          return;
-        }
-        window.addEventListener("afterprint", cleanup, { once: true });
-        window.setTimeout(cleanup, 90_000);
-      });
-    });
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Imprime desde el contentWindow del iframe (escritorio). */
-function tryPrintViaIframe(fullHtml: string): boolean {
-  try {
-    document.getElementById(PRINT_FRAME_ID)?.remove();
-
-    const iframe = document.createElement("iframe");
-    iframe.id = PRINT_FRAME_ID;
-    iframe.setAttribute("title", "Ticket comanda");
-    iframe.setAttribute("aria-hidden", "true");
-    Object.assign(iframe.style, {
-      position: "fixed",
-      left: "-10000px",
-      top: "0",
-      width: `${DEFAULT_PRINTER.paperMm}mm`,
-      height: "1px",
-      border: "none",
-      opacity: "0",
-      pointerEvents: "none",
-    });
-
-    document.body.appendChild(iframe);
-
-    const win = iframe.contentWindow;
-    if (!win) {
-      iframe.remove();
-      return false;
-    }
-
-    const cleanup = () => iframe.remove();
-
-    const doPrint = () => {
-      try {
-        win.focus();
-        win.print();
-      } catch {
-        cleanup();
-        return;
-      }
-      win.addEventListener("afterprint", cleanup, { once: true });
-      window.setTimeout(cleanup, 90_000);
-    };
-
-    win.document.open();
-    win.document.write(fullHtml);
-    win.document.close();
-
-    if (win.document.readyState === "complete") {
-      window.setTimeout(doPrint, 200);
-    } else {
-      iframe.onload = () => window.setTimeout(doPrint, 200);
-    }
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Tablet/móvil → /ticket. Escritorio → ventana nueva / overlay / iframe.
- */
-function runPrintTicket(fullHtml: string, plainText?: string, skipRawBt = false): boolean {
-  if (typeof window === "undefined" || typeof document === "undefined") return false;
-
-  if (!skipRawBt && plainText && isRawBtPreferred() && tryPrintRawBt(plainText)) {
-    return true;
-  }
-
-  if (isMobileBrowser()) {
-    return tryPrintViaTicketPage(fullHtml);
-  }
-
-  if (tryPrintViaBlankWindow(fullHtml)) return true;
-  if (tryPrintViaIframe(fullHtml)) return true;
-  if (tryPrintViaOverlay(fullHtml)) return true;
-  return tryPrintViaBlobWindow(fullHtml);
+  return openComandaTicketPage(html, ticketReturnUrl(), { autoPrint: opts.autoPrint });
 }
 
 /** @deprecated Los popups suelen bloquearse en móvil. */
@@ -538,14 +285,10 @@ export function openPrintPopup(): Window | null {
   return null;
 }
 
-function runPrint(html: string, _silent: boolean, _preOpenedPopup?: Window | null, plain?: string) {
-  runPrintTicket(html, plain);
-}
-
-export type PrintTicketResult = "rawbt" | "browser" | false;
+export type PrintTicketResult = "rawbt" | "ticket" | false;
 
 /**
- * Imprime el ticket con diálogo del sistema (llamar en el clic del usuario).
+ * Abre el ticket en /ticket (o RawBT si está activo). No imprime hasta que el usuario lo pida.
  */
 export function printComandaDialogNow(
   c: Comanda,
@@ -554,16 +297,8 @@ export function printComandaDialogNow(
 ): PrintTicketResult {
   const html = renderComandaTicket(c, productos);
   const plain = renderComandaTicketPlainText(c, productos);
-
-  if (plain && isRawBtPreferred() && tryPrintRawBtFromUserGesture(plain)) {
-    return "rawbt";
-  }
-
-  if (isMobileBrowser()) {
-    return tryPrintViaTicketPage(html) ? "browser" : false;
-  }
-
-  return runPrintTicket(html, plain, true) ? "browser" : false;
+  if (plain && isRawBtPreferred() && tryPrintRawBtFromUserGesture(plain)) return "rawbt";
+  return openComandaTicketPage(html, ticketReturnUrl(), { autoPrint: false }) ? "ticket" : false;
 }
 
 export function printComanda(
@@ -572,25 +307,20 @@ export function printComanda(
   opts?: { silent?: boolean; dialog?: boolean; popup?: Window | null },
 ) {
   const forceDialog = opts?.dialog === true;
-  const silent = Boolean(opts?.silent);
-  const preOpenedPopup = opts?.popup;
   const html = renderComandaTicket(c, productos);
   const plain = renderComandaTicketPlainText(c, productos);
   const useRawBt = !forceDialog && isRawBtPreferred();
 
   enqueuePrint(
     () => {
-      if (useRawBt && tryPrintRawBt(plain)) return;
-      runPrint(html, silent, preOpenedPopup, plain);
+      dispatchToTicketOrRawBt(html, plain, { autoPrint: !forceDialog });
     },
     { skipWait: useRawBt },
   );
 }
 
 export function printTestTicket(): void {
-  const html = renderTestTicket();
-  const plain = renderTestTicketPlainText();
-  runPrintTicket(html, plain);
+  openComandaTicketHtml(renderTestTicket(), false);
 }
 
 export function timeAgo(ts: number): string {
