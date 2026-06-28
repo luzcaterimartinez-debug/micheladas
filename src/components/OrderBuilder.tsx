@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
 import { printComandaOnSend } from "@/lib/comanda-print";
+import { buildOptimisticComanda } from "@/lib/offline/sync-engine";
 import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
 import { getStoredSession } from "@/lib/auth";
 import { buildOrderDeductions } from "@/lib/inventory-deduction";
@@ -116,36 +117,44 @@ export function OrderBuilder() {
     setConfirmOpen(true);
   }
 
-  async function confirmAndSendOrder() {
+  function confirmAndSendOrder() {
     const nombre = cliente.trim() || "Cliente";
     const mesa = mesaNombre;
-    setSending(true);
-    try {
-      const c = await addComanda({
-        cliente: nombre,
-        mesaId: mesaId !== "__none__" ? mesaId : undefined,
-        mesa,
-        items: cart,
-        total: cartTotal,
-      });
-      if (!getStoredSession()) {
-        decrementBatch(buildOrderDeductions(cart, adiciones, productos, faseOpciones));
-      } else {
-        void reloadInventario();
+    const payload = {
+      cliente: nombre,
+      mesaId: mesaId !== "__none__" ? mesaId : undefined,
+      mesa,
+      items: cart,
+      total: cartTotal,
+    };
+    const clientId = crypto.randomUUID();
+    const ticket = buildOptimisticComanda(payload, clientId);
+
+    printComandaOnSend(ticket, productos);
+    setConfirmOpen(false);
+
+    void (async () => {
+      setSending(true);
+      try {
+        const c = await addComanda(payload, clientId);
+        if (!getStoredSession()) {
+          decrementBatch(buildOrderDeductions(cart, adiciones, productos, faseOpciones));
+        } else {
+          void reloadInventario();
+        }
+        setConfirmOpen(false);
+        toast.success(
+          `${c.queueOrder ? `Turno ${c.queueOrder} · ` : ""}Comanda #${c.folio} enviada a barra.`,
+        );
+        setCart([]);
+        setCliente("");
+        setMesaId("__none__");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "No se pudo enviar");
+      } finally {
+        setSending(false);
       }
-      setConfirmOpen(false);
-      toast.success(
-        `${c.queueOrder ? `Turno ${c.queueOrder} · ` : ""}Comanda #${c.folio} enviada a barra.`,
-      );
-      window.setTimeout(() => printComandaOnSend(c, productos), 300);
-      setCart([]);
-      setCliente("");
-      setMesaId("__none__");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "No se pudo enviar");
-    } finally {
-      setSending(false);
-    }
+    })();
   }
 
   if (!michelada) {

@@ -28,6 +28,7 @@ import { MeseroPasoItem } from "@/components/mesero/MeseroPasoItem";
 import { MeseroPasoFase } from "@/components/mesero/MeseroPasoFase";
 import { MeseroPasoMesa } from "@/components/mesero/MeseroPasoMesa";
 import { printComandaOnSend } from "@/lib/comanda-print";
+import { buildOptimisticComanda } from "@/lib/offline/sync-engine";
 import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
 import { faseOpcionNames } from "@/lib/comanda-display";
 import { isFasePaso, opcionesForFase, parseFaseIdFromPaso } from "@/lib/fases";
@@ -198,46 +199,55 @@ export function MeseroOrderWizard() {
     setConfirmOpen(true);
   }
 
-  async function confirmAndSendOrder() {
+  function confirmAndSendOrder() {
     const nombre = cliente.trim() || "Cliente";
     const mesa = mesaSeleccionada?.nombre;
-    setSending(true);
-    try {
-      const pendingBefore = getPendingCount();
-      const c = await addComanda({
-        cliente: nombre,
-        mesaId: mesaId || undefined,
-        mesa,
-        items: cart,
-        total: cartTotal,
-      });
-      const queued = getPendingCount() > pendingBefore;
-      if (!getStoredSession() || !isAppOnline() || queued) {
-        decrementBatch(buildOrderDeductions(cart, adiciones, productos, faseOpciones));
-      } else {
-        void reloadInventario();
+    const payload = {
+      cliente: nombre,
+      mesaId: mesaId || undefined,
+      mesa,
+      items: cart,
+      total: cartTotal,
+    };
+    const clientId = crypto.randomUUID();
+    const ticket = buildOptimisticComanda(payload, clientId);
+
+    // Imprimir en el mismo clic (antes de cualquier await) — requerido en móvil
+    printComandaOnSend(ticket, productos);
+    setConfirmOpen(false);
+
+    void (async () => {
+      setSending(true);
+      try {
+        const pendingBefore = getPendingCount();
+        const c = await addComanda(payload, clientId);
+        const queued = getPendingCount() > pendingBefore;
+        if (!getStoredSession() || !isAppOnline() || queued) {
+          decrementBatch(buildOrderDeductions(cart, adiciones, productos, faseOpciones));
+        } else {
+          void reloadInventario();
+        }
+        setConfirmOpen(false);
+        toast.success(
+          queued
+            ? `Turno ${c.queueOrder} · Comanda #${c.folio} guardada.`
+            : `Turno ${c.queueOrder} · Comanda #${c.folio} enviada a barra.`,
+        );
+        void reloadMesas();
+        setCart([]);
+        setCliente("");
+        setMesaId("");
+        setMesaDetalleId(null);
+        setCurrentStep("mesa");
+        resetItemBuilder();
+        setSelectedId("");
+        setSelectedCategoriaId("");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "No se pudo enviar el pedido");
+      } finally {
+        setSending(false);
       }
-      setConfirmOpen(false);
-      toast.success(
-        queued
-          ? `Turno ${c.queueOrder} · Comanda #${c.folio} guardada.`
-          : `Turno ${c.queueOrder} · Comanda #${c.folio} enviada a barra.`,
-      );
-      window.setTimeout(() => printComandaOnSend(c, productos), 300);
-      void reloadMesas();
-      setCart([]);
-      setCliente("");
-      setMesaId("");
-      setMesaDetalleId(null);
-      setCurrentStep("mesa");
-      resetItemBuilder();
-      setSelectedId("");
-      setSelectedCategoriaId("");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "No se pudo enviar el pedido");
-    } finally {
-      setSending(false);
-    }
+    })();
   }
 
   function canContinue(): boolean {

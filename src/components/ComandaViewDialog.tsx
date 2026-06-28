@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { queueLabel } from "@/lib/comanda-queue";
-import { faseOpcionNames, orderItemLabel, orderItemSubtitle, printComanda } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel, orderItemSubtitle, printComandaDialogNow } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
@@ -100,7 +100,6 @@ export function ComandaViewDialog({
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
   const setOpen = (v: boolean) => {
-    if (confirming) return;
     if (isControlled) onOpenChange?.(v);
     else setInternalOpen(v);
   };
@@ -108,9 +107,9 @@ export function ComandaViewDialog({
   const isConfirm = mode === "confirm";
   const isPreview = comanda.folio <= 0;
 
-  async function handleConfirm() {
-    if (!onConfirm || comanda.items.length === 0) return;
-    await onConfirm();
+  function handleConfirm() {
+    if (!onConfirm || comanda.items.length === 0 || confirming) return;
+    onConfirm();
   }
 
   return (
@@ -128,8 +127,12 @@ export function ComandaViewDialog({
         </Button>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md gap-0 p-0 overflow-hidden max-h-[min(88vh,640px)] flex flex-col sm:rounded-xl">
+      <Dialog open={open} onOpenChange={(v) => !confirming && setOpen(v)}>
+        <DialogContent
+          className="max-w-md gap-0 p-0 overflow-hidden max-h-[min(88vh,640px)] flex flex-col sm:rounded-xl z-[60]"
+          onPointerDownOutside={(e) => confirming && e.preventDefault()}
+          onEscapeKeyDown={(e) => confirming && e.preventDefault()}
+        >
           <DialogHeader className="px-5 pt-5 pb-4 space-y-3 text-left border-b">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -210,7 +213,7 @@ export function ComandaViewDialog({
                 <Button
                   type="button"
                   className="w-full sm:w-auto gap-2"
-                  onClick={() => void handleConfirm()}
+                  onClick={handleConfirm}
                   disabled={confirming || comanda.items.length === 0}
                 >
                   {confirming ? (
@@ -228,7 +231,7 @@ export function ComandaViewDialog({
                   variant="ghost"
                   size="sm"
                   className="gap-1.5 text-muted-foreground"
-                  onClick={() => printComanda(comanda, productos, { dialog: true })}
+                  onClick={() => printComandaDialogNow(comanda, productos)}
                   disabled={comanda.items.length === 0}
                 >
                   <Printer className="h-4 w-4" />

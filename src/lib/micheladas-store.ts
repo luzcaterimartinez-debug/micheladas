@@ -310,13 +310,16 @@ export function useComandas() {
     loading,
     error,
     reload,
-    addComanda: async (c: Omit<Comanda, "id" | "folio" | "queueOrder" | "createdAt" | "status">) => {
+    addComanda: async (
+      c: Omit<Comanda, "id" | "folio" | "queueOrder" | "createdAt" | "status">,
+      existingClientId?: string,
+    ) => {
       if (!getStoredSession()) {
         const prev = getCachedComandas();
         const folio = nextLocalFolio();
         const nueva: Comanda = {
           ...c,
-          id: crypto.randomUUID(),
+          id: existingClientId ?? crypto.randomUUID(),
           folio,
           queueOrder: nextQueueOrderForToday(prev),
           createdAt: Date.now(),
@@ -329,7 +332,7 @@ export function useComandas() {
         return nueva;
       }
 
-      const clientId = crypto.randomUUID();
+      const clientId = existingClientId ?? crypto.randomUUID();
 
       const queueOffline = () => {
         const nueva = buildOptimisticComanda(c, clientId);

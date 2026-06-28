@@ -305,16 +305,33 @@ function runPrint(html: string, _silent: boolean) {
   };
 
   const doPrint = () => {
+    const onAfterPrint = () => {
+      window.removeEventListener("afterprint", onAfterPrint);
+      cleanup();
+    };
+    window.addEventListener("afterprint", onAfterPrint);
+    window.setTimeout(() => {
+      window.removeEventListener("afterprint", onAfterPrint);
+      cleanup();
+    }, 60_000);
     try {
       window.focus();
       window.print();
-    } finally {
+    } catch {
       cleanup();
     }
   };
 
   document.head.appendChild(style);
-  requestAnimationFrame(() => setTimeout(doPrint, 300));
+  requestAnimationFrame(() => setTimeout(doPrint, 100));
+}
+
+/** Imprime de inmediato con diálogo (debe llamarse en el clic del usuario). */
+export function printComandaDialogNow(
+  c: Comanda,
+  productos: MicheladaType[] = MICHELADAS,
+): void {
+  runPrint(renderComandaTicket(c, productos), false);
 }
 
 export function printComanda(

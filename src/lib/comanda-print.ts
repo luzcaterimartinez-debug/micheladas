@@ -1,4 +1,4 @@
-import { printComanda } from "@/lib/comanda-display";
+import { printComanda, printComandaDialogNow } from "@/lib/comanda-display";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 
 export const COMANDA_NUEVA_EVENT = "michelada-comanda-nueva";
@@ -51,10 +51,10 @@ export function shouldPrintOnSend(): boolean {
   return true;
 }
 
-/** Abre el diálogo de impresión del ticket al enviar a barra. */
+/** Abre el diálogo de impresión (llamar en el mismo clic del usuario, antes de await). */
 export function printComandaOnSend(comanda: Comanda, productos: MicheladaType[]): boolean {
   if (typeof window === "undefined") return false;
-  printComanda(comanda, productos, { dialog: true });
+  printComandaDialogNow(comanda, productos);
   return true;
 }
 
