@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,16 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ComandaViewDialog } from "@/components/ComandaViewDialog";
-import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
-import { getStoredSession } from "@/lib/auth";
-import { buildOrderDeductions } from "@/lib/inventory-deduction";
+import { faseOpcionNames, openComandaTicketForSend, orderItemLabel } from "@/lib/comanda-display";
+import { consumeMeseroCartRestore } from "@/lib/ticket-print-session";
 import { useMenu } from "@/lib/menu-context";
 import { QuantityStepper } from "@/components/QuantityStepper";
 import {
   calcItemLineTotal,
-  useComandas,
-  useInventory,
   useMesas,
   type Comanda,
   type OrderItem,
@@ -42,15 +38,17 @@ export function OrderBuilder() {
   const [cliente, setCliente] = useState("");
   const [mesaId, setMesaId] = useState<string>("__none__");
   const [cart, setCart] = useState<OrderItem[]>([]);
-  const [sending, setSending] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState<"confirm" | "view">("confirm");
-  const [dialogComanda, setDialogComanda] = useState<Comanda | null>(null);
+
+  useEffect(() => {
+    const restored = consumeMeseroCartRestore();
+    if (!restored) return;
+    setCart(restored.cart);
+    setCliente(restored.cliente);
+    setMesaId(restored.mesaId || "__none__");
+  }, []);
 
   const activeId = selectedId || productos[0]?.id || "";
   const michelada = productos.find((m) => m.id === activeId);
-  const { addComanda } = useComandas();
-  const { decrementBatch, reload: reloadInventario } = useInventory();
   const { mesas } = useMesas();
 
   const selectedAdditions = useMemo(
@@ -114,52 +112,21 @@ export function OrderBuilder() {
       toast.error("Agrega al menos una michelada");
       return;
     }
-    setDialogComanda(previewComanda);
-    setDialogMode("confirm");
-    setConfirmOpen(true);
-  }
-
-  function handleConfirmDialogChange(open: boolean) {
-    setConfirmOpen(open);
-    if (!open) setDialogMode("confirm");
-  }
-
-  function confirmAndSendOrder() {
-    const nombre = cliente.trim() || "Cliente";
-    const mesa = mesaNombre;
-    const payload = {
-      cliente: nombre,
-      mesaId: mesaId !== "__none__" ? mesaId : undefined,
-      mesa,
-      items: cart,
-      total: cartTotal,
-    };
     const clientId = crypto.randomUUID();
-
-    void (async () => {
-      setSending(true);
-      try {
-        const c = await addComanda(payload, clientId);
-        if (!getStoredSession()) {
-          decrementBatch(buildOrderDeductions(cart, adiciones, productos, faseOpciones));
-        } else {
-          void reloadInventario();
-        }
-        setDialogComanda(c);
-        setDialogMode("view");
-        setConfirmOpen(true);
-        toast.success(
-          `${c.queueOrder ? `Turno ${c.queueOrder} · ` : ""}Comanda #${c.folio} enviada a barra.`,
-        );
-        setCart([]);
-        setCliente("");
-        setMesaId("__none__");
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "No se pudo enviar");
-      } finally {
-        setSending(false);
-      }
-    })();
+    const ok = openComandaTicketForSend(
+      previewComanda,
+      productos,
+      {
+        cliente: cliente.trim() || "Cliente",
+        mesaId: mesaId !== "__none__" ? mesaId : undefined,
+        mesa: mesaNombre,
+        items: cart,
+        total: cartTotal,
+        clientId,
+      },
+      { cart, cliente, mesaId: mesaId !== "__none__" ? mesaId : "" },
+    );
+    if (!ok) toast.error("No se pudo abrir la comanda");
   }
 
   if (!michelada) {
@@ -413,23 +380,12 @@ export function OrderBuilder() {
             className="w-full"
             size="lg"
             onClick={openSendConfirm}
-            disabled={cart.length === 0 || sending}
+            disabled={cart.length === 0}
           >
-            {sending ? "Enviando…" : "Enviar pedido y generar comanda"}
+            Enviar pedido y generar comanda
           </Button>
         </CardContent>
       </Card>
-
-      <ComandaViewDialog
-        comanda={dialogComanda ?? previewComanda}
-        mode={dialogMode}
-        open={confirmOpen}
-        onOpenChange={handleConfirmDialogChange}
-        onConfirm={confirmAndSendOrder}
-        confirming={sending}
-        hideTrigger
-        hidePrint
-      />
     </div>
   );
 }

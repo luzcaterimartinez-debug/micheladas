@@ -2,7 +2,7 @@ import { queueLabel } from "@/lib/comanda-queue";
 import { enqueuePrint } from "@/lib/print-queue";
 import { DEFAULT_PRINTER, isRawBtPreferred } from "@/lib/printer-config";
 import { tryPrintRawBt, tryPrintRawBtFromUserGesture } from "@/lib/rawbt-print";
-import { navigateToTicketPrintPage } from "@/lib/ticket-print-session";
+import { openComandaTicketPage, type MeseroCartRestore, type PendingBarraOrder } from "@/lib/ticket-print-session";
 import { MICHELADAS, orderItemQuantity, type Comanda, type MicheladaType, type OrderItem } from "@/lib/micheladas-store";
 
 /** Subtítulo bajo el nombre (tamaño legacy o cantidad). */
@@ -247,7 +247,21 @@ function isMobileBrowser(): boolean {
 
 /** En tablet/móvil: página dedicada /ticket (Chrome no imprime bien la SPA). */
 function tryPrintViaTicketPage(fullHtml: string): boolean {
-  return navigateToTicketPrintPage(fullHtml, location.pathname + location.search, true);
+  return openComandaTicketPage(fullHtml, location.pathname + location.search, { autoPrint: true });
+}
+
+/** Abre el ticket 58 mm para revisar/enviar (sin imprimir automático). */
+export function openComandaTicketForSend(
+  c: Comanda,
+  productos: MicheladaType[] = MICHELADAS,
+  pendingOrder: PendingBarraOrder,
+  cartRestore?: MeseroCartRestore,
+): boolean {
+  return openComandaTicketPage(renderComandaTicket(c, productos), location.pathname + location.search, {
+    autoPrint: false,
+    pendingOrder,
+    cartRestore,
+  });
 }
 
 /** Ventana nueva con solo el ticket (más fiable en clic del usuario). */

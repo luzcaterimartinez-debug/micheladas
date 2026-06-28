@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -28,18 +28,15 @@ import { MeseroPasoItem } from "@/components/mesero/MeseroPasoItem";
 import { MeseroPasoFase } from "@/components/mesero/MeseroPasoFase";
 import { MeseroPasoMesa } from "@/components/mesero/MeseroPasoMesa";
 import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
-import { faseOpcionNames } from "@/lib/comanda-display";
+import { faseOpcionNames, openComandaTicketForSend } from "@/lib/comanda-display";
+import { consumeMeseroCartRestore } from "@/lib/ticket-print-session";
 import { isFasePaso, opcionesForFase, parseFaseIdFromPaso } from "@/lib/fases";
 import { getStoredSession } from "@/lib/auth";
-import { isAppOnline } from "@/lib/offline/network";
-import { getPendingCount } from "@/lib/offline/outbox";
-import { buildOrderDeductions } from "@/lib/inventory-deduction";
 import { getComandasListas, getMesaActivity } from "@/lib/pos-utils";
 import { useMenu } from "@/lib/menu-context";
 import {
   calcItemLineTotal,
   useComandas,
-  useInventory,
   useMesas,
   type Comanda,
   type OrderItem,
@@ -52,8 +49,7 @@ const TOUCH_BTN =
 
 export function MeseroOrderWizard() {
   const { categorias, productos, adiciones, fases, faseOpciones, loading: menuLoading } = useMenu();
-  const { comandas, addComanda, updateStatus, reload: reloadComandas } = useComandas();
-  const { decrementBatch, reload: reloadInventario } = useInventory();
+  const { comandas, updateStatus, reload: reloadComandas } = useComandas();
   const { mesas, loading: mesasLoading, reload: reloadMesas, marcarAtendida } = useMesas();
   const meseroId = getStoredSession()?.user.id;
 
@@ -70,10 +66,15 @@ export function MeseroOrderWizard() {
   const [notes, setNotes] = useState("");
   const [itemQuantity, setItemQuantity] = useState(1);
   const [cart, setCart] = useState<OrderItem[]>([]);
-  const [sending, setSending] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState<"confirm" | "view">("confirm");
-  const [dialogComanda, setDialogComanda] = useState<Comanda | null>(null);
+
+  useEffect(() => {
+    const restored = consumeMeseroCartRestore();
+    if (!restored) return;
+    setCart(restored.cart);
+    setCliente(restored.cliente);
+    setMesaId(restored.mesaId);
+    if (restored.cart.length > 0) setCurrentStep("carrito");
+  }, []);
 
   const categoriasActivas = useMemo(
     () => categorias.filter((c) => c.activo !== false && c.productos.length > 0),
@@ -196,62 +197,21 @@ export function MeseroOrderWizard() {
       toast.error("Agrega al menos una michelada");
       return;
     }
-    setDialogComanda(previewComanda);
-    setDialogMode("confirm");
-    setConfirmOpen(true);
-  }
-
-  function handleConfirmDialogChange(open: boolean) {
-    setConfirmOpen(open);
-    if (!open) setDialogMode("confirm");
-  }
-
-  function confirmAndSendOrder() {
-    const nombre = cliente.trim() || "Cliente";
-    const mesa = mesaSeleccionada?.nombre;
-    const payload = {
-      cliente: nombre,
-      mesaId: mesaId || undefined,
-      mesa,
-      items: cart,
-      total: cartTotal,
-    };
     const clientId = crypto.randomUUID();
-
-    void (async () => {
-      setSending(true);
-      try {
-        const pendingBefore = getPendingCount();
-        const c = await addComanda(payload, clientId);
-        const queued = getPendingCount() > pendingBefore;
-        if (!getStoredSession() || !isAppOnline() || queued) {
-          decrementBatch(buildOrderDeductions(cart, adiciones, productos, faseOpciones));
-        } else {
-          void reloadInventario();
-        }
-        setDialogComanda(c);
-        setDialogMode("view");
-        setConfirmOpen(true);
-        toast.success(
-          queued
-            ? `Turno ${c.queueOrder} · Comanda #${c.folio} guardada.`
-            : `Turno ${c.queueOrder} · Comanda #${c.folio} enviada a barra.`,
-        );
-        void reloadMesas();
-        setCart([]);
-        setCliente("");
-        setMesaId("");
-        setMesaDetalleId(null);
-        setCurrentStep("mesa");
-        resetItemBuilder();
-        setSelectedId("");
-        setSelectedCategoriaId("");
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "No se pudo enviar el pedido");
-      } finally {
-        setSending(false);
-      }
-    })();
+    const ok = openComandaTicketForSend(
+      previewComanda,
+      productos,
+      {
+        cliente: cliente.trim() || "Cliente",
+        mesaId: mesaId || undefined,
+        mesa: mesaSeleccionada?.nombre,
+        items: cart,
+        total: cartTotal,
+        clientId,
+      },
+      { cart, cliente, mesaId },
+    );
+    if (!ok) toast.error("No se pudo abrir la comanda");
   }
 
   function canContinue(): boolean {
@@ -576,29 +536,15 @@ export function MeseroOrderWizard() {
                 TOUCH_BTN,
               )}
               onClick={openSendConfirm}
-              disabled={cart.length === 0 || sending}
+              disabled={cart.length === 0}
             >
-              {sending ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <ClipboardList className="h-5 w-5" />
-              )}
-              {sending ? "Enviando…" : "Enviar a barra"}
+              <ClipboardList className="h-5 w-5" />
+              Enviar a barra
             </Button>
           </div>
         </MichelandiaFooterBar>
       )}
 
-      <ComandaViewDialog
-        comanda={dialogComanda ?? previewComanda}
-        mode={dialogMode}
-        open={confirmOpen}
-        onOpenChange={handleConfirmDialogChange}
-        onConfirm={confirmAndSendOrder}
-        confirming={sending}
-        hideTrigger
-        hidePrint
-      />
     </div>
   );
 }
