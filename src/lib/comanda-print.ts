@@ -1,5 +1,4 @@
 import { printComanda } from "@/lib/comanda-display";
-import { isAutoPrintEnabled, isPrintRoute } from "@/lib/printer-config";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 
 export const COMANDA_NUEVA_EVENT = "michelada-comanda-nueva";
@@ -47,21 +46,15 @@ export function notifyComandaNueva(comanda: Comanda): void {
   window.dispatchEvent(new CustomEvent(COMANDA_NUEVA_EVENT, { detail: comanda }));
 }
 
-/** ¿Imprimir ticket al enviar desde este equipo? */
+/** Siempre true: al enviar se abre el diálogo de impresión en cualquier dispositivo. */
 export function shouldPrintOnSend(): boolean {
-  if (!isAutoPrintEnabled()) return false;
-  if (isPrintRoute()) return true;
-  if (/Android/i.test(navigator.userAgent)) return true;
-  return false;
+  return true;
 }
 
-/** Imprime al enviar si este equipo tiene impresora o es estación de barra. */
+/** Abre el diálogo de impresión del ticket al enviar a barra. */
 export function printComandaOnSend(comanda: Comanda, productos: MicheladaType[]): boolean {
   if (typeof window === "undefined") return false;
-  if (!shouldPrintOnSend()) return false;
-  if (isComandaPrinted(comanda.id)) return false;
-  markComandaPrinted(comanda.id);
-  printComanda(comanda, productos, { silent: true });
+  printComanda(comanda, productos, { dialog: true });
   return true;
 }
 

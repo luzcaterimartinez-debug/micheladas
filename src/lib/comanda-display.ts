@@ -314,12 +314,13 @@ function runPrint(html: string, _silent: boolean) {
 export function printComanda(
   c: Comanda,
   productos: MicheladaType[] = MICHELADAS,
-  opts?: { silent?: boolean },
+  opts?: { silent?: boolean; dialog?: boolean },
 ) {
+  const forceDialog = opts?.dialog === true;
   const silent = Boolean(opts?.silent);
   const html = renderComandaTicket(c, productos);
   const plain = renderComandaTicketPlainText(c, productos);
-  const useRawBt = /Android/i.test(navigator.userAgent);
+  const useRawBt = !forceDialog && /Android/i.test(navigator.userAgent);
 
   enqueuePrint(
     () => {
@@ -332,16 +333,7 @@ export function printComanda(
 
 export function printTestTicket(): void {
   const html = renderTestTicket();
-  const plain = renderTestTicketPlainText();
-  const useRawBt = /Android/i.test(navigator.userAgent);
-
-  enqueuePrint(
-    () => {
-      if (useRawBt && tryPrintRawBt(plain)) return;
-      runPrint(html, true);
-    },
-    { skipWait: useRawBt },
-  );
+  enqueuePrint(() => runPrint(html, false));
 }
 
 export function timeAgo(ts: number): string {
