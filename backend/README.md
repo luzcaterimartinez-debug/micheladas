@@ -82,26 +82,38 @@ npm run test
 
 Desde la raíz del proyecto: `npm run test` (frontend) y `npm run test:backend` (API).
 
-## Producción (Vercel)
+## Producción (Vercel + MySQL Hostinger)
 
 El frontend (TanStack/Nitro) y el API Python (`api/index.py`) se despliegan juntos.
 El build ejecuta `postbuild` que empaqueta la función en `.vercel/output/functions/api/index.func`.
 
-**Variables obligatorias en Vercel → Settings → Environment Variables:**
+### Variables en Vercel → Settings → Environment Variables
 
 | Variable | Ejemplo |
 |----------|---------|
-| `MYSQL_HOST` | host de tu MySQL (Hostinger, etc.) |
+| `MYSQL_HOST` | `srv123.hstgr.io` (hostname de Hostinger, no solo la IP) |
+| `MYSQL_PORT` | `3306` |
 | `MYSQL_USER` | usuario BD |
 | `MYSQL_PASSWORD` | contraseña |
-| `MYSQL_DATABASE` | `michelada` |
+| `MYSQL_DATABASE` | `u659323332_micheladas` |
 | `JWT_SECRET` | secreto largo (32+ caracteres) |
 | `APP_ENV` | `production` |
 | `CORS_ORIGINS` | `https://micheladas-black.vercel.app` |
 
 `VITE_API_URL` puede quedar **vacío** en Vercel (el frontend usa el mismo dominio `/api/...`).
 
-Tras cambios en `vercel.json` o `api/`, haz **Redeploy** en Vercel.
+### MySQL desde Vercel (error 2003 / timeout)
+
+Si en los logs aparece `Can't connect to MySQL server on '...:3306' (110)`:
+
+1. En **Hostinger → Bases de datos → MySQL remoto**, activa acceso remoto y añade el host `%` (cualquier IP) o las IPs de salida de Vercel si tienes plan con IP fija.
+2. Usa el **hostname MySQL** que muestra Hostinger (p. ej. `srvXXX.hstgr.io`), no la IP del servidor web.
+3. Comprueba que el usuario tenga permisos sobre la base `u659323332_micheladas`.
+4. En hosting compartido, MySQL remoto a veces **no está permitido** hacia Vercel. Alternativas: API en el mismo Hostinger, VPS, o BD en la nube (PlanetScale, Railway, etc.).
+
+Diagnóstico: `GET https://micheladas-black.vercel.app/api/status` (muestra si la BD responde).
+
+Tras cambios en `vercel.json`, variables de entorno o `api/`, haz **Redeploy** en Vercel.
 
 Para servidor propio (no Vercel):
 

@@ -1,21 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { toast, Toaster } from "sonner";
 
-import { renderComandaTicket } from "@/lib/comanda-display";
-import { getStoredSession } from "@/lib/auth";
-import { buildOrderDeductions } from "@/lib/inventory-deduction";
-import { MenuProvider, useMenu } from "@/lib/menu-context";
-import { useComandas, useInventory } from "@/lib/micheladas-store";
-import { isAppOnline } from "@/lib/offline/network";
-import { getPendingCount } from "@/lib/offline/outbox";
-import {
-  clearPendingBarraOrder,
-  consumePrintTicketSession,
-  loadPendingBarraOrder,
-  parseTicketHtml,
-  type PendingBarraOrder,
-} from "@/lib/ticket-print-session";
+import { parseTicketHtml, consumePrintTicketSession } from "@/lib/ticket-print-session";
 
 export const Route = createFileRoute("/ticket")({
   ssr: false,
@@ -26,26 +12,14 @@ export const Route = createFileRoute("/ticket")({
 });
 
 function TicketRoute() {
-  return (
-    <MenuProvider>
-      <Toaster position="top-center" richColors />
-      <TicketPrintPage />
-    </MenuProvider>
-  );
+  return <TicketPrintPage />;
 }
 
 function TicketPrintPage() {
-  const { productos, adiciones, faseOpciones } = useMenu();
-  const { addComanda } = useComandas();
-  const { decrementBatch, reload: reloadInventario } = useInventory();
-
   const [session] = useState(() => consumePrintTicketSession());
-  const [ticketHtml, setTicketHtml] = useState(session?.html ?? "");
+  const [ticketHtml] = useState(session?.html ?? "");
   const [returnUrl] = useState(session?.returnUrl ?? "/");
   const [autoPrint] = useState(session?.autoPrint ?? false);
-  const [pending, setPending] = useState<PendingBarraOrder | null>(() => loadPendingBarraOrder());
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     if (!session) {
@@ -54,47 +28,14 @@ function TicketPrintPage() {
   }, [session]);
 
   useEffect(() => {
-    if (!autoPrint || pending) return;
+    if (!autoPrint) return;
 
     const timer = window.setTimeout(() => window.print(), 700);
     const goBack = () => window.location.replace(returnUrl);
     window.addEventListener("afterprint", goBack, { once: true });
     window.setTimeout(goBack, 120_000);
     return () => window.clearTimeout(timer);
-  }, [autoPrint, pending, returnUrl]);
-
-  async function handleSendToBarra() {
-    if (!pending || sending) return;
-    setSending(true);
-    try {
-      const { clientId, ...payload } = pending;
-      const pendingBefore = getPendingCount();
-      const c = await addComanda(payload, clientId);
-      const queued = getPendingCount() > pendingBefore;
-
-      if (!getStoredSession() || !isAppOnline() || queued) {
-        decrementBatch(
-          buildOrderDeductions(pending.items, adiciones, productos, faseOpciones),
-        );
-      } else {
-        void reloadInventario();
-      }
-
-      clearPendingBarraOrder();
-      setPending(null);
-      setSent(true);
-      setTicketHtml(renderComandaTicket(c, productos));
-      toast.success(
-        queued
-          ? `Turno ${c.queueOrder} · Comanda #${c.folio} guardada.`
-          : `Turno ${c.queueOrder} · Comanda #${c.folio} enviada a barra.`,
-      );
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "No se pudo enviar a barra");
-    } finally {
-      setSending(false);
-    }
-  }
+  }, [autoPrint, returnUrl]);
 
   function handleBack() {
     window.location.replace(returnUrl);
@@ -109,7 +50,6 @@ function TicketPrintPage() {
   }
 
   const { body, css } = parseTicketHtml(ticketHtml);
-  const isDraft = Boolean(pending);
 
   return (
     <div id="michelada-ticket-print-root">
@@ -155,11 +95,6 @@ function TicketPrintPage() {
               color: #fff;
               border-color: #111;
             }
-            #ticket-print-actions button.send {
-              background: #0f766e;
-              color: #fff;
-              border-color: #0f766e;
-            }
             #ticket-print-hint {
               text-align: center;
               font-family: system-ui, sans-serif;
@@ -174,19 +109,9 @@ function TicketPrintPage() {
           `,
         }}
       />
-      {isDraft && (
-        <p id="ticket-print-hint">Revisa el ticket. Luego envía a barra o imprime.</p>
-      )}
-      {sent && (
-        <p id="ticket-print-hint">Comanda enviada. Puedes imprimir el ticket o volver.</p>
-      )}
+      <p id="ticket-print-hint">Comanda enviada. Imprime el ticket o vuelve a la app.</p>
       <div dangerouslySetInnerHTML={{ __html: body }} />
       <div id="ticket-print-actions">
-        {pending && (
-          <button type="button" className="send" onClick={() => void handleSendToBarra()} disabled={sending}>
-            {sending ? "Enviando…" : "Enviar a barra"}
-          </button>
-        )}
         <button type="button" className="primary" onClick={() => window.print()}>
           Imprimir comanda
         </button>

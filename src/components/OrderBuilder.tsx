@@ -17,12 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { faseOpcionNames, openComandaTicketForSend, orderItemLabel } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
+import { sendToBarraAndOpenTicket } from "@/lib/send-to-barra";
 import { consumeMeseroCartRestore } from "@/lib/ticket-print-session";
 import { useMenu } from "@/lib/menu-context";
 import { QuantityStepper } from "@/components/QuantityStepper";
 import {
   calcItemLineTotal,
+  useComandas,
+  useInventory,
   useMesas,
   type Comanda,
   type OrderItem,
@@ -30,6 +33,8 @@ import {
 
 export function OrderBuilder() {
   const { productos, adiciones, faseOpciones } = useMenu();
+  const { addComanda } = useComandas();
+  const { decrementBatch, reload: reloadInventario } = useInventory();
   const [selectedId, setSelectedId] = useState<string>("");
   const [toppings, setToppings] = useState<string[]>([]);
   const [additions, setAdditions] = useState<string[]>([]);
@@ -38,6 +43,7 @@ export function OrderBuilder() {
   const [cliente, setCliente] = useState("");
   const [mesaId, setMesaId] = useState<string>("__none__");
   const [cart, setCart] = useState<OrderItem[]>([]);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     const restored = consumeMeseroCartRestore();
@@ -108,25 +114,42 @@ export function OrderBuilder() {
   }
 
   function openSendConfirm() {
-    if (cart.length === 0) {
-      toast.error("Agrega al menos una michelada");
+    if (cart.length === 0 || sending) {
+      if (cart.length === 0) toast.error("Agrega al menos una michelada");
       return;
     }
-    const clientId = crypto.randomUUID();
-    const ok = openComandaTicketForSend(
-      previewComanda,
-      productos,
-      {
-        cliente: cliente.trim() || "Cliente",
-        mesaId: mesaId !== "__none__" ? mesaId : undefined,
-        mesa: mesaNombre,
-        items: cart,
-        total: cartTotal,
-        clientId,
-      },
-      { cart, cliente, mesaId: mesaId !== "__none__" ? mesaId : "" },
-    );
-    if (!ok) toast.error("No se pudo abrir la comanda");
+    void (async () => {
+      setSending(true);
+      const clientId = crypto.randomUUID();
+      const result = await sendToBarraAndOpenTicket(
+        {
+          cliente: cliente.trim() || "Cliente",
+          mesaId: mesaId !== "__none__" ? mesaId : undefined,
+          mesa: mesaNombre,
+          items: cart,
+          total: cartTotal,
+          clientId,
+        },
+        productos,
+        {
+          addComanda,
+          decrementBatch,
+          reloadInventario,
+          adiciones,
+          faseOpciones,
+        },
+      );
+      setSending(false);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(
+        result.queued
+          ? `Comanda #${result.comanda.folio} guardada para sincronizar.`
+          : `Comanda #${result.comanda.folio} enviada a barra.`,
+      );
+    })();
   }
 
   if (!michelada) {
@@ -380,9 +403,9 @@ export function OrderBuilder() {
             className="w-full"
             size="lg"
             onClick={openSendConfirm}
-            disabled={cart.length === 0}
+            disabled={cart.length === 0 || sending}
           >
-            Enviar pedido y generar comanda
+            {sending ? "Enviando…" : "Enviar pedido y generar comanda"}
           </Button>
         </CardContent>
       </Card>

@@ -28,7 +28,8 @@ import { MeseroPasoItem } from "@/components/mesero/MeseroPasoItem";
 import { MeseroPasoFase } from "@/components/mesero/MeseroPasoFase";
 import { MeseroPasoMesa } from "@/components/mesero/MeseroPasoMesa";
 import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
-import { faseOpcionNames, openComandaTicketForSend } from "@/lib/comanda-display";
+import { faseOpcionNames } from "@/lib/comanda-display";
+import { sendToBarraAndOpenTicket } from "@/lib/send-to-barra";
 import { consumeMeseroCartRestore } from "@/lib/ticket-print-session";
 import { isFasePaso, opcionesForFase, parseFaseIdFromPaso } from "@/lib/fases";
 import { getStoredSession } from "@/lib/auth";
@@ -37,6 +38,7 @@ import { useMenu } from "@/lib/menu-context";
 import {
   calcItemLineTotal,
   useComandas,
+  useInventory,
   useMesas,
   type Comanda,
   type OrderItem,
@@ -49,7 +51,8 @@ const TOUCH_BTN =
 
 export function MeseroOrderWizard() {
   const { categorias, productos, adiciones, fases, faseOpciones, loading: menuLoading } = useMenu();
-  const { comandas, updateStatus, reload: reloadComandas } = useComandas();
+  const { comandas, addComanda, updateStatus, reload: reloadComandas } = useComandas();
+  const { decrementBatch, reload: reloadInventario } = useInventory();
   const { mesas, loading: mesasLoading, reload: reloadMesas, marcarAtendida } = useMesas();
   const meseroId = getStoredSession()?.user.id;
 
@@ -66,6 +69,7 @@ export function MeseroOrderWizard() {
   const [notes, setNotes] = useState("");
   const [itemQuantity, setItemQuantity] = useState(1);
   const [cart, setCart] = useState<OrderItem[]>([]);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     const restored = consumeMeseroCartRestore();
@@ -193,25 +197,42 @@ export function MeseroOrderWizard() {
   }
 
   function openSendConfirm() {
-    if (cart.length === 0) {
-      toast.error("Agrega al menos una michelada");
+    if (cart.length === 0 || sending) {
+      if (cart.length === 0) toast.error("Agrega al menos una michelada");
       return;
     }
-    const clientId = crypto.randomUUID();
-    const ok = openComandaTicketForSend(
-      previewComanda,
-      productos,
-      {
-        cliente: cliente.trim() || "Cliente",
-        mesaId: mesaId || undefined,
-        mesa: mesaSeleccionada?.nombre,
-        items: cart,
-        total: cartTotal,
-        clientId,
-      },
-      { cart, cliente, mesaId },
-    );
-    if (!ok) toast.error("No se pudo abrir la comanda");
+    void (async () => {
+      setSending(true);
+      const clientId = crypto.randomUUID();
+      const result = await sendToBarraAndOpenTicket(
+        {
+          cliente: cliente.trim() || "Cliente",
+          mesaId: mesaId || undefined,
+          mesa: mesaSeleccionada?.nombre,
+          items: cart,
+          total: cartTotal,
+          clientId,
+        },
+        productos,
+        {
+          addComanda,
+          decrementBatch,
+          reloadInventario,
+          adiciones,
+          faseOpciones,
+        },
+      );
+      setSending(false);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(
+        result.queued
+          ? `Turno ${result.comanda.queueOrder} · Comanda #${result.comanda.folio} guardada.`
+          : `Turno ${result.comanda.queueOrder} · Comanda #${result.comanda.folio} enviada a barra.`,
+      );
+    })();
   }
 
   function canContinue(): boolean {
@@ -536,10 +557,14 @@ export function MeseroOrderWizard() {
                 TOUCH_BTN,
               )}
               onClick={openSendConfirm}
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || sending}
             >
-              <ClipboardList className="h-5 w-5" />
-              Enviar a barra
+              {sending ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <ClipboardList className="h-5 w-5" />
+              )}
+              {sending ? "Enviando…" : "Enviar a barra"}
             </Button>
           </div>
         </MichelandiaFooterBar>

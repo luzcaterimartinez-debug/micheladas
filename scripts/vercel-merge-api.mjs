@@ -106,6 +106,28 @@ function installPythonDeps(funcDir) {
   }
 }
 
+function copyPwaAssets() {
+  const distDir = path.join(root, "dist");
+  const staticDir = path.join(outputDir, "static");
+  if (!fs.existsSync(distDir) || !fs.existsSync(staticDir)) {
+    console.warn("No se copiaron assets PWA (falta dist/ o static/)");
+    return;
+  }
+
+  const swSrc = path.join(distDir, "sw.js");
+  if (fs.existsSync(swSrc)) {
+    fs.copyFileSync(swSrc, path.join(staticDir, "sw.js"));
+    console.log("PWA: sw.js → static/");
+  }
+
+  for (const entry of fs.readdirSync(distDir)) {
+    if (entry.startsWith("workbox-") && entry.endsWith(".js")) {
+      fs.copyFileSync(path.join(distDir, entry), path.join(staticDir, entry));
+      console.log(`PWA: ${entry} → static/`);
+    }
+  }
+}
+
 function patchConfigRoutes() {
   const configPath = path.join(outputDir, "config.json");
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
@@ -170,6 +192,7 @@ fs.writeFileSync(
 );
 
 patchConfigRoutes();
+copyPwaAssets();
 installPythonDeps(funcDir);
 
 const indexSource = fs.readFileSync(path.join(funcDir, "index.py"), "utf8");
