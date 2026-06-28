@@ -238,71 +238,112 @@ export function renderTestTicketPlainText(): string {
 
 
 
-/**
- * Abre una ventana popup vacía SINCRÓNICAMENTE dentro del gesto del usuario
- * (antes de cualquier await/setTimeout) para evitar que el bloqueador de popups
- * la bloquee. Luego se rellena con el HTML del ticket y se llama print().
- */
-export function openPrintPopup(): Window | null {
-  if (typeof window === "undefined") return null;
-  const w = DEFAULT_PRINTER.paperMm;
-  return window.open(
-    "",
-    "_blank",
-    `width=${w * 4},height=600,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`,
-  );
-}
+const PRINT_ROOT_ID = "michelada-print-root";
+const PRINT_STYLE_ID = "michelada-print-style";
 
 /**
- * Escribe el HTML del ticket en el popup ya abierto y llama print().
- * Si popup es null (fue bloqueado), intenta abrir una ventana de fallback.
+ * Imprime el ticket en la misma pestaña (sin popup).
+ * Funciona en celular, tablet y PC; evita bloqueadores de ventanas.
  */
-function runPrint(html: string, _silent: boolean, preOpenedPopup?: Window | null) {
-  const popup = preOpenedPopup ?? null;
+function runPrintInPage(html: string): boolean {
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
 
-  const doWriteAndPrint = (win: Window) => {
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
-    win.focus();
+  try {
+    document.getElementById(PRINT_STYLE_ID)?.remove();
+
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    const ticketHtml = parsed.body.innerHTML;
+    const ticketCss = parsed.querySelector("style")?.textContent ?? "";
+    const w = DEFAULT_PRINTER.paperMm;
+
+    const style = document.createElement("style");
+    style.id = PRINT_STYLE_ID;
+    style.textContent = `
+      ${ticketCss}
+      @media screen {
+        #${PRINT_ROOT_ID} {
+          position: fixed;
+          left: -10000px;
+          top: 0;
+          width: ${w}mm;
+          opacity: 0;
+          pointer-events: none;
+          z-index: -1;
+        }
+      }
+      @media print {
+        body > *:not(#${PRINT_ROOT_ID}) {
+          display: none !important;
+        }
+        #${PRINT_ROOT_ID} {
+          display: block !important;
+          position: static !important;
+          width: ${w}mm !important;
+          max-width: ${w}mm !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          opacity: 1 !important;
+          color: #000 !important;
+          background: #fff !important;
+        }
+      }
+    `;
+
+    let root = document.getElementById(PRINT_ROOT_ID);
+    if (!root) {
+      root = document.createElement("div");
+      root.id = PRINT_ROOT_ID;
+      root.setAttribute("aria-hidden", "true");
+      document.body.appendChild(root);
+    }
+    root.innerHTML = ticketHtml;
+
+    const cleanup = () => {
+      const r = document.getElementById(PRINT_ROOT_ID);
+      if (r) r.innerHTML = "";
+      style.remove();
+    };
 
     const doPrint = () => {
       try {
-        win.print();
-      } finally {
-        setTimeout(() => {
-          try { win.close(); } catch { /* ignorar */ }
-        }, 1500);
+        window.focus();
+        window.print();
+      } catch {
+        cleanup();
+        return false;
       }
+      return true;
     };
 
-    if (win.document.readyState === "complete") {
-      setTimeout(doPrint, 350);
-    } else {
-      win.addEventListener("load", () => setTimeout(doPrint, 350));
-      setTimeout(doPrint, 800); // seguro si el load ya ocurrió
-    }
-  };
+    document.head.appendChild(style);
+    window.addEventListener("afterprint", () => cleanup(), { once: true });
+    window.setTimeout(() => cleanup(), 120_000);
 
-  if (popup && !popup.closed) {
-    doWriteAndPrint(popup);
-    return;
-  }
-
-  // Popup bloqueado — intentar abrir de todas formas (puede fallar en móvil)
-  const win = window.open("", "_blank");
-  if (win) {
-    doWriteAndPrint(win);
+    requestAnimationFrame(() => {
+      setTimeout(doPrint, 120);
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 
-/** Imprime de inmediato con diálogo usando un popup pre-abierto en el clic del usuario. */
+/** @deprecated Usar runPrintInPage — los popups suelen bloquearse en móvil. */
+export function openPrintPopup(): Window | null {
+  return null;
+}
+
+function runPrint(html: string, _silent: boolean, _preOpenedPopup?: Window | null) {
+  runPrintInPage(html);
+}
+
+/** Imprime de inmediato con diálogo (llamar en el clic del usuario). */
 export function printComandaDialogNow(
   c: Comanda,
   productos: MicheladaType[] = MICHELADAS,
-  preOpenedPopup?: Window | null,
-): void {
-  runPrint(renderComandaTicket(c, productos), false, preOpenedPopup);
+  _preOpenedPopup?: Window | null,
+): boolean {
+  return runPrintInPage(renderComandaTicket(c, productos));
 }
 
 export function printComanda(
@@ -327,8 +368,7 @@ export function printComanda(
 }
 
 export function printTestTicket(): void {
-  const html = renderTestTicket();
-  enqueuePrint(() => runPrint(html, false));
+  runPrintInPage(renderTestTicket());
 }
 
 export function timeAgo(ts: number): string {

@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
-import { printComandaOnSend, openPrintPopup } from "@/lib/comanda-print";
+import { printComandaOnSend } from "@/lib/comanda-print";
 import { buildOptimisticComanda } from "@/lib/offline/sync-engine";
 import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
 import { getStoredSession } from "@/lib/auth";
@@ -130,9 +130,10 @@ export function OrderBuilder() {
     const clientId = crypto.randomUUID();
     const ticket = buildOptimisticComanda(payload, clientId);
 
-    // Abrir el popup ANTES de cualquier await — necesario en móvil
-    const printPopup = openPrintPopup();
-    printComandaOnSend(ticket, productos, printPopup);
+    const printed = printComandaOnSend(ticket, productos);
+    if (!printed) {
+      toast.error("No se pudo abrir la impresión. Intenta de nuevo.");
+    }
     setConfirmOpen(false);
 
     void (async () => {

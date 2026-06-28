@@ -1,4 +1,4 @@
-import { printComandaDialogNow, openPrintPopup, printComanda } from "@/lib/comanda-display";
+import { printComandaDialogNow, printComanda } from "@/lib/comanda-display";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 
 export const COMANDA_NUEVA_EVENT = "michelada-comanda-nueva";
@@ -52,24 +52,15 @@ export function shouldPrintOnSend(): boolean {
 }
 
 /**
- * Abre una ventana popup vacía SINCRÓNICAMENTE dentro del gesto del usuario.
- * Llámalo ANTES de cualquier await en el handler del botón "Enviar a barra".
- * Luego pasa el resultado a printComandaOnSend().
- */
-export { openPrintPopup };
-
-/**
- * Completa la impresión usando el popup ya abierto sincrónicamente.
- * Recibe el popup que fue abierto ANTES del await en el handler del click.
+ * Imprime al confirmar envío a barra (mismo clic del usuario).
  */
 export function printComandaOnSend(
   comanda: Comanda,
   productos: MicheladaType[],
-  preOpenedPopup?: Window | null,
+  _preOpenedPopup?: Window | null,
 ): boolean {
   if (typeof window === "undefined") return false;
-  printComandaDialogNow(comanda, productos, preOpenedPopup);
-  return true;
+  return printComandaDialogNow(comanda, productos);
 }
 
 export function printComandaIfNew(

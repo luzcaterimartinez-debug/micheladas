@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { queueLabel } from "@/lib/comanda-queue";
-import { faseOpcionNames, orderItemLabel, orderItemSubtitle, printComandaDialogNow, openPrintPopup } from "@/lib/comanda-display";
+import { faseOpcionNames, orderItemLabel, orderItemSubtitle, printComandaDialogNow } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
@@ -232,8 +232,9 @@ export function ComandaViewDialog({
                   size="sm"
                   className="gap-1.5 text-muted-foreground"
                   onClick={() => {
-                    const popup = openPrintPopup();
-                    printComandaDialogNow(comanda, productos, popup);
+                    if (!printComandaDialogNow(comanda, productos)) {
+                      window.alert("No se pudo abrir la impresión. Revisa permisos del navegador.");
+                    }
                   }}
                   disabled={comanda.items.length === 0}
                 >
