@@ -1,0 +1,18 @@
+# Evita que el empaquetado Python de Vercel arrastre el frontend/deps
+node_modules
+.venv
+venv
+.git
+.cursor
+dist
+src
+public
+backend/tests
+backend/backups
+backend/scripts
+**/*.md
+**/*.map
+coverage
+.turbo
+.pytest_cache
+__pycache__

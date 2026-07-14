@@ -85,6 +85,17 @@ Desde la raíz del proyecto: `npm run test` (frontend) y `npm run test:backend` 
 
 ## Producción (Vercel + MySQL Hostinger)
 
+### Si el deploy falla por tamaño (`api/index` > 250 MB)
+
+El runtime Python de Vercel hace que la función supere 250 MB aunque el código sea liviano (~13 MB). En el proyecto de Vercel:
+
+1. **Settings → Environment Variables**
+2. Añade `VERCEL_SUPPORT_LARGE_FUNCTIONS` = `1` (Production + Preview)
+3. **Redeploy**
+
+Eso activa Large Functions (hasta 5 GB). Es el arreglo oficial de Vercel para proyectos antiguos; no basta con reducir dependencias.
+
+
 El frontend (TanStack/Nitro) y el API Python (`api/index.py`) se despliegan juntos.
 El build ejecuta `postbuild` que empaqueta la función en `.vercel/output/functions/api/index.func`.
 

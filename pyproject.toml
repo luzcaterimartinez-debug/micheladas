@@ -11,6 +11,3 @@ dependencies = [
     "pydantic-settings==2.7.0",
     "email-validator==2.2.0",
 ]
-
-[tool.vercel]
-entrypoint = "api.index:handler"
