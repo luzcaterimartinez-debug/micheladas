@@ -26,7 +26,26 @@ const SKIP_DIRS = new Set([
   "scripts",
   "database",
 ]);
-const SKIP_FILES = new Set([".env", ".gitignore", "README.md", "pytest.ini"]);
+const SKIP_FILES = new Set([
+  ".env",
+  ".gitignore",
+  "README.md",
+  "pytest.ini",
+  ".env.example",
+  ".env.local.example",
+  ".env.production.example",
+  "requirements-dev.txt",
+  "test_db_connection.py",
+  "pytest.ini",
+  "pyproject.toml",
+  "bun.lock",
+  "bunfig.toml",
+  "tsconfig.json",
+  "vite.config.ts",
+  "vitest.config.ts",
+  "package-lock.json",
+  "package.json",
+]);
 
 /** Carpetas que no aportan al runtime y engordan el unzip de la función. */
 const PRUNE_DIR_NAMES = new Set([
@@ -37,6 +56,26 @@ const PRUNE_DIR_NAMES = new Set([
   "testing",
   "examples",
   "docs",
+  "doc",
+  "documentation",
+  "demo",
+  "benchmarks",
+  "benchmark",
+  "tests_integration",
+  "tests_unit",
+  "testsuite",
+  "test_suite",
+]);
+
+const PRUNE_FILE_EXTS = new Set([
+  ".pyc",
+  ".pyo",
+  ".whl",
+  ".tar.gz",
+  ".zip",
+  ".md",
+  ".rst",
+  ".txt",
 ]);
 
 function rmRecursive(target) {
@@ -106,9 +145,23 @@ function prunePythonBundle(dir) {
       entry.name.endsWith(".pyc") ||
       entry.name.endsWith(".pyo") ||
       entry.name === "RECORD" ||
-      entry.name === "INSTALLER"
+      entry.name === "INSTALLER" ||
+      entry.name === "WHEEL" ||
+      entry.name === "METADATA" ||
+      entry.name === "top_level.txt" ||
+      entry.name === "direct_url.json" ||
+      entry.name.endsWith(".whl") ||
+      entry.name.endsWith(".md") ||
+      entry.name.endsWith(".rst") ||
+      entry.name.endsWith(".txt") ||
+      entry.name.endsWith(".zip") ||
+      entry.name.endsWith(".tar.gz")
     ) {
-      fs.unlinkSync(full);
+      try {
+        fs.unlinkSync(full);
+      } catch (e) {
+        // ignore errors
+      }
     }
   }
 }
