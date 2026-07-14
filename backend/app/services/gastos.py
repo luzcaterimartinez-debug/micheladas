@@ -39,6 +39,20 @@ def _gasto_out(row: dict[str, Any]) -> GastoOut:
     )
 
 
+def _load_gasto(cursor: Any, gasto_id: str) -> GastoOut | None:
+    row = fetch_one(
+        cursor,
+        """
+        SELECT g.*, u.nombre AS creado_por_nombre
+        FROM gastos g
+        LEFT JOIN usuarios u ON u.id = g.creado_por
+        WHERE g.id = %s
+        """,
+        (gasto_id,),
+    )
+    return _gasto_out(row) if row else None
+
+
 def list_gastos(
     *,
     fecha: date | None = None,
@@ -66,17 +80,19 @@ def list_gastos(
         params.append(categoria)
 
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    rows = fetch_all(
-        f"""
-        SELECT g.*, u.nombre AS creado_por_nombre
-        FROM gastos g
-        LEFT JOIN usuarios u ON u.id = g.creado_por
-        {where}
-        ORDER BY g.fecha DESC, g.creado_en DESC
-        LIMIT %s
-        """,
-        (*params, limit),
-    )
+    with get_db() as (_, cursor):
+        rows = fetch_all(
+            cursor,
+            f"""
+            SELECT g.*, u.nombre AS creado_por_nombre
+            FROM gastos g
+            LEFT JOIN usuarios u ON u.id = g.creado_por
+            {where}
+            ORDER BY g.fecha DESC, g.creado_en DESC
+            LIMIT %s
+            """,
+            (*params, limit),
+        )
     return [_gasto_out(r) for r in rows]
 
 
@@ -98,24 +114,27 @@ def resumen_gastos(
 
     assert desde is not None and hasta is not None
 
-    total_row = fetch_one(
-        """
-        SELECT COALESCE(SUM(monto), 0) AS total, COUNT(*) AS cantidad
-        FROM gastos
-        WHERE fecha BETWEEN %s AND %s
-        """,
-        (desde, hasta),
-    )
-    por_cat = fetch_all(
-        """
-        SELECT categoria, COALESCE(SUM(monto), 0) AS total, COUNT(*) AS cantidad
-        FROM gastos
-        WHERE fecha BETWEEN %s AND %s
-        GROUP BY categoria
-        ORDER BY total DESC
-        """,
-        (desde, hasta),
-    )
+    with get_db() as (_, cursor):
+        total_row = fetch_one(
+            cursor,
+            """
+            SELECT COALESCE(SUM(monto), 0) AS total, COUNT(*) AS cantidad
+            FROM gastos
+            WHERE fecha BETWEEN %s AND %s
+            """,
+            (desde, hasta),
+        )
+        por_cat = fetch_all(
+            cursor,
+            """
+            SELECT categoria, COALESCE(SUM(monto), 0) AS total, COUNT(*) AS cantidad
+            FROM gastos
+            WHERE fecha BETWEEN %s AND %s
+            GROUP BY categoria
+            ORDER BY total DESC
+            """,
+            (desde, hasta),
+        )
     return GastosResumenOut(
         desde=desde,
         hasta=hasta,
@@ -135,7 +154,7 @@ def resumen_gastos(
 def create_gasto(body: GastoCreate, user_id: int) -> GastoOut:
     gasto_id = str(uuid.uuid4())
     notas = body.notas.strip() if body.notas else None
-    with get_db() as (conn, cursor):
+    with get_db() as (_, cursor):
         cursor.execute(
             """
             INSERT INTO gastos (id, concepto, monto, categoria, fecha, notas, creado_por)
@@ -151,86 +170,59 @@ def create_gasto(body: GastoCreate, user_id: int) -> GastoOut:
                 user_id,
             ),
         )
-        conn.commit()
-    row = fetch_one(
-        """
-        SELECT g.*, u.nombre AS creado_por_nombre
-        FROM gastos g
-        LEFT JOIN usuarios u ON u.id = g.creado_por
-        WHERE g.id = %s
-        """,
-        (gasto_id,),
-    )
-    if not row:
+        out = _load_gasto(cursor, gasto_id)
+    if not out:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "No se pudo crear el gasto")
-    return _gasto_out(row)
+    return out
 
 
 def update_gasto(gasto_id: str, body: GastoUpdate) -> GastoOut:
-    existing = fetch_one("SELECT * FROM gastos WHERE id = %s", (gasto_id,))
-    if not existing:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Gasto no encontrado")
-
     data = body.model_dump(exclude_unset=True)
-    if not data:
-        row = fetch_one(
-            """
-            SELECT g.*, u.nombre AS creado_por_nombre
-            FROM gastos g
-            LEFT JOIN usuarios u ON u.id = g.creado_por
-            WHERE g.id = %s
-            """,
-            (gasto_id,),
-        )
-        assert row
-        return _gasto_out(row)
+    with get_db() as (_, cursor):
+        existing = fetch_one(cursor, "SELECT id FROM gastos WHERE id = %s", (gasto_id,))
+        if not existing:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Gasto no encontrado")
 
-    fields: list[str] = []
-    params: list[Any] = []
+        if not data:
+            out = _load_gasto(cursor, gasto_id)
+            assert out
+            return out
 
-    if "concepto" in data and data["concepto"] is not None:
-        fields.append("concepto = %s")
-        params.append(str(data["concepto"]).strip())
-    if "monto" in data and data["monto"] is not None:
-        fields.append("monto = %s")
-        params.append(round(float(data["monto"]), 2))
-    if "categoria" in data and data["categoria"] is not None:
-        fields.append("categoria = %s")
-        params.append(data["categoria"])
-    if "fecha" in data and data["fecha"] is not None:
-        fields.append("fecha = %s")
-        params.append(data["fecha"])
-    if "notas" in data:
-        notas = data["notas"]
-        fields.append("notas = %s")
-        params.append(notas.strip() if isinstance(notas, str) and notas.strip() else None)
+        fields: list[str] = []
+        params: list[Any] = []
 
-    if fields:
-        params.append(gasto_id)
-        with get_db() as (conn, cursor):
+        if "concepto" in data and data["concepto"] is not None:
+            fields.append("concepto = %s")
+            params.append(str(data["concepto"]).strip())
+        if "monto" in data and data["monto"] is not None:
+            fields.append("monto = %s")
+            params.append(round(float(data["monto"]), 2))
+        if "categoria" in data and data["categoria"] is not None:
+            fields.append("categoria = %s")
+            params.append(data["categoria"])
+        if "fecha" in data and data["fecha"] is not None:
+            fields.append("fecha = %s")
+            params.append(data["fecha"])
+        if "notas" in data:
+            notas = data["notas"]
+            fields.append("notas = %s")
+            params.append(notas.strip() if isinstance(notas, str) and notas.strip() else None)
+
+        if fields:
+            params.append(gasto_id)
             cursor.execute(
                 f"UPDATE gastos SET {', '.join(fields)} WHERE id = %s",
                 tuple(params),
             )
-            conn.commit()
 
-    row = fetch_one(
-        """
-        SELECT g.*, u.nombre AS creado_por_nombre
-        FROM gastos g
-        LEFT JOIN usuarios u ON u.id = g.creado_por
-        WHERE g.id = %s
-        """,
-        (gasto_id,),
-    )
-    if not row:
+        out = _load_gasto(cursor, gasto_id)
+    if not out:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Gasto no encontrado")
-    return _gasto_out(row)
+    return out
 
 
 def delete_gasto(gasto_id: str) -> None:
-    with get_db() as (conn, cursor):
+    with get_db() as (_, cursor):
         cursor.execute("DELETE FROM gastos WHERE id = %s", (gasto_id,))
         if cursor.rowcount == 0:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Gasto no encontrado")
-        conn.commit()

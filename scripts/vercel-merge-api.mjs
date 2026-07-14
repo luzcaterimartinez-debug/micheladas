@@ -28,16 +28,40 @@ const SKIP_DIRS = new Set([
 ]);
 const SKIP_FILES = new Set([".env", ".gitignore", "README.md", "pytest.ini"]);
 
+/** Carpetas que no aportan al runtime y engordan el unzip de la función. */
+const PRUNE_DIR_NAMES = new Set([
+  "__pycache__",
+  ".pytest_cache",
+  "tests",
+  "test",
+  "testing",
+  "examples",
+  "docs",
+  "include",
+]);
+
 function rmRecursive(target) {
   if (!fs.existsSync(target)) return;
+  try {
+    fs.rmSync(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    return;
+  } catch {
+    // Fallback Windows / archivos bloqueados: vaciar contenido y reintentar
+  }
   if (process.platform === "win32") {
-    execSync(
-      `powershell -NoProfile -Command "Remove-Item -LiteralPath '${target.replace(/'/g, "''")}' -Recurse -Force"`,
-    );
+    try {
+      execSync(
+        `powershell -NoProfile -Command "Get-ChildItem -LiteralPath '${target.replace(/'/g, "''")}' -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath '${target.replace(/'/g, "''")}' -Recurse -Force -ErrorAction SilentlyContinue"`,
+        { stdio: "ignore" },
+      );
+    } catch {
+      console.warn(`No se pudo limpiar por completo: ${target}`);
+    }
     return;
   }
   fs.rmSync(target, { recursive: true, force: true });
 }
+
 function shouldSkip(name) {
   return SKIP_DIRS.has(name) || SKIP_FILES.has(name);
 }
@@ -68,14 +92,47 @@ function pythonCmd() {
   throw new Error("No se encontró python3 ni python en PATH");
 }
 
-function installPythonDeps(funcDir) {
-  const requirements = path.join(funcDir, "requirements.txt");
+function prunePythonBundle(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (PRUNE_DIR_NAMES.has(entry.name) || entry.name.endsWith(".dist-info") || entry.name.endsWith(".egg-info")) {
+        rmRecursive(full);
+        continue;
+      }
+      prunePythonBundle(full);
+      continue;
+    }
+    if (
+      entry.name.endsWith(".pyc") ||
+      entry.name.endsWith(".pyo") ||
+      entry.name === "RECORD" ||
+      entry.name === "INSTALLER"
+    ) {
+      fs.unlinkSync(full);
+    }
+  }
+}
+
+function installPythonDeps(targetDir) {
+  const requirements = path.join(targetDir, "requirements.txt");
   if (!fs.existsSync(requirements)) {
-    throw new Error(`Falta requirements.txt en ${funcDir}`);
+    throw new Error(`Falta requirements.txt en ${targetDir}`);
   }
 
   const py = pythonCmd();
-  const args = ["-m", "pip", "install", "-r", "requirements.txt", "-t", ".", "--upgrade", "--no-cache-dir"];
+  const args = [
+    "-m",
+    "pip",
+    "install",
+    "-r",
+    "requirements.txt",
+    "-t",
+    ".",
+    "--no-cache-dir",
+    "--no-compile",
+    "--disable-pip-version-check",
+  ];
 
   // Empaquetar wheels Linux para Lambda cuando el build corre fuera de Vercel/Linux
   if (process.platform !== "linux") {
@@ -91,19 +148,36 @@ function installPythonDeps(funcDir) {
     );
   }
 
-  console.log(`Instalando dependencias Python en ${path.relative(root, funcDir)} ...`);
-  execSync([py, ...args].join(" "), { cwd: funcDir, stdio: "inherit" });
+  console.log(`Instalando dependencias Python en ${path.relative(root, targetDir)} ...`);
+  execSync([py, ...args].join(" "), { cwd: targetDir, stdio: "inherit" });
+
+  // Evitar que Vercel vuelva a instalar deps (duplica tamaño y suma el runtime)
+  fs.unlinkSync(requirements);
+  prunePythonBundle(targetDir);
 
   if (process.platform === "linux") {
     execSync(`${py} -c "import fastapi; print('fastapi', fastapi.__version__)"`, {
-      cwd: funcDir,
+      cwd: targetDir,
       stdio: "inherit",
     });
-  } else if (!fs.existsSync(path.join(funcDir, "fastapi"))) {
+  } else if (!fs.existsSync(path.join(targetDir, "fastapi"))) {
     throw new Error("pip install no generó el paquete fastapi en el bundle");
   } else {
     console.log("Dependencias Python empaquetadas (wheels Linux para Lambda)");
   }
+
+  const sizeBytes = walkSize(targetDir);
+  console.log(`Tamaño API (sin runtime Vercel): ${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`);
+}
+
+function walkSize(dir) {
+  let total = 0;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) total += walkSize(full);
+    else total += fs.statSync(full).size;
+  }
+  return total;
 }
 
 function copyPwaAssets() {
@@ -152,16 +226,18 @@ if (!fs.existsSync(path.join(outputDir, "config.json"))) {
   process.exit(1);
 }
 
-// Limpiar handler catch-all anterior si existía
+// Limpiar handlers previos (incluyendo acumular deps en redeploys locales)
 rmRecursive(path.join(outputDir, "functions/api/[...path].func"));
+rmRecursive(funcDir);
 
 fs.mkdirSync(funcDir, { recursive: true });
 
 fs.copyFileSync(path.join(root, "api/index.py"), path.join(funcDir, "index.py"));
 
-// Usar requirements.txt optimizado para Vercel si existe, si no usar el original
 const vercelRequirements = path.join(root, "api/requirements-vercel.txt");
-const sourceRequirements = fs.existsSync(vercelRequirements) ? vercelRequirements : path.join(root, "api/requirements.txt");
+const sourceRequirements = fs.existsSync(vercelRequirements)
+  ? vercelRequirements
+  : path.join(root, "api/requirements.txt");
 fs.copyFileSync(sourceRequirements, path.join(funcDir, "requirements.txt"));
 fs.writeFileSync(
   path.join(funcDir, "pyproject.toml"),

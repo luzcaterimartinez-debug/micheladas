@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 
 from app.config import get_settings
 from app.models.user import TokenPayload
@@ -23,5 +24,5 @@ def decode_access_token(token: str) -> TokenPayload | None:
     try:
         data = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         return TokenPayload(sub=data["sub"], rol=data["rol"], nombre=data["nombre"])
-    except JWTError:
+    except PyJWTError:
         return None
