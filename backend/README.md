@@ -34,6 +34,7 @@ python -m scripts.migrate_inventario
 python -m scripts.migrate_inventario_vinculo
 python -m scripts.migrate_adiciones_porcion
 python -m scripts.migrate_caja
+python -m scripts.migrate_gastos
 ```
 
 (O con cliente MySQL: `mysql -u root < database/schema.sql`)

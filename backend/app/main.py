@@ -6,7 +6,7 @@ import logging
 
 from app.config import get_settings, production_config_errors
 from app.database import check_database
-from app.routers import admin, admin_menu, auth, caja, comandas, inventario, menu, mesas, nomina, reportes
+from app.routers import admin, admin_menu, auth, caja, comandas, gastos, inventario, menu, mesas, nomina, reportes
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ app.include_router(inventario.router)
 app.include_router(reportes.router)
 app.include_router(nomina.router)
 app.include_router(caja.router)
+app.include_router(gastos.router)
 
 
 @app.middleware("http")

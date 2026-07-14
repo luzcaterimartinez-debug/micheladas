@@ -10,6 +10,7 @@ import {
   Layers,
   ListPlus,
   Menu,
+  Receipt,
   UserCog,
   Users,
   UtensilsCrossed,
@@ -25,6 +26,7 @@ export type AdminSection =
   | "usuarios"
   | "comandas"
   | "caja"
+  | "gastos"
   | "reportes"
   | "nomina"
   | "inventario"
@@ -46,6 +48,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { id: "usuarios", label: "Usuarios", icon: UserCog },
   { id: "comandas", label: "Comandas", icon: ClipboardList },
   { id: "caja", label: "Caja", icon: Banknote },
+  { id: "gastos", label: "Gastos", icon: Receipt },
   { id: "reportes", label: "Reportes", icon: BarChart3 },
   { id: "nomina", label: "Nómina", icon: Wallet },
   { id: "inventario", label: "Inventario", icon: Boxes },
@@ -56,7 +59,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
 export const ADMIN_NAV_GROUPS: { label: string; ids: AdminSection[] }[] = [
   { label: "General", ids: ["resumen", "reportes"] },
   { label: "Menú", ids: ["categorias", "menu", "fases", "adiciones"] },
-  { label: "Operación", ids: ["comandas", "caja", "inventario", "mesas", "pos"] },
+  { label: "Operación", ids: ["comandas", "caja", "gastos", "inventario", "mesas", "pos"] },
   { label: "Equipo", ids: ["usuarios", "nomina"] },
 ];
 
