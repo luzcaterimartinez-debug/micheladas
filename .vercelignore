@@ -1,18 +1,13 @@
-# Evita que el empaquetado Python de Vercel arrastre el frontend/deps
-node_modules
+# Solo excluir del upload lo que NO necesita el build en Vercel.
+# NO excluir src/, public/, ni archivos de la app: rompen `vite build`.
+.cursor
 .venv
 venv
-.git
-.cursor
-dist
-src
-public
-backend/tests
 backend/backups
-backend/scripts
+backend/tests
 **/*.md
-**/*.map
 coverage
 .turbo
 .pytest_cache
-__pycache__
+**/__pycache__
+**/*.map

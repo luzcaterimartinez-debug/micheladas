@@ -37,7 +37,6 @@ const PRUNE_DIR_NAMES = new Set([
   "testing",
   "examples",
   "docs",
-  "include",
 ]);
 
 function rmRecursive(target) {
