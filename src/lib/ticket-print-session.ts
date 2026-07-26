@@ -1,4 +1,4 @@
-/** Datos temporales para la pantalla /ticket (vista tipo impresora 58 mm). */
+/** Datos temporales para la pantalla /ticket (vista tipo impresora 80 mm). */
 
 import type { OrderItem } from "@/lib/micheladas-store";
 

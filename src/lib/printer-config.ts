@@ -1,8 +1,8 @@
-/** Impresora térmica AON Business MPR-200 — papel 58 mm, ESC/POS. */
+/** Impresora térmica AON Business MPR-200 — papel 80 mm, ESC/POS. */
 export const DEFAULT_PRINTER = {
   model: "AON MPR-200",
-  paperMm: 58,
-  printableMm: 48,
+  paperMm: 80,
+  printableMm: 72,
 } as const;
 
 const AUTO_PRINT_KEY = "micheladas_auto_print";

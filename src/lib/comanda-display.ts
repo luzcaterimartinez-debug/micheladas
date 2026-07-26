@@ -183,7 +183,7 @@ export function renderTestTicket(): string {
   </div></body></html>`;
 }
 
-const LINE = "--------------------------------";
+const LINE = "------------------------------------------";
 
 export function renderComandaTicketPlainText(
   c: Comanda,
@@ -240,7 +240,7 @@ export function renderTestTicketPlainText(): string {
 const ticketReturnUrl = () =>
   typeof window !== "undefined" ? location.pathname + location.search : "/";
 
-/** Abre /ticket con el ticket 58 mm (revisar; imprimir solo si el usuario lo pide). */
+/** Abre /ticket con el ticket 80 mm (revisar; imprimir solo si el usuario lo pide). */
 export function openComandaTicketView(
   c: Comanda,
   productos: MicheladaType[] = MICHELADAS,
