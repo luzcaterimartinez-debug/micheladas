@@ -53,71 +53,154 @@ function ticketStyles(): string {
       color: #000;
       background: #fff;
       font-family: "Courier New", Courier, monospace;
-      font-size: 16px;
-      line-height: 1.4;
+      font-size: 15px;
+      line-height: 1.35;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    .wrap { padding: 3mm 3mm 5mm; }
-    h2 {
-      text-align: center;
-      font-size: 18px;
+    .wrap { padding: 3.5mm 3.5mm 6mm; }
+    .header { text-align: center; margin-bottom: 2mm; }
+    .brand {
+      display: block;
+      font-family: "Segoe Script", "Brush Script MT", Georgia, cursive;
+      font-style: italic;
+      font-size: 28px;
       font-weight: bold;
-      margin: 0 0 6px;
+      line-height: 1.15;
       letter-spacing: 0.5px;
     }
-    .brand {
-      font-family: "Segoe Script", "Brush Script MT", "Comic Sans MS", cursive;
-      font-style: italic;
-      font-size: 24px;
+    .station {
+      display: inline-block;
+      margin-top: 3px;
+      padding: 2px 10px;
+      border: 2px solid #000;
+      border-radius: 999px;
+      font-size: 12px;
       font-weight: bold;
-      text-transform: none;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .turno-box {
+      border: 3px solid #000;
+      border-radius: 4px;
+      padding: 6px 4px 8px;
+      margin: 8px 0 6px;
+      text-align: center;
+    }
+    .turno-label {
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
     }
     .turno {
-      font-size: 40px;
+      font-size: 42px;
       font-weight: bold;
-      text-align: center;
-      margin: 8px 0;
       letter-spacing: 1px;
-      line-height: 1.1;
+      line-height: 1;
     }
-    .folio { text-align: center; font-size: 15px; margin-bottom: 6px; }
-    hr {
+    .folio {
+      text-align: center;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+    .rule {
       border: none;
       border-top: 2px dashed #000;
       margin: 8px 0;
     }
-    .meta { font-size: 16px; margin: 3px 0; }
-    .item { margin-bottom: 11px; page-break-inside: avoid; }
+    .rule-double {
+      border: none;
+      height: 0;
+      border-top: 2px solid #000;
+      border-bottom: 2px solid #000;
+      margin: 8px 0;
+      padding: 1px 0;
+    }
+    .meta-block { margin: 2px 0 4px; }
+    .meta {
+      display: flex;
+      gap: 6px;
+      font-size: 15px;
+      margin: 3px 0;
+    }
+    .meta-k {
+      font-weight: bold;
+      min-width: 4.2em;
+      flex-shrink: 0;
+    }
+    .meta-v { flex: 1; word-break: break-word; }
+    .section-title {
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin: 2px 0 6px;
+    }
+    .item {
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px dotted #000;
+      page-break-inside: avoid;
+    }
+    .item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+      margin-bottom: 4px;
+    }
     .item-head {
       display: flex;
       justify-content: space-between;
-      gap: 6px;
+      align-items: flex-start;
+      gap: 8px;
       font-weight: bold;
-      font-size: 18px;
+      font-size: 17px;
     }
     .item-name { flex: 1; word-break: break-word; }
     .item-price { white-space: nowrap; }
-    .item-extra { font-size: 15px; margin-top: 3px; word-break: break-word; }
-    .item-note {
-      font-size: 15px;
-      font-style: italic;
+    .item-extra {
+      font-size: 14px;
       margin-top: 3px;
-      padding-left: 5px;
+      padding-left: 2px;
+      word-break: break-word;
+    }
+    .item-note {
+      font-size: 14px;
+      font-style: italic;
+      margin-top: 4px;
+      padding: 3px 0 3px 6px;
       border-left: 3px solid #000;
+    }
+    .total-box {
+      border: 3px solid #000;
+      border-radius: 4px;
+      padding: 8px 10px;
+      margin-top: 4px;
     }
     .total {
       display: flex;
       justify-content: space-between;
+      align-items: baseline;
       font-size: 22px;
       font-weight: bold;
-      margin-top: 6px;
+    }
+    .total span:first-child {
+      font-size: 14px;
+      letter-spacing: 1.5px;
     }
     .foot {
       text-align: center;
-      font-size: 13px;
+      font-size: 11px;
       margin-top: 10px;
-      opacity: 0.85;
+      letter-spacing: 0.3px;
+    }
+    .thanks {
+      text-align: center;
+      font-size: 13px;
+      font-style: italic;
+      margin-top: 8px;
     }
   `;
 }
@@ -143,7 +226,7 @@ export function renderComandaTicket(
             <span class="item-price">$${it.total}</span>
           </div>
           ${extras.length ? `<div class="item-extra">${esc(extras.join(" · "))}</div>` : ""}
-          ${it.notes ? `<div class="item-note">${esc(it.notes)}</div>` : ""}
+          ${it.notes ? `<div class="item-note">* ${esc(it.notes)}</div>` : ""}
         </div>`;
     })
     .join("");
@@ -158,17 +241,29 @@ export function renderComandaTicket(
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(queueLabel(turno))}</title>
   <style>${ticketStyles()}</style></head><body>
   <div class="wrap">
-  <h2><span class="brand">Michelandia</span> · BARRA</h2>
-  <div class="turno">${esc(queueLabel(turno).toUpperCase())}</div>
+  <div class="header">
+    <span class="brand">Michelandia</span>
+    <div><span class="station">Barra</span></div>
+  </div>
+  <div class="turno-box">
+    <div class="turno-label">Turno</div>
+    <div class="turno">${esc(queueLabel(turno).toUpperCase())}</div>
+  </div>
   <div class="folio">Folio #${c.folio}</div>
-  <hr/>
-  <div class="meta"><b>Cliente:</b> ${esc(c.cliente)}</div>
-  ${c.mesa ? `<div class="meta"><b>Mesa:</b> ${esc(c.mesa)}</div>` : ""}
-  <div class="meta"><b>Hora:</b> ${esc(hora)}</div>
-  <hr/>
+  <hr class="rule"/>
+  <div class="meta-block">
+    <div class="meta"><span class="meta-k">Cliente</span><span class="meta-v">${esc(c.cliente)}</span></div>
+    ${c.mesa ? `<div class="meta"><span class="meta-k">Mesa</span><span class="meta-v">${esc(c.mesa)}</span></div>` : ""}
+    <div class="meta"><span class="meta-k">Hora</span><span class="meta-v">${esc(hora)}</span></div>
+  </div>
+  <hr class="rule"/>
+  <div class="section-title">Pedido</div>
   ${rows}
-  <hr/>
-  <div class="total"><span>TOTAL</span><span>$${c.total}</span></div>
+  <hr class="rule-double"/>
+  <div class="total-box">
+    <div class="total"><span>TOTAL</span><span>$${c.total}</span></div>
+  </div>
+  <div class="thanks">¡Gracias!</div>
   <div class="foot">${DEFAULT_PRINTER.model} · ${DEFAULT_PRINTER.paperMm}mm</div>
   </div>
   </body></html>`;
@@ -179,14 +274,22 @@ export function renderTestTicket(): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Prueba</title>
   <style>${ticketStyles()}</style></head><body>
   <div class="wrap">
-  <h2><span class="brand">Michelandia</span></h2>
-  <div class="turno">PRUEBA</div>
-  <hr/>
-  <div class="meta">Impresora: ${esc(DEFAULT_PRINTER.model)}</div>
-  <div class="meta">Papel: ${DEFAULT_PRINTER.paperMm} mm</div>
-  <div class="meta">${esc(now)}</div>
-  <hr/>
-  <p class="meta">Si ves este ticket, la impresión automática de comandas funcionará correctamente.</p>
+  <div class="header">
+    <span class="brand">Michelandia</span>
+    <div><span class="station">Prueba</span></div>
+  </div>
+  <div class="turno-box">
+    <div class="turno-label">Ticket</div>
+    <div class="turno">OK</div>
+  </div>
+  <hr class="rule"/>
+  <div class="meta-block">
+    <div class="meta"><span class="meta-k">Impresora</span><span class="meta-v">${esc(DEFAULT_PRINTER.model)}</span></div>
+    <div class="meta"><span class="meta-k">Papel</span><span class="meta-v">${DEFAULT_PRINTER.paperMm} mm</span></div>
+    <div class="meta"><span class="meta-k">Hora</span><span class="meta-v">${esc(now)}</span></div>
+  </div>
+  <hr class="rule-double"/>
+  <p class="thanks">Si ves este ticket, la impresión funciona.</p>
   </div></body></html>`;
 }
 
