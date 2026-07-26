@@ -119,37 +119,22 @@ function prunePythonBundle(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (
-        PRUNE_DIR_NAMES.has(entry.name) ||
-        entry.name.endsWith(".dist-info") ||
-        entry.name.endsWith(".egg-info")
-      ) {
+      // Conservar *.dist-info: pydantic usa importlib.metadata (email-validator, etc.)
+      if (PRUNE_DIR_NAMES.has(entry.name) || entry.name.endsWith(".egg-info")) {
         rmRecursive(full);
         continue;
+      }
+      if (entry.name.endsWith(".dist-info")) {
+        continue; // no tocar metadata de paquetes
       }
       prunePythonBundle(full);
       continue;
     }
-    // SOLO eliminar archivos 100% seguros, no metadata/configs que los paquetes necesiten
-    if (
-      entry.name.endsWith(".pyc") ||
-      entry.name.endsWith(".pyo") ||
-      entry.name === "RECORD" ||
-      entry.name === "INSTALLER" ||
-      entry.name === "WHEEL" ||
-      entry.name === "direct_url.json" ||
-      entry.name.endsWith(".whl") ||
-      entry.name.endsWith(".md") ||
-      entry.name.endsWith(".rst") ||
-      entry.name.endsWith(".zip") ||
-      entry.name.endsWith(".tar.gz") ||
-      entry.name.endsWith(".c") ||
-      entry.name.endsWith(".h")
-    ) {
+    if (entry.name.endsWith(".pyc") || entry.name.endsWith(".pyo")) {
       try {
         fs.unlinkSync(full);
-      } catch (e) {
-        // ignore errors
+      } catch {
+        // ignore
       }
     }
   }
