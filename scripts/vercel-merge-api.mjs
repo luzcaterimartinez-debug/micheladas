@@ -61,21 +61,6 @@ const PRUNE_DIR_NAMES = new Set([
   "demo",
   "benchmarks",
   "benchmark",
-  "tests_integration",
-  "tests_unit",
-  "testsuite",
-  "test_suite",
-]);
-
-const PRUNE_FILE_EXTS = new Set([
-  ".pyc",
-  ".pyo",
-  ".whl",
-  ".tar.gz",
-  ".zip",
-  ".md",
-  ".rst",
-  ".txt",
 ]);
 
 function rmRecursive(target) {
@@ -137,9 +122,7 @@ function prunePythonBundle(dir) {
       if (
         PRUNE_DIR_NAMES.has(entry.name) ||
         entry.name.endsWith(".dist-info") ||
-        entry.name.endsWith(".egg-info") ||
-        entry.name.startsWith("test") ||
-        entry.name.startsWith("_test")
+        entry.name.endsWith(".egg-info")
       ) {
         rmRecursive(full);
         continue;
@@ -147,32 +130,21 @@ function prunePythonBundle(dir) {
       prunePythonBundle(full);
       continue;
     }
+    // SOLO eliminar archivos 100% seguros, no metadata/configs que los paquetes necesiten
     if (
       entry.name.endsWith(".pyc") ||
       entry.name.endsWith(".pyo") ||
       entry.name === "RECORD" ||
       entry.name === "INSTALLER" ||
       entry.name === "WHEEL" ||
-      entry.name === "METADATA" ||
-      entry.name === "top_level.txt" ||
       entry.name === "direct_url.json" ||
-      entry.name === "entry_points.txt" ||
       entry.name.endsWith(".whl") ||
       entry.name.endsWith(".md") ||
       entry.name.endsWith(".rst") ||
-      entry.name.endsWith(".txt") ||
       entry.name.endsWith(".zip") ||
       entry.name.endsWith(".tar.gz") ||
-      entry.name.endsWith(".cfg") ||
-      entry.name.endsWith(".ini") ||
-      entry.name.endsWith(".toml") ||
-      entry.name.endsWith(".yml") ||
-      entry.name.endsWith(".yaml") ||
       entry.name.endsWith(".c") ||
-      entry.name.endsWith(".h") ||
-      entry.name.startsWith("test_") ||
-      entry.name.startsWith("_test") ||
-      entry.name.includes("test") && entry.name.endsWith(".py")
+      entry.name.endsWith(".h")
     ) {
       try {
         fs.unlinkSync(full);
@@ -184,19 +156,7 @@ function prunePythonBundle(dir) {
 }
 
 function aggressivePrune(targetDir) {
-  // Remover archivos de dependencias que no se usan en runtime
-  const dirsToRemove = [
-    path.join(targetDir, "bin"),
-    path.join(targetDir, "pydantic_core", "include"),
-    path.join(targetDir, "mysql", "xprotocol"),
-    path.join(targetDir, "mysql", "protobuf"),
-  ];
-  
-  for (const d of dirsToRemove) {
-    rmRecursive(d);
-  }
-
-  // Remover archivos de stubs/types de mypy/pyright si existen
+  // SOLO eliminar archivos 100% seguros (stubs de tipado, no afectan runtime)
   const removeStubFiles = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
