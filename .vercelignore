@@ -11,3 +11,24 @@ coverage
 .pytest_cache
 **/__pycache__
 **/*.map
+# Ignorar requirements y configs Python para que Vercel no recompile/instale deps
+# (la función API se arma manualmente en scripts/vercel-merge-api.mjs)
+api/requirements.txt
+api/requirements-vercel.txt
+api/pyproject.toml
+backend/requirements.txt
+backend/requirements-dev.txt
+backend/pytest.ini
+requirements.txt
+pyproject.toml
+.python-version
+# Excluir node_modules y directorios pesados que no van en la función
+dist
+.tanstack
+.lovable
+scripts/*.py
+public/**/*.png
+public/**/*.ico
+public/**/*.jpg
+public/**/*.jpeg
+public/**/*.svg
