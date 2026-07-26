@@ -1,10 +1,5 @@
 {
   "buildCommand": "npm run build",
-  "functions": {
-    "api/index.py": {
-      "excludeFiles": "{node_modules/**,src/**,dist/**,public/**,.git/**,backend/tests/**,backend/backups/**,backend/scripts/**,**/*.md,**/*.pyc,**/*.pyo,**/*.whl,**/*.tar.gz,**/*.zip,**/*.rst,**/*.txt,.venv/**,venv/**,coverage/**,.turbo/**,**/*.map,.lovable/**,.tanstack/**,**/test_*.py,**/tests/**,**/docs/**,**/examples/**}"
-    }
-  },
   "headers": [
     {
       "source": "/sw.js",
