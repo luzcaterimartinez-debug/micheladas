@@ -53,63 +53,70 @@ function ticketStyles(): string {
       color: #000;
       background: #fff;
       font-family: "Courier New", Courier, monospace;
-      font-size: 11px;
-      line-height: 1.35;
+      font-size: 16px;
+      line-height: 1.4;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    .wrap { padding: 2mm 2.5mm 4mm; }
+    .wrap { padding: 3mm 3mm 5mm; }
     h2 {
       text-align: center;
-      font-size: 12px;
+      font-size: 18px;
       font-weight: bold;
-      margin: 0 0 4px;
+      margin: 0 0 6px;
       letter-spacing: 0.5px;
     }
+    .brand {
+      font-family: "Segoe Script", "Brush Script MT", "Comic Sans MS", cursive;
+      font-style: italic;
+      font-size: 24px;
+      font-weight: bold;
+      text-transform: none;
+    }
     .turno {
-      font-size: 26px;
+      font-size: 40px;
       font-weight: bold;
       text-align: center;
-      margin: 6px 0;
+      margin: 8px 0;
       letter-spacing: 1px;
       line-height: 1.1;
     }
-    .folio { text-align: center; font-size: 10px; margin-bottom: 4px; }
+    .folio { text-align: center; font-size: 15px; margin-bottom: 6px; }
     hr {
       border: none;
-      border-top: 1px dashed #000;
-      margin: 6px 0;
+      border-top: 2px dashed #000;
+      margin: 8px 0;
     }
-    .meta { font-size: 11px; margin: 2px 0; }
-    .item { margin-bottom: 8px; page-break-inside: avoid; }
+    .meta { font-size: 16px; margin: 3px 0; }
+    .item { margin-bottom: 11px; page-break-inside: avoid; }
     .item-head {
       display: flex;
       justify-content: space-between;
-      gap: 4px;
+      gap: 6px;
       font-weight: bold;
-      font-size: 12px;
+      font-size: 18px;
     }
     .item-name { flex: 1; word-break: break-word; }
     .item-price { white-space: nowrap; }
-    .item-extra { font-size: 10px; margin-top: 2px; word-break: break-word; }
+    .item-extra { font-size: 15px; margin-top: 3px; word-break: break-word; }
     .item-note {
-      font-size: 10px;
+      font-size: 15px;
       font-style: italic;
-      margin-top: 2px;
-      padding-left: 4px;
-      border-left: 2px solid #000;
+      margin-top: 3px;
+      padding-left: 5px;
+      border-left: 3px solid #000;
     }
     .total {
       display: flex;
       justify-content: space-between;
-      font-size: 14px;
+      font-size: 22px;
       font-weight: bold;
-      margin-top: 4px;
+      margin-top: 6px;
     }
     .foot {
       text-align: center;
-      font-size: 9px;
-      margin-top: 8px;
+      font-size: 13px;
+      margin-top: 10px;
       opacity: 0.85;
     }
   `;
@@ -151,7 +158,7 @@ export function renderComandaTicket(
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(queueLabel(turno))}</title>
   <style>${ticketStyles()}</style></head><body>
   <div class="wrap">
-  <h2>MICHELANDIA · BARRA</h2>
+  <h2><span class="brand">Michelandia</span> · BARRA</h2>
   <div class="turno">${esc(queueLabel(turno).toUpperCase())}</div>
   <div class="folio">Folio #${c.folio}</div>
   <hr/>
@@ -172,7 +179,7 @@ export function renderTestTicket(): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Prueba</title>
   <style>${ticketStyles()}</style></head><body>
   <div class="wrap">
-  <h2>MICHELANDIA</h2>
+  <h2><span class="brand">Michelandia</span></h2>
   <div class="turno">PRUEBA</div>
   <hr/>
   <div class="meta">Impresora: ${esc(DEFAULT_PRINTER.model)}</div>
