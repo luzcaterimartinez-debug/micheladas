@@ -18,6 +18,11 @@ DEFAULT_ITEMS: list[dict[str, Any]] = [
     {"clave": "cerveza", "nombre": "Cerveza (botellas)", "stock": 96, "unidad": "pz", "minimo": 10},
     {"clave": "cola_pola", "nombre": "Cola y pola", "stock": 48, "unidad": "pz", "minimo": 12},
     {"clave": "smirnoff", "nombre": "Smirnoff", "stock": 24, "unidad": "pz", "minimo": 6},
+    {"clave": "coronita", "nombre": "Coronita", "stock": 48, "unidad": "pz", "minimo": 12},
+    {"clave": "corona", "nombre": "Corona", "stock": 48, "unidad": "pz", "minimo": 12},
+    {"clave": "cerveza_latona", "nombre": "Cerveza latona", "stock": 48, "unidad": "pz", "minimo": 12},
+    {"clave": "cerveza_personal", "nombre": "Cerveza personal", "stock": 48, "unidad": "pz", "minimo": 12},
+    {"clave": "ginger_litro_medio", "nombre": "Ginger 1.5 L", "stock": 24, "unidad": "pz", "minimo": 6},
     {"clave": "clamato", "nombre": "Clamato", "stock": 8, "unidad": "L", "minimo": 2},
     {"clave": "limon", "nombre": "Limón", "stock": 100, "unidad": "pz", "minimo": 15},
     {"clave": "chamoy", "nombre": "Chamoy", "stock": 3, "unidad": "L", "minimo": 1},
@@ -28,6 +33,17 @@ DEFAULT_ITEMS: list[dict[str, Any]] = [
     {"clave": "maracuya", "nombre": "Maracuyá", "stock": 50, "unidad": "pz", "minimo": 10},
     {"clave": "mango", "nombre": "Mango", "stock": 50, "unidad": "pz", "minimo": 10},
 ]
+
+# Productos de categoría Bebidas: 1 unidad del ítem, sin limón.
+BEBIDAS_CONSUMO: dict[str, list[tuple[str, float]]] = {
+    "coronita": [("coronita", 1.0)],
+    "corona": [("corona", 1.0)],
+    "cerveza_latona": [("cerveza_latona", 1.0)],
+    "cerveza_personal": [("cerveza_personal", 1.0)],
+    "la_soda": [("soda", 1.0)],
+    "ginger_personal": [("ginger", 1.0)],
+    "ginger_litro_medio": [("ginger_litro_medio", 1.0)],
+}
 
 
 def _row_to_out(row: dict[str, Any]) -> InventarioOut:
@@ -119,6 +135,8 @@ def _bebida_base_from_producto_id(producto_id: str) -> str | None:
 
 
 def _consumo_por_producto(producto_id: str) -> list[tuple[str, float]]:
+    if producto_id in BEBIDAS_CONSUMO:
+        return list(BEBIDAS_CONSUMO[producto_id])
     bebida = _bebida_base_from_producto_id(producto_id)
     if bebida:
         return [(bebida, 1.0), ("limon", 2.0)]

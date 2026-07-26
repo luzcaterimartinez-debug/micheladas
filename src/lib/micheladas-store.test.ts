@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calcItemTotal } from "@/lib/micheladas-store";
+import { calcItemLineTotal, calcItemTotal, LLEVAR_EXTRA } from "@/lib/micheladas-store";
 
 describe("calcItemTotal", () => {
   it("suma precio base y adiciones", () => {
@@ -13,5 +13,10 @@ describe("calcItemTotal", () => {
 
   it("sin adiciones devuelve base", () => {
     expect(calcItemTotal(48, [])).toBe(48);
+  });
+
+  it("suma cargo para llevar por unidad", () => {
+    expect(calcItemTotal(5000, [], LLEVAR_EXTRA)).toBe(6000);
+    expect(calcItemLineTotal(5000, [], 2, LLEVAR_EXTRA)).toBe(12000);
   });
 });

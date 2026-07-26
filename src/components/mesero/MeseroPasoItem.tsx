@@ -25,6 +25,8 @@ type Props = {
   onQuantityChange: (quantity: number) => void;
   mesa?: Mesa;
   cliente?: string;
+  /** Cargo extra por unidad (para llevar). */
+  llevarExtra?: number;
   onAddToCart: () => void;
 };
 
@@ -38,6 +40,7 @@ export function MeseroPasoItem({
   onQuantityChange,
   mesa,
   cliente,
+  llevarExtra = 0,
   onAddToCart,
 }: Props) {
   const clienteLabel = cliente?.trim();
@@ -45,6 +48,9 @@ export function MeseroPasoItem({
     ...toppingLabels,
     ...additions.map((a) => (a.price > 0 ? `${a.name} +${formatMenuPrice(a.price)}` : a.name)),
   ];
+  if (llevarExtra > 0) {
+    extras.push(`Para llevar +${formatMenuPrice(llevarExtra)}`);
+  }
 
   return (
     <div className="space-y-4">

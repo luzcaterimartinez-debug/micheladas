@@ -34,6 +34,19 @@ def test_consumo_por_producto_michelandia_bases() -> None:
         assert "cerveza" not in keys or bebida == "cerveza"
 
 
+def test_consumo_por_producto_bebidas() -> None:
+    assert _consumo_por_producto("coronita") == [("coronita", 1.0)]
+    assert _consumo_por_producto("corona") == [("corona", 1.0)]
+    assert _consumo_por_producto("la_soda") == [("soda", 1.0)]
+    assert _consumo_por_producto("ginger_personal") == [("ginger", 1.0)]
+    assert _consumo_por_producto("ginger_litro_medio") == [("ginger_litro_medio", 1.0)]
+    for lines in (
+        _consumo_por_producto("coronita"),
+        _consumo_por_producto("cerveza_latona"),
+    ):
+        assert "limon" not in {k for k, _ in lines}
+
+
 def test_consumo_tuples_from_models() -> None:
     consumo = [
         ConsumoLine(clave="cerveza", cantidad=2),

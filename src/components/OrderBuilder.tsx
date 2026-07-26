@@ -24,6 +24,8 @@ import { useMenu } from "@/lib/menu-context";
 import { QuantityStepper } from "@/components/QuantityStepper";
 import {
   calcItemLineTotal,
+  llevarExtraPorUnidad,
+  MESA_LLEVAR_ID,
   useComandas,
   useInventory,
   useMesas,
@@ -62,12 +64,19 @@ export function OrderBuilder() {
     [adiciones, additions],
   );
 
-  const currentUnitTotal = michelada ? calcItemLineTotal(michelada.price, selectedAdditions, 1) : 0;
+  const llevarExtra = llevarExtraPorUnidad(mesaId === "__none__" ? null : mesaId);
+  const currentUnitTotal = michelada
+    ? calcItemLineTotal(michelada.price, selectedAdditions, 1, llevarExtra)
+    : 0;
   const currentTotal = michelada
-    ? calcItemLineTotal(michelada.price, selectedAdditions, itemQuantity)
+    ? calcItemLineTotal(michelada.price, selectedAdditions, itemQuantity, llevarExtra)
     : 0;
   const cartTotal = cart.reduce((s, i) => s + i.total, 0);
-  const mesaNombre = mesaId !== "__none__" ? mesas.find((m) => m.id === mesaId)?.nombre : undefined;
+  const mesaNombre =
+    mesaId !== "__none__"
+      ? mesas.find((m) => m.id === mesaId)?.nombre ??
+        (mesaId === MESA_LLEVAR_ID ? "Para llevar" : undefined)
+      : undefined;
 
   const previewComanda = useMemo(
     (): Comanda => ({
@@ -102,6 +111,7 @@ export function OrderBuilder() {
       selectedToppings: [...toppings],
       additions: selectedAdditions,
       notes: notes.trim() || undefined,
+      llevarExtra: llevarExtra || undefined,
       total: currentTotal,
     };
     setCart((c) => [...c, item]);

@@ -8,6 +8,8 @@ import {
   MeseroMesaActividad,
 } from "@/components/mesero/MeseroMesaActividad";
 import type { Comanda, Mesa } from "@/lib/micheladas-store";
+import { LLEVAR_EXTRA, MESA_LLEVAR_ID } from "@/lib/micheladas-store";
+import { formatMenuPrice } from "@/lib/michelandia-theme";
 import { getMesaActivity } from "@/lib/pos-utils";
 import { cn } from "@/lib/utils";
 
@@ -138,11 +140,11 @@ export function MeseroPasoMesa({
   onMarcarMesaAtendida,
   onReloadComandas,
 }: Props) {
-  const { salon, otros } = useMemo(() => {
-    const special = new Set(["llevar", "barra"]);
+  const { salon, barra } = useMemo(() => {
+    const special = new Set([MESA_LLEVAR_ID, "barra"]);
     return {
       salon: mesas.filter((m) => !special.has(m.id)),
-      otros: mesas.filter((m) => special.has(m.id)),
+      barra: mesas.filter((m) => m.id === "barra"),
     };
   }, [mesas]);
 
@@ -158,6 +160,8 @@ export function MeseroPasoMesa({
     return { libre, ocupada, reservada };
   }, [salon]);
 
+  const llevarSelected = mesaId === MESA_LLEVAR_ID;
+
   return (
     <div className="space-y-5">
       <MeseroStepHeader
@@ -165,6 +169,36 @@ export function MeseroPasoMesa({
         title="Elige la mesa"
         description="Toca una mesa para tomar el pedido. Las ocupadas muestran la cuenta activa."
       />
+
+      {!mesaDetalleId && (
+        <button
+          type="button"
+          onClick={() => onSelectMesa(MESA_LLEVAR_ID)}
+          className={cn(
+            TOUCH,
+            "w-full rounded-2xl bg-white p-4 sm:p-5 text-left shadow-lg",
+            "flex items-center gap-4 border-[3px]",
+            llevarSelected
+              ? "border-slate-900 ring-2 ring-offset-2 ring-slate-900/25"
+              : "border-amber-500",
+          )}
+        >
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+            <ShoppingBag className="h-6 w-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-extrabold text-base sm:text-lg text-slate-900 leading-tight">
+              Para llevar
+            </span>
+            <span className="block text-xs sm:text-sm text-slate-600 mt-0.5 font-medium">
+              +{formatMenuPrice(LLEVAR_EXTRA)} por cada producto
+            </span>
+          </span>
+          <span className="text-sm font-black tabular-nums text-amber-700 shrink-0">
+            +{formatMenuPrice(LLEVAR_EXTRA)}
+          </span>
+        </button>
+      )}
 
       {!mesaDetalleId && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/90 font-semibold">
@@ -228,14 +262,14 @@ export function MeseroPasoMesa({
             </div>
           </section>
 
-          {otros.length > 0 && (
+          {barra.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-white/90 uppercase tracking-wide">
                 <ShoppingBag className="h-3.5 w-3.5" />
-                Para llevar y barra
+                Barra
               </div>
               <div className="grid gap-2">
-                {otros.map((m) => (
+                {barra.map((m) => (
                   <MesaTile
                     key={m.id}
                     mesa={m}

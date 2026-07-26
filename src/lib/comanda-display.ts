@@ -218,6 +218,7 @@ export function renderComandaTicket(
       const extras: string[] = [];
       if (tops.length) extras.push(`+ ${tops.join(", ")}`);
       if (adds.length) extras.push(`Adic: ${adds.join(", ")}`);
+      if ((it.llevarExtra ?? 0) > 0) extras.push(`Para llevar +$${it.llevarExtra}`);
 
       return `
         <div class="item">
@@ -325,6 +326,7 @@ export function renderComandaTicketPlainText(
     if (tops.length) lines.push(`  + ${tops.join(", ")}`);
     const adds = it.additions.map((a) => a.name);
     if (adds.length) lines.push(`  Adic: ${adds.join(", ")}`);
+    if ((it.llevarExtra ?? 0) > 0) lines.push(`  Para llevar +$${it.llevarExtra}`);
     if (it.notes) lines.push(`  * ${it.notes}`);
   }
 

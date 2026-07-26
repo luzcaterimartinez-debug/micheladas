@@ -86,6 +86,8 @@ export type OrderItem = {
   selectedToppings: string[]; // topping ids
   additions: { id: string; name: string; price: number }[];
   notes?: string;
+  /** Cargo extra por unidad (p. ej. para llevar = 1000). */
+  llevarExtra?: number;
   total: number;
 };
 
@@ -221,6 +223,11 @@ const DEFAULT_INVENTORY: InventoryItem[] = [
   { key: "cerveza", name: "Cerveza (botellas)", stock: 96, unit: "pz", minStock: 10 },
   { key: "cola_pola", name: "Cola y pola", stock: 48, unit: "pz", minStock: 12 },
   { key: "smirnoff", name: "Smirnoff", stock: 24, unit: "pz", minStock: 6 },
+  { key: "coronita", name: "Coronita", stock: 48, unit: "pz", minStock: 12 },
+  { key: "corona", name: "Corona", stock: 48, unit: "pz", minStock: 12 },
+  { key: "cerveza_latona", name: "Cerveza latona", stock: 48, unit: "pz", minStock: 12 },
+  { key: "cerveza_personal", name: "Cerveza personal", stock: 48, unit: "pz", minStock: 12 },
+  { key: "ginger_litro_medio", name: "Ginger 1.5 L", stock: 24, unit: "pz", minStock: 6 },
   { key: "clamato", name: "Clamato", stock: 8, unit: "L", minStock: 2 },
   { key: "limon", name: "Limón", stock: 100, unit: "pz", minStock: 15 },
   { key: "chamoy", name: "Chamoy", stock: 3, unit: "L", minStock: 1 },
@@ -746,15 +753,34 @@ export function orderItemQuantity(item: OrderItem): number {
   return q > 0 ? Math.floor(q) : 1;
 }
 
-export function calcItemTotal(basePrice: number, additions: OrderItem["additions"]) {
+/** Id de mesa virtual para pedidos para llevar. */
+export const MESA_LLEVAR_ID = "llevar";
+
+/** Cargo adicional por unidad cuando el pedido es para llevar. */
+export const LLEVAR_EXTRA = 1000;
+
+export function isParaLlevar(mesaId?: string | null): boolean {
+  return mesaId === MESA_LLEVAR_ID;
+}
+
+export function llevarExtraPorUnidad(mesaId?: string | null): number {
+  return isParaLlevar(mesaId) ? LLEVAR_EXTRA : 0;
+}
+
+export function calcItemTotal(
+  basePrice: number,
+  additions: OrderItem["additions"],
+  llevarExtra = 0,
+) {
   const adds = additions.reduce((sum, a) => sum + a.price, 0);
-  return basePrice + adds;
+  return basePrice + adds + Math.max(0, llevarExtra);
 }
 
 export function calcItemLineTotal(
   basePrice: number,
   additions: OrderItem["additions"],
   quantity = 1,
+  llevarExtra = 0,
 ): number {
-  return calcItemTotal(basePrice, additions) * Math.max(1, quantity);
+  return calcItemTotal(basePrice, additions, llevarExtra) * Math.max(1, quantity);
 }

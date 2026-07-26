@@ -39,27 +39,24 @@ export function isFasePaso(paso: string): boolean {
   return parseFaseIdFromPaso(paso) !== null;
 }
 
+/** Normaliza pasos del producto. Las fases son opcionales: sin `pasos` → solo notas. */
 export function normalizeProductPasos(pasos: string[] | undefined, faseIds: string[]): string[] {
   if (!pasos?.length) {
-    const ids = faseIds.length ? faseIds : ["topping"];
-    return [...ids.map(fasePasoId), PASO_NOTAS];
+    return [PASO_NOTAS];
   }
   const valid = new Set(faseIds);
   const out: string[] = [];
   for (const p of pasos) {
     if (p === PASO_NOTAS) out.push(PASO_NOTAS);
-    else if (p === LEGACY_PASO_TOPPINGS) out.push(fasePasoId("topping"));
-    else if (p.startsWith(FASE_PASO_PREFIX)) {
+    else if (p === LEGACY_PASO_TOPPINGS) {
+      if (!valid.size || valid.has("topping")) out.push(fasePasoId("topping"));
+    } else if (p.startsWith(FASE_PASO_PREFIX)) {
       const fid = parseFaseIdFromPaso(p);
       if (fid && (!valid.size || valid.has(fid))) out.push(fasePasoId(fid));
     }
   }
-  if (!out.some((x) => x.startsWith(FASE_PASO_PREFIX))) {
-    const ids = faseIds.length ? faseIds : ["topping"];
-    out.unshift(...ids.map(fasePasoId));
-  }
   if (!out.includes(PASO_NOTAS)) out.push(PASO_NOTAS);
-  return out;
+  return out.length ? out : [PASO_NOTAS];
 }
 
 export function opcionesForFase(

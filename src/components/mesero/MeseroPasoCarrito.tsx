@@ -38,6 +38,9 @@ function CartItemRow({
     ...tops,
     ...item.additions.map((a) => (a.price > 0 ? `${a.name} +${formatMenuPrice(a.price)}` : a.name)),
   ];
+  if ((item.llevarExtra ?? 0) > 0) {
+    extras.push(`Para llevar +${formatMenuPrice(item.llevarExtra!)}`);
+  }
   const qty = orderItemQuantity(item);
 
   return (

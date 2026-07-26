@@ -37,6 +37,8 @@ import { getComandasListas, getMesaActivity } from "@/lib/pos-utils";
 import { useMenu } from "@/lib/menu-context";
 import {
   calcItemLineTotal,
+  llevarExtraPorUnidad,
+  MESA_LLEVAR_ID,
   useComandas,
   useInventory,
   useMesas,
@@ -103,9 +105,16 @@ export function MeseroOrderWizard() {
     [adiciones, additionIds],
   );
 
-  const itemTotal = michelada ? calcItemLineTotal(michelada.price, selectedAdditions, itemQuantity) : 0;
+  const llevarExtra = llevarExtraPorUnidad(mesaId);
+  const itemTotal = michelada
+    ? calcItemLineTotal(michelada.price, selectedAdditions, itemQuantity, llevarExtra)
+    : 0;
   const cartTotal = cart.reduce((s, i) => s + i.total, 0);
-  const mesaSeleccionada = mesas.find((m) => m.id === mesaId);
+  const mesaSeleccionada =
+    mesas.find((m) => m.id === mesaId) ??
+    (mesaId === MESA_LLEVAR_ID
+      ? { id: MESA_LLEVAR_ID, nombre: "Para llevar", capacidad: 0, estado: "libre" as const }
+      : undefined);
   const previewComanda = useMemo(
     (): Comanda => ({
       id: "preview",
@@ -128,7 +137,7 @@ export function MeseroOrderWizard() {
     setMesaId(id);
     setMesaDetalleId(null);
     if (mesa?.cliente) setCliente(mesa.cliente);
-    else if (id === "llevar") setCliente((c) => c || "Para llevar");
+    else if (id === MESA_LLEVAR_ID) setCliente((c) => c || "Para llevar");
     setCurrentStep("cliente");
   }
 
@@ -183,6 +192,7 @@ export function MeseroOrderWizard() {
       selectedToppings: [...toppings],
       additions: selectedAdditions,
       notes: notes.trim() || undefined,
+      llevarExtra: llevarExtra || undefined,
       total: itemTotal,
     };
     setCart((c) => [...c, item]);
@@ -452,6 +462,7 @@ export function MeseroOrderWizard() {
           onQuantityChange={setItemQuantity}
           mesa={mesaSeleccionada}
           cliente={cliente}
+          llevarExtra={llevarExtra}
           onAddToCart={addToCart}
         />
       )}
@@ -471,7 +482,12 @@ export function MeseroOrderWizard() {
                   ? {
                       ...it,
                       quantity,
-                      total: calcItemLineTotal(it.basePrice, it.additions, quantity),
+                      total: calcItemLineTotal(
+                        it.basePrice,
+                        it.additions,
+                        quantity,
+                        it.llevarExtra ?? llevarExtra,
+                      ),
                     }
                   : it,
               ),
@@ -500,8 +516,7 @@ export function MeseroOrderWizard() {
             )}
             {step !== "item" &&
               step !== "mesa" &&
-              step !== "categoria" &&
-              !isFasePaso(step) && (
+              step !== "categoria" && (
               <Button
                 type="button"
                 className={cn(
@@ -512,7 +527,7 @@ export function MeseroOrderWizard() {
                 onClick={goNext}
                 disabled={!canContinue()}
               >
-                Siguiente
+                {isFasePaso(step) ? "Continuar" : "Siguiente"}
                 <ArrowRight className="h-5 w-5" />
               </Button>
             )}

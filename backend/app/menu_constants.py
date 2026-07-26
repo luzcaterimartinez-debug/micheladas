@@ -25,6 +25,11 @@ def parse_fase_id_from_paso(paso: str) -> str | None:
     return None
 
 
+def default_pasos() -> list[str]:
+    """Productos sin fases configuradas: solo notas. Las fases son opcionales."""
+    return [PASO_NOTAS]
+
+
 def default_pasos_for_fases(fase_ids: list[str]) -> list[str]:
     pasos = [fase_paso_id(fid) for fid in fase_ids]
     pasos.append(PASO_NOTAS)
@@ -33,16 +38,14 @@ def default_pasos_for_fases(fase_ids: list[str]) -> list[str]:
 
 def parse_pasos(raw: Any, fase_ids_activos: list[str] | None = None) -> list[str]:
     if raw is None:
-        fids = fase_ids_activos or ["topping"]
-        return default_pasos_for_fases(fids)
+        return default_pasos()
     if isinstance(raw, str):
         try:
             raw = json.loads(raw)
         except json.JSONDecodeError:
             raw = None
     if not isinstance(raw, list):
-        fids = fase_ids_activos or ["topping"]
-        return default_pasos_for_fases(fids)
+        return default_pasos()
 
     valid_fases = set(fase_ids_activos or [])
     out: list[str] = []
@@ -52,15 +55,15 @@ def parse_pasos(raw: Any, fase_ids_activos: list[str] | None = None) -> list[str
         if p == PASO_NOTAS:
             out.append(PASO_NOTAS)
         elif p == LEGACY_PASO_TOPPINGS:
-            out.append(fase_paso_id("topping"))
+            if not valid_fases or "topping" in valid_fases:
+                out.append(fase_paso_id("topping"))
         elif p.startswith(FASE_PASO_PREFIX):
             fid = parse_fase_id_from_paso(p)
             if fid and (not valid_fases or fid in valid_fases):
                 out.append(fase_paso_id(fid))
 
     if not out:
-        fids = fase_ids_activos or ["topping"]
-        return default_pasos_for_fases(fids)
+        return default_pasos()
     if PASO_NOTAS not in out:
         out.append(PASO_NOTAS)
     return out
@@ -78,5 +81,5 @@ def pasos_to_json(pasos: list[str]) -> str:
             if legacy not in cleaned:
                 cleaned.append(legacy)
     if not cleaned:
-        cleaned = default_pasos_for_fases(["topping"])
+        cleaned = default_pasos()
     return json.dumps(cleaned)

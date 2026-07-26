@@ -27,7 +27,7 @@ export function MeseroPasoFase({
     <div className="space-y-4">
       <MeseroStepHeader
         title={faseName}
-        description={`Elige opciones de ${faseName.toLowerCase()} para ${productoName}.`}
+        description={`Opcional: elige ${faseName.toLowerCase()} para ${productoName}, o continúa sin seleccionar.`}
       />
 
       <ThemedPanel themeId="tradicional">

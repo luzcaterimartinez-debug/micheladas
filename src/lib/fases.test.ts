@@ -29,9 +29,13 @@ describe("fases", () => {
     expect(out).toContain("notas");
   });
 
-  it("normalizeProductPasos por defecto usa fases activas", () => {
+  it("normalizeProductPasos por defecto solo notas (fases opcionales)", () => {
     const out = normalizeProductPasos(undefined, ["topping"]);
-    expect(out[0]).toBe("fase:topping");
-    expect(out).toContain("notas");
+    expect(out).toEqual(["notas"]);
+  });
+
+  it("normalizeProductPasos no fuerza fases si el producto no las tiene", () => {
+    const out = normalizeProductPasos(["notas"], ["topping", "nectar"]);
+    expect(out).toEqual(["notas"]);
   });
 });

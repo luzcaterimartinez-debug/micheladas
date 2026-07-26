@@ -8,6 +8,16 @@ function add(totals: Record<string, number>, key: string, qty: number) {
 
 const MICHELADA_BASES = ["ginger", "soda", "cerveza", "cola_pola", "smirnoff"] as const;
 
+const BEBIDAS_CONSUMO: Record<string, ConsumoLine[]> = {
+  coronita: [{ clave: "coronita", cantidad: 1 }],
+  corona: [{ clave: "corona", cantidad: 1 }],
+  cerveza_latona: [{ clave: "cerveza_latona", cantidad: 1 }],
+  cerveza_personal: [{ clave: "cerveza_personal", cantidad: 1 }],
+  la_soda: [{ clave: "soda", cantidad: 1 }],
+  ginger_personal: [{ clave: "ginger", cantidad: 1 }],
+  ginger_litro_medio: [{ clave: "ginger_litro_medio", cantidad: 1 }],
+};
+
 function bebidaBaseFromProductoId(productoId: string): string | null {
   for (const base of MICHELADA_BASES) {
     if (productoId.endsWith(`_${base}`)) return base;
@@ -16,6 +26,7 @@ function bebidaBaseFromProductoId(productoId: string): string | null {
 }
 
 function defaultProductConsumo(productoId: string): ConsumoLine[] {
+  if (BEBIDAS_CONSUMO[productoId]) return BEBIDAS_CONSUMO[productoId];
   const bebida = bebidaBaseFromProductoId(productoId);
   if (bebida) {
     return [

@@ -2,6 +2,7 @@ import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
 import { fetchWithTimeout } from "@/lib/api-fetch";
 import { markApiFailureFromStatus } from "@/lib/offline/network";
 import type { Comanda, Mesa, OrderItem } from "@/lib/micheladas-store";
+import { LLEVAR_EXTRA, MESA_LLEVAR_ID } from "@/lib/micheladas-store";
 
 function assertOk(res: Response, data: unknown): asserts res is Response & { ok: true } {
   if (!res.ok) {
@@ -29,7 +30,14 @@ function mapMesa(raw: Record<string, unknown>): Mesa {
   };
 }
 
-function mapOrderItem(raw: Record<string, unknown>): OrderItem {
+function mapOrderItem(raw: Record<string, unknown>, mesaId?: string): OrderItem {
+  const llevarFromApi = raw.llevarExtra != null ? Number(raw.llevarExtra) : undefined;
+  const llevarExtra =
+    llevarFromApi && llevarFromApi > 0
+      ? llevarFromApi
+      : mesaId === MESA_LLEVAR_ID
+        ? LLEVAR_EXTRA
+        : undefined;
   return {
     id: String(raw.id),
     micheladaId: String(raw.micheladaId),
@@ -40,19 +48,23 @@ function mapOrderItem(raw: Record<string, unknown>): OrderItem {
     selectedToppings: (raw.selectedToppings as string[]) ?? [],
     additions: (raw.additions as OrderItem["additions"]) ?? [],
     notes: raw.notes != null ? String(raw.notes) : undefined,
+    llevarExtra,
     total: Number(raw.total),
   };
 }
 
 export function mapComanda(raw: Record<string, unknown>): Comanda {
-  const items = ((raw.items as Record<string, unknown>[]) ?? []).map(mapOrderItem);
+  const mesaId = raw.mesaId != null ? String(raw.mesaId) : undefined;
+  const items = ((raw.items as Record<string, unknown>[]) ?? []).map((it) =>
+    mapOrderItem(it, mesaId),
+  );
   return {
     id: String(raw.id),
     folio: Number(raw.folio),
     queueOrder: Number(raw.queueOrder ?? raw.orden_cola ?? 1),
     cliente: String(raw.cliente),
     mesa: raw.mesa != null ? String(raw.mesa) : undefined,
-    mesaId: raw.mesaId != null ? String(raw.mesaId) : undefined,
+    mesaId,
     meseroId: raw.meseroId != null ? Number(raw.meseroId) : undefined,
     items,
     total: Number(raw.total),

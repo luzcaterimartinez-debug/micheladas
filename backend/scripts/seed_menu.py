@@ -68,6 +68,32 @@ ESPECIALES = [
     ),
 ]
 
+# id, nombre, precio, descripción, orden, [(clave_inventario, cantidad)]
+BEBIDAS = [
+    ("coronita", "Coronita", 6_000, "Cerveza Coronita", 1, [("coronita", 1.0)]),
+    ("corona", "Corona", 8_000, "Cerveza Corona", 2, [("corona", 1.0)]),
+    ("cerveza_latona", "Cerveza latona", 6_000, "Cerveza latona", 3, [("cerveza_latona", 1.0)]),
+    ("cerveza_personal", "Cerveza personal", 5_000, "Cerveza personal", 4, [("cerveza_personal", 1.0)]),
+    ("la_soda", "La soda", 5_000, "Soda", 5, [("soda", 1.0)]),
+    ("ginger_personal", "Ginger personal", 5_000, "Ginger ale personal", 6, [("ginger", 1.0)]),
+    (
+        "ginger_litro_medio",
+        "Ginger litro y medio",
+        8_000,
+        "Ginger ale 1.5 L",
+        7,
+        [("ginger_litro_medio", 1.0)],
+    ),
+]
+
+BEBIDAS_INVENTARIO = [
+    ("coronita", "Coronita", 48, "pz", 12),
+    ("corona", "Corona", 48, "pz", 12),
+    ("cerveza_latona", "Cerveza latona", 48, "pz", 12),
+    ("cerveza_personal", "Cerveza personal", 48, "pz", 12),
+    ("ginger_litro_medio", "Ginger 1.5 L", 24, "pz", 6),
+]
+
 
 def _upsert_categoria(cursor, cat_id: str, nombre: str, descripcion: str, orden: int) -> None:
     cursor.execute(
@@ -171,6 +197,20 @@ def main() -> None:
             )
             productos += 1
 
+        orden_cat += 1
+        _upsert_categoria(cursor, "bebidas", "Bebidas", "Cervezas, soda y ginger", orden_cat)
+        for pid, nombre, precio, desc, orden, _consumo in BEBIDAS:
+            _upsert_producto(
+                cursor,
+                pid=pid,
+                nombre=nombre,
+                precio=precio,
+                descripcion=desc,
+                categoria_id="bebidas",
+                orden=orden,
+            )
+            productos += 1
+
         cursor.execute("UPDATE menu_productos SET activo = 0 WHERE categoria_id IS NULL")
 
         for aid, nombre, precio, stock, orden, qty in ADICIONES:
@@ -197,12 +237,34 @@ def main() -> None:
         )
 
         ensure_inventario_seeded(cursor)
+
+        for clave, nombre, stock, unidad, minimo in BEBIDAS_INVENTARIO:
+            cursor.execute(
+                """
+                INSERT INTO inventario (clave, nombre, stock, stock_inicial, unidad, minimo)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                  nombre = VALUES(nombre),
+                  unidad = VALUES(unidad),
+                  minimo = VALUES(minimo)
+                """,
+                (clave, nombre, stock, stock, unidad, minimo),
+            )
+
         cursor.execute("SELECT id FROM menu_productos WHERE activo = 1")
         for row in cursor.fetchall():
             sync_consumo_producto(cursor, row["id"])
 
+        for pid, *_rest, consumo in BEBIDAS:
+            sync_consumo_producto(
+                cursor,
+                pid,
+                [{"clave": c, "cantidad": q} for c, q in consumo],
+            )
+
     print(
-        f"Menú Michelandia: {productos} productos, {len(ADICIONES)} adiciones, consumo sincronizado."
+        f"Menú Michelandia: {productos} productos, {len(ADICIONES)} adiciones, "
+        f"{len(BEBIDAS)} bebidas, consumo sincronizado."
     )
 
 

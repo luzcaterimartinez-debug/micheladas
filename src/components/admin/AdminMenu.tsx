@@ -61,18 +61,13 @@ type ProductForm = {
   consumo: ConsumoLine[];
 };
 
-function defaultPasos(fases: Fase[]): string[] {
-  const ids = fases.filter((f) => f.activo !== false).map((f) => f.id);
-  return normalizeProductPasos(undefined, ids.length ? ids : ["topping"]);
-}
-
-const emptyProductForm = (categoriaId = "", fases: Fase[] = []): ProductForm => ({
+const emptyProductForm = (categoriaId = ""): ProductForm => ({
   nombre: "",
   precio: "",
   descripcion: "",
   categoriaId,
   activo: true,
-  pasos: defaultPasos(fases),
+  pasos: [PASO_NOTAS],
   opcionIds: [],
   consumo: [],
 });
@@ -117,7 +112,7 @@ export function AdminMenu() {
     const catId = categoriaId ?? selectedCategoriaId ?? categorias[0]?.id ?? "";
     setProductDialog("create");
     setEditProductId(null);
-    setProdForm(emptyProductForm(catId, fases));
+    setProdForm(emptyProductForm(catId));
   }
 
   function openEditProduct(p: ProductoAdmin) {
@@ -446,7 +441,8 @@ export function AdminMenu() {
             <div className="space-y-2">
               <Label>Fases en el pedido (mesero)</Label>
               <p className="text-xs text-muted-foreground">
-                Cada fase activa un paso aparte. Adiciones es global (apartado Adiciones).
+                Opcional: marca solo las fases que apliquen a este producto. Si no marcas ninguna,
+                el mesero salta directo a notas/adiciones.
               </p>
               <div className="space-y-2 rounded-lg border p-3">
                 {fases.length === 0 ? (
