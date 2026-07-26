@@ -19,18 +19,22 @@ function isIosDevice(): boolean {
 }
 
 export function usePwaInstall() {
+  // Empezar siempre en false para evitar hydration mismatch (SSR vs cliente).
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(() => isStandaloneMode());
+  const [installed, setInstalled] = useState(false);
   const [isIos, setIsIos] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (isStandaloneMode()) {
       setInstalled(true);
+      setReady(true);
       return;
     }
 
     setIsIos(isIosDevice());
+    setReady(true);
 
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
@@ -49,7 +53,7 @@ export function usePwaInstall() {
     };
   }, []);
 
-  const canInstall = !installed && (!!deferred || isIos);
+  const canInstall = ready && !installed && (!!deferred || isIos);
 
   const install = useCallback(async (): Promise<"accepted" | "dismissed" | "ios" | "unavailable"> => {
     if (deferred) {

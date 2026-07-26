@@ -249,9 +249,10 @@ function walkSize(dir) {
 
 function copyPwaAssets() {
   const distDir = path.join(root, "dist");
+  const publicDir = path.join(root, "public");
   const staticDir = path.join(outputDir, "static");
-  if (!fs.existsSync(distDir) || !fs.existsSync(staticDir)) {
-    console.warn("No se copiaron assets PWA (falta dist/ o static/)");
+  if (!fs.existsSync(staticDir)) {
+    console.warn("No se copiaron assets PWA (falta static/)");
     return;
   }
 
@@ -261,11 +262,28 @@ function copyPwaAssets() {
     console.log("PWA: sw.js → static/");
   }
 
-  for (const entry of fs.readdirSync(distDir)) {
-    if (entry.startsWith("workbox-") && entry.endsWith(".js")) {
-      fs.copyFileSync(path.join(distDir, entry), path.join(staticDir, entry));
-      console.log(`PWA: ${entry} → static/`);
+  if (fs.existsSync(distDir)) {
+    for (const entry of fs.readdirSync(distDir)) {
+      if (entry.startsWith("workbox-") && entry.endsWith(".js")) {
+        fs.copyFileSync(path.join(distDir, entry), path.join(staticDir, entry));
+        console.log(`PWA: ${entry} → static/`);
+      }
     }
+  }
+
+  // Asegurar iconos/manifest aunque Nitro no los haya copiado
+  const publicAssets = [
+    "favicon.ico",
+    "apple-touch-icon.png",
+    "icon-192x192.png",
+    "icon-512x512.png",
+    "manifest.webmanifest",
+  ];
+  for (const name of publicAssets) {
+    const src = path.join(publicDir, name);
+    if (!fs.existsSync(src)) continue;
+    fs.copyFileSync(src, path.join(staticDir, name));
+    console.log(`PWA: public/${name} → static/`);
   }
 }
 

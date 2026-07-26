@@ -1,5 +1,5 @@
 # Solo excluir del upload lo que NO necesita el build en Vercel.
-# NO excluir src/, public/, ni archivos de la app: rompen `vite build`.
+# NO excluir src/, public/, ni iconos PWA: rompen build y dan 404 en producción.
 .cursor
 .venv
 venv
@@ -13,20 +13,13 @@ coverage
 **/*.map
 # Ignorar requirements y configs Python DEL ROOT para que Vercel no recompile/instale deps
 # (la función API se arma manualmente en scripts/vercel-merge-api.mjs)
-# NOTA: NO excluir api/requirements*.txt, los necesita el build script!
 backend/requirements.txt
 backend/requirements-dev.txt
 backend/pytest.ini
 requirements.txt
 pyproject.toml
 .python-version
-# Excluir node_modules y directorios pesados que no van en la función
 dist
 .tanstack
 .lovable
 scripts/*.py
-public/**/*.png
-public/**/*.ico
-public/**/*.jpg
-public/**/*.jpeg
-public/**/*.svg

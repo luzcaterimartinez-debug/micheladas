@@ -21,6 +21,12 @@ export const Route = createFileRoute("/login")({
   ssr: false,
   head: () => ({
     meta: [{ title: "Iniciar sesión · Michelandia" }],
+    links: [
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@600;700;800&display=swap",
+      },
+    ],
   }),
   beforeLoad: () => {
     const session = getStoredSession();
