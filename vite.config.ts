@@ -24,9 +24,10 @@ export default defineConfig({
         ],
         manifest: pwaManifest,
         workbox: {
-          navigateFallback: "/",
-          navigateFallbackDenylist: [/^\/api/],
-          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,webmanifest}"],
+          // App SSR/Nitro: no hay "/" en precache; navigateFallback:"/" provoca
+          // non-precached-url en Workbox. Offline de datos va por localStorage.
+          navigateFallbackDenylist: [/^\/api/, /^\/ticket/],
+          globPatterns: ["**/*.{js,css,ico,png,svg,woff2,webmanifest}"],
           runtimeCaching: [
             {
               urlPattern: ({ request, url }) =>
