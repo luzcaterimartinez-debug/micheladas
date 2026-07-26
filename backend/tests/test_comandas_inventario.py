@@ -121,8 +121,8 @@ def test_comanda_with_adicion_deducts_stock(
     mesero_token: str,
 ) -> None:
     headers = auth_headers(mesero_token)
-    cam_qty = _menu_adicion_cantidad(client, mesero_token, "camaron")
-    cam_before = _stock(client, mesero_token, "camaron")
+    cam_qty = _menu_adicion_cantidad(client, mesero_token, "fresa")
+    cam_before = _stock(client, mesero_token, "fresa")
 
     r = client.post(
         "/api/comandas",
@@ -137,15 +137,15 @@ def test_comanda_with_adicion_deducts_stock(
                     "micheladaName": "Clásica",
                     "basePrice": 48,
                     "selectedToppings": [],
-                    "additions": [{"id": "camaron", "name": "Camarón", "price": 25}],
-                    "total": 73,
+                    "additions": [{"id": "fresa", "name": "Fresa", "price": 3000}],
+                    "total": 3048,
                 }
             ],
-            "total": 73,
+            "total": 3048,
         },
     )
     assert r.status_code == 201
-    cam_after = _stock(client, mesero_token, "camaron")
+    cam_after = _stock(client, mesero_token, "fresa")
     assert cam_after == pytest.approx(cam_before - cam_qty)
 
 

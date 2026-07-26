@@ -208,13 +208,11 @@ export const MICHELADAS: MicheladaType[] = [
 ];
 
 export const ADDITIONS: Addition[] = [
-  { id: "camaron", name: "Camarón cocido", price: 25, stockKey: "camaron" },
-  { id: "pulpo", name: "Pulpo", price: 35, stockKey: "pulpo" },
-  { id: "pepino", name: "Pepino", price: 10, stockKey: "pepino" },
-  { id: "jicama", name: "Jícama", price: 10, stockKey: "jicama" },
-  { id: "cacahuate", name: "Cacahuates", price: 15, stockKey: "cacahuate" },
-  { id: "gomitas", name: "Gomitas enchiladas", price: 15, stockKey: "gomitas" },
-  { id: "rielitos", name: "Rielitos", price: 20, stockKey: "rielitos" },
+  { id: "cereza", name: "Cereza", price: 3000, stockKey: "cereza" },
+  { id: "fresa", name: "Fresa", price: 3000, stockKey: "fresa" },
+  { id: "sandia", name: "Sandía", price: 3000, stockKey: "sandia" },
+  { id: "maracuya", name: "Maracuyá", price: 3000, stockKey: "maracuya" },
+  { id: "mango", name: "Mango", price: 3000, stockKey: "mango" },
 ];
 
 const DEFAULT_INVENTORY: InventoryItem[] = [
@@ -227,13 +225,11 @@ const DEFAULT_INVENTORY: InventoryItem[] = [
   { key: "limon", name: "Limón", stock: 100, unit: "pz", minStock: 15 },
   { key: "chamoy", name: "Chamoy", stock: 3, unit: "L", minStock: 1 },
   { key: "tajin", name: "Tajín", stock: 1500, unit: "g", minStock: 200 },
-  { key: "camaron", name: "Camarón cocido", stock: 40, unit: "pz", minStock: 5 },
-  { key: "pulpo", name: "Pulpo", stock: 20, unit: "pz", minStock: 5 },
-  { key: "pepino", name: "Pepino", stock: 25, unit: "pz", minStock: 5 },
-  { key: "jicama", name: "Jícama", stock: 15, unit: "pz", minStock: 5 },
-  { key: "cacahuate", name: "Cacahuates", stock: 2000, unit: "g", minStock: 300 },
-  { key: "gomitas", name: "Gomitas enchiladas", stock: 1500, unit: "g", minStock: 200 },
-  { key: "rielitos", name: "Rielitos", stock: 60, unit: "pz", minStock: 10 },
+  { key: "cereza", name: "Cereza", stock: 50, unit: "pz", minStock: 10 },
+  { key: "fresa", name: "Fresa", stock: 50, unit: "pz", minStock: 10 },
+  { key: "sandia", name: "Sandía", stock: 50, unit: "pz", minStock: 10 },
+  { key: "maracuya", name: "Maracuyá", stock: 50, unit: "pz", minStock: 10 },
+  { key: "mango", name: "Mango", stock: 50, unit: "pz", minStock: 10 },
 ];
 
 const DEFAULT_MESAS: Mesa[] = [

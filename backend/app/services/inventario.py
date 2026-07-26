@@ -22,13 +22,11 @@ DEFAULT_ITEMS: list[dict[str, Any]] = [
     {"clave": "limon", "nombre": "Limón", "stock": 100, "unidad": "pz", "minimo": 15},
     {"clave": "chamoy", "nombre": "Chamoy", "stock": 3, "unidad": "L", "minimo": 1},
     {"clave": "tajin", "nombre": "Tajín", "stock": 1500, "unidad": "g", "minimo": 200},
-    {"clave": "camaron", "nombre": "Camarón cocido", "stock": 40, "unidad": "pz", "minimo": 5},
-    {"clave": "pulpo", "nombre": "Pulpo", "stock": 20, "unidad": "pz", "minimo": 5},
-    {"clave": "pepino", "nombre": "Pepino", "stock": 25, "unidad": "pz", "minimo": 5},
-    {"clave": "jicama", "nombre": "Jícama", "stock": 15, "unidad": "pz", "minimo": 5},
-    {"clave": "cacahuate", "nombre": "Cacahuates", "stock": 2000, "unidad": "g", "minimo": 300},
-    {"clave": "gomitas", "nombre": "Gomitas enchiladas", "stock": 1500, "unidad": "g", "minimo": 200},
-    {"clave": "rielitos", "nombre": "Rielitos", "stock": 60, "unidad": "pz", "minimo": 10},
+    {"clave": "cereza", "nombre": "Cereza", "stock": 50, "unidad": "pz", "minimo": 10},
+    {"clave": "fresa", "nombre": "Fresa", "stock": 50, "unidad": "pz", "minimo": 10},
+    {"clave": "sandia", "nombre": "Sandía", "stock": 50, "unidad": "pz", "minimo": 10},
+    {"clave": "maracuya", "nombre": "Maracuyá", "stock": 50, "unidad": "pz", "minimo": 10},
+    {"clave": "mango", "nombre": "Mango", "stock": 50, "unidad": "pz", "minimo": 10},
 ]
 
 

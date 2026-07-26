@@ -28,7 +28,7 @@ const productos: MicheladaType[] = [
 ];
 
 const adiciones: Addition[] = [
-  { id: "camaron", name: "Camarón", price: 25, stockKey: "camaron", cantidad: 2 },
+  { id: "fresa", name: "Fresa", price: 3000, stockKey: "fresa", cantidad: 2 },
 ];
 
 const faseCatalog: FaseOpcion[] = productos[0].faseOpciones;
@@ -75,12 +75,12 @@ describe("buildOrderDeductions", () => {
         micheladaName: "Clásica",
         basePrice: 48,
         selectedToppings: [],
-        additions: [{ id: "camaron", name: "Camarón", price: 25 }],
-        total: 73,
+        additions: [{ id: "fresa", name: "Fresa", price: 3000 }],
+        total: 3048,
       },
     ];
     const totals = buildOrderDeductions(cart, adiciones, productos, faseCatalog);
-    expect(totals.camaron).toBe(2);
+    expect(totals.fresa).toBe(2);
   });
 
   it("usa reglas por defecto para cubana sin consumo configurado", () => {

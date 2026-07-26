@@ -67,7 +67,7 @@ def test_adicion_requires_admin(
         json={
             "nombre": f"Test Adicion {suffix}",
             "precio": 12,
-            "stock_key": "pepino",
+            "stock_key": "fresa",
             "cantidad": 2,
         },
     )

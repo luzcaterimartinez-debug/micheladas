@@ -46,13 +46,11 @@ SABORES = [
 
 # id, nombre, precio COP, clave inventario, orden, cantidad por venta
 ADICIONES = [
-    ("camaron", "Camarón cocido", 5_000, "camaron", 1, 2),
-    ("pulpo", "Pulpo", 8_000, "pulpo", 2, 2),
-    ("pepino", "Pepino", 3_000, "pepino", 3, 1),
-    ("jicama", "Jícama", 3_000, "jicama", 4, 1),
-    ("cacahuate", "Cacahuates", 4_000, "cacahuate", 5, 50),
-    ("gomitas", "Gomitas enchiladas", 4_000, "gomitas", 6, 40),
-    ("rielitos", "Rielitos", 5_000, "rielitos", 7, 1),
+    ("cereza", "Cereza", 3_000, "cereza", 1, 1),
+    ("fresa", "Fresa", 3_000, "fresa", 2, 1),
+    ("sandia", "Sandía", 3_000, "sandia", 3, 1),
+    ("maracuya", "Maracuyá", 3_000, "maracuya", 4, 1),
+    ("mango", "Mango", 3_000, "mango", 5, 1),
 ]
 
 ESPECIALES = [
@@ -190,6 +188,13 @@ def main() -> None:
                 """,
                 (aid, nombre, precio, stock, qty, orden),
             )
+
+        keep_ids = tuple(a[0] for a in ADICIONES)
+        placeholders = ", ".join(["%s"] * len(keep_ids))
+        cursor.execute(
+            f"UPDATE menu_adiciones SET activo = 0 WHERE id NOT IN ({placeholders})",
+            keep_ids,
+        )
 
         ensure_inventario_seeded(cursor)
         cursor.execute("SELECT id FROM menu_productos WHERE activo = 1")
