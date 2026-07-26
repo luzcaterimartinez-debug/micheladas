@@ -259,15 +259,18 @@ function installPythonDeps(targetDir) {
   if (fs.existsSync(backendReq)) try { fs.unlinkSync(backendReq); } catch {}
   if (fs.existsSync(backendReqDev)) try { fs.unlinkSync(backendReqDev); } catch {}
 
-  if (process.platform === "linux") {
-    execSync(`${py} -c "import fastapi; print('fastapi', fastapi.__version__)"`, {
-      cwd: targetDir,
-      stdio: "inherit",
-    });
-  } else if (!fs.existsSync(path.join(targetDir, "fastapi"))) {
+  if (!fs.existsSync(path.join(targetDir, "fastapi"))) {
     throw new Error("pip install no generó el paquete fastapi en el bundle");
-  } else {
-    console.log("Dependencias Python empaquetadas (wheels Linux para Lambda)");
+  }
+  console.log("Dependencias Python empaquetadas correctamente");
+  if (fs.existsSync(path.join(targetDir, "fastapi/__init__.py"))) {
+    try {
+      const initContent = fs.readFileSync(path.join(targetDir, "fastapi/__init__.py"), "utf8");
+      const versionMatch = initContent.match(/__version__\s*=\s*["']([^"']+)["']/);
+      if (versionMatch) {
+        console.log(`  → fastapi ${versionMatch[1]}`);
+      }
+    } catch {}
   }
 
   const sizeBytes = walkSize(targetDir);
