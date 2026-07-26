@@ -1,3 +1,4 @@
+import os
 import secrets
 import warnings
 from functools import lru_cache
@@ -16,8 +17,21 @@ _INSECURE_JWT_SECRETS = frozenset(
 )
 
 
+def _optional_env_file():
+    """
+    Vercel (y entornos serverless) no tienen archivo .env — las variables se inyectan
+    directamente via entorno. Solo carga .env si el archivo existe localmente.
+    """
+    candidate = os.environ.get("ENV_FILE", ".env")
+    return candidate if os.path.isfile(candidate) else None
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_optional_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_env: str = "development"
 

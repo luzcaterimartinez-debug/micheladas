@@ -17,23 +17,69 @@ app = FastAPI(
     version="1.0.0",
 )
 
-settings = get_settings()
-
-
-@app.exception_handler(mysql.connector.Error)
-async def mysql_error_handler(_request: Request, exc: mysql.connector.Error) -> JSONResponse:
-    logger.error("MySQL error: %s", exc)
-    payload: dict[str, str] = {"detail": "Base de datos no disponible"}
-    if not settings.is_production:
-        payload["database_error"] = str(exc)
-    return JSONResponse(status_code=503, content=payload)
+# Configurar CORS una vez con settings iniciales
+_settings_on_start = get_settings()
+logger.info(
+    "API iniciada — env=%s, mysql=%s:%s/%s, user=%s, origins=%s",
+    _settings_on_start.app_env,
+    _settings_on_start.mysql_host,
+    _settings_on_start.mysql_port,
+    _settings_on_start.mysql_database,
+    _settings_on_start.mysql_user,
+    _settings_on_start.cors_origin_list,
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
+    allow_origins=_settings_on_start.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(mysql.connector.Error)
+async def mysql_error_handler(request: Request, exc: mysql.connector.Error) -> JSONResponse:
+    settings = get_settings()
+    logger.error("MySQL error: %s", exc)
+    payload: dict[str, str] = {"detail": "Base de datos no disponible"}
+    if not settings.is_production:
+        payload["database_error"] = str(exc)
+    logger.error(
+        "MySQL error handler called for %s %s — exc=%s",
+        request.method,
+        request.url.path,
+        str(exc),
+    )
+    return JSONResponse(status_code=503, content=payload)
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    import traceback
+
+    tb = traceback.format_exc()
+    logger.error(
+        "Unhandled exception in %s %s: %s\n%s",
+        request.method,
+        request.url.path,
+        str(exc),
+        tb,
+    )
+    settings = get_settings()
+    if not settings.is_production:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Error interno del servidor",
+                "error": str(exc),
+                "traceback": tb,
+            },
+        )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor"},
+    )
+
 
 app.include_router(auth.router)
 app.include_router(menu.router)
@@ -50,10 +96,17 @@ app.include_router(gastos.router)
 
 @app.middleware("http")
 async def guard_production_config(request: Request, call_next):
+    settings = get_settings()
     if request.url.path in ("/api/health", "/api/ping", "/api/status"):
         return await call_next(request)
     config_errors = production_config_errors(settings)
     if config_errors:
+        logger.error(
+            "Bloqueado %s %s por errores de configuración: %s",
+            request.method,
+            request.url.path,
+            config_errors,
+        )
         return JSONResponse(
             status_code=503,
             content={"detail": "Configuración de producción incompleta", "config_errors": config_errors},
@@ -64,12 +117,14 @@ async def guard_production_config(request: Request, call_next):
 @app.get("/api/ping")
 def ping() -> dict[str, str | bool]:
     """Smoke test — no requiere MySQL ni JWT."""
+    settings = get_settings()
     return {"ok": True, "api": "micheladas", "env": settings.app_env}
 
 
 @app.get("/api/status")
 def status(response: Response) -> dict[str, str | list[str] | bool]:
     """Diagnóstico: config + MySQL (sin secretos)."""
+    settings = get_settings()
     config_errors = production_config_errors(settings)
     db_ok, db_error = check_database()
     payload: dict[str, str | list[str] | bool] = {
@@ -86,11 +141,18 @@ def status(response: Response) -> dict[str, str | list[str] | bool]:
     elif not db_ok:
         payload["database_error"] = db_error or "sin detalle"
         response.status_code = 503
+    logger.info(
+        "Status endpoint: env=%s, config_ok=%s, db=%s",
+        settings.app_env,
+        len(config_errors) == 0,
+        "ok" if db_ok else "error",
+    )
     return payload
 
 
 @app.get("/api/health")
 def health(response: Response) -> dict[str, str | list[str]]:
+    settings = get_settings()
     config_errors = production_config_errors(settings)
     if config_errors:
         response.status_code = 503
@@ -105,7 +167,7 @@ def health(response: Response) -> dict[str, str | list[str]]:
     if db_ok:
         logger.info("Health check: base de datos conectada (%s)", settings.mysql_database)
     else:
-        logger.warning("Health check: base de datos no disponible (%s)", settings.mysql_database)
+        logger.warning("Health check: base de datos no disponible (%s) — %s", settings.mysql_database, db_error)
     payload: dict[str, str | list[str]] = {
         "status": "ok" if db_ok else "degraded",
         "database": "ok" if db_ok else "error",
