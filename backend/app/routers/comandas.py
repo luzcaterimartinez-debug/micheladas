@@ -17,7 +17,7 @@ def get_comandas(
     _: StaffUser,
     status: str | None = Query(default=None, description="Filtro: pendiente,lista,entregada o CSV"),
     mesa_id: str | None = Query(default=None, alias="mesa_id"),
-    limit: int = Query(default=200, ge=1, le=500),
+    limit: int = Query(default=500, ge=1, le=2000),
 ) -> list[ComandaOut]:
     return list_comandas(status_filter=status, mesa_id=mesa_id, limit=limit)
 

@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { localDateIso } from "@/lib/local-date";
 import {
   CATEGORIA_GASTO_LABEL,
   CATEGORIAS_GASTO,
@@ -37,10 +38,6 @@ import {
 
 function money(n: number) {
   return `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function monthStartIso() {
@@ -60,13 +57,13 @@ const emptyForm = (): FormState => ({
   concepto: "",
   monto: "",
   categoria: "otros",
-  fecha: todayIso(),
+  fecha: localDateIso(),
   notas: "",
 });
 
 export function AdminGastos() {
   const [desde, setDesde] = useState(monthStartIso());
-  const [hasta, setHasta] = useState(todayIso());
+  const [hasta, setHasta] = useState(localDateIso());
   const [categoriaFiltro, setCategoriaFiltro] = useState<CategoriaGasto | "todas">("todas");
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [resumen, setResumen] = useState<GastosResumen | null>(null);

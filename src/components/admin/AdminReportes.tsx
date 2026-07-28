@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { localDateIso } from "@/lib/local-date";
 import { fetchReporte, type PeriodoReporte, type ReporteData } from "@/lib/reportes-api";
 
 const MESES = [
@@ -36,10 +37,6 @@ const ESTADO_LABEL: Record<string, string> = {
   lista: "Lista",
   entregada: "Entregada",
 };
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function money(n: number) {
   return `$${n.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -123,7 +120,7 @@ export function AdminReportes() {
 
   useEffect(() => {
     const now = new Date();
-    setFecha(todayIso());
+    setFecha(localDateIso(now));
     setAnio(String(now.getFullYear()));
     setMes(String(now.getMonth() + 1));
     setYearBase(now.getFullYear());

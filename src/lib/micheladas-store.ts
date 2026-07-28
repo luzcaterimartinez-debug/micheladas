@@ -273,7 +273,7 @@ export function useComandas() {
         setComandas([...cached].sort(sortComandasByQueue));
       }
       await flushOutbox();
-      const data = await fetchComandas({ status: "pendiente,lista,entregada" });
+      const data = await fetchComandas({ status: "pendiente,lista,entregada", limit: 500 });
       setCachedComandas(data);
       setComandas([...data].sort(sortComandasByQueue));
       setError(null);

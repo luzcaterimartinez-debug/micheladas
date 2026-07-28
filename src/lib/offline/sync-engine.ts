@@ -67,7 +67,7 @@ export async function pullFreshData(): Promise<void> {
 
   try {
     const [comandas, mesas, inventario, menu] = await Promise.all([
-      fetchComandas({ status: "pendiente,lista,entregada" }),
+      fetchComandas({ status: "pendiente,lista,entregada", limit: 500 }),
       fetchMesas(),
       fetchInventario(),
       fetchMenu(),

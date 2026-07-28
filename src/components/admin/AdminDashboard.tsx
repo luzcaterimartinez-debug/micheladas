@@ -1,24 +1,33 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useComandas, useInventory, useMesas } from "@/lib/micheladas-store";
+import { fetchCajaResumen, type CajaResumen } from "@/lib/caja-api";
+import { localDateIso } from "@/lib/local-date";
 import { AlertTriangle, ClipboardList, DollarSign, Users, Package } from "lucide-react";
-
-function isToday(ts: number) {
-  const d = new Date(ts);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
-}
 
 export function AdminDashboard() {
   const { comandas } = useComandas();
   const { items } = useInventory();
   const { mesas } = useMesas();
+  const [cajaHoy, setCajaHoy] = useState<CajaResumen | null>(null);
 
-  const hoy = comandas.filter((c) => isToday(c.createdAt));
-  const ventasHoy = hoy.reduce((s, c) => s + c.total, 0);
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCajaResumen(localDateIso())
+      .then((r) => {
+        if (!cancelled) setCajaHoy(r);
+      })
+      .catch(() => {
+        if (!cancelled) setCajaHoy(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [comandas.length]);
+
+  const ventasHoy = (cajaHoy?.ventasPagadas ?? 0) + (cajaHoy?.ventasPendientes ?? 0);
+  const comandasHoy =
+    (cajaHoy?.comandasPagadas ?? 0) + (cajaHoy?.comandasPendientes ?? 0);
   const pendientes = comandas.filter((c) => c.status === "pendiente").length;
   const listas = comandas.filter((c) => c.status === "lista").length;
   const inventarioBajo = items.filter((i) => i.stock <= (i.minStock ?? 5)).length;
@@ -28,7 +37,9 @@ export function AdminDashboard() {
     {
       title: "Ventas hoy",
       value: `$${ventasHoy.toLocaleString("es-MX")}`,
-      sub: `${hoy.length} comandas`,
+      sub: cajaHoy
+        ? `${comandasHoy} comandas · ${moneyShort(cajaHoy.ventasPagadas)} cobrado`
+        : "Cargando…",
       icon: DollarSign,
     },
     {
@@ -58,7 +69,9 @@ export function AdminDashboard() {
     },
   ];
 
-  const recientes = comandas.slice(0, 8);
+  const recientes = [...comandas]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 8);
 
   return (
     <div className="space-y-6">
@@ -105,6 +118,7 @@ export function AdminDashboard() {
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {c.mesa ? `Mesa ${c.mesa}` : "Sin mesa"} ·{" "}
                         <span className="capitalize">{c.status}</span>
+                        {c.pagado ? " · Cobrado" : ""}
                       </p>
                     </div>
                     <p className="font-bold text-sm tabular-nums shrink-0">${c.total}</p>
@@ -128,7 +142,10 @@ export function AdminDashboard() {
                         <td className="py-2 pr-4 font-medium">#{c.folio}</td>
                         <td className="py-2 pr-4">{c.cliente}</td>
                         <td className="py-2 pr-4 text-muted-foreground">{c.mesa ?? "—"}</td>
-                        <td className="py-2 pr-4 capitalize">{c.status}</td>
+                        <td className="py-2 pr-4 capitalize">
+                          {c.status}
+                          {c.pagado ? " · cobrado" : ""}
+                        </td>
                         <td className="py-2 text-right font-medium">${c.total}</td>
                       </tr>
                     ))}
@@ -141,4 +158,8 @@ export function AdminDashboard() {
       </Card>
     </div>
   );
+}
+
+function moneyShort(n: number) {
+  return `$${n.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`;
 }

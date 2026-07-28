@@ -47,17 +47,14 @@ import {
 } from "@/lib/caja-api";
 import type { Comanda } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
+import { localDateIso } from "@/lib/local-date";
 
 function money(n: number) {
   return `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export function AdminCaja() {
-  const [fecha, setFecha] = useState(todayIso());
+  const [fecha, setFecha] = useState(localDateIso());
   const [resumen, setResumen] = useState<CajaResumen | null>(null);
   const [pendientes, setPendientes] = useState<Comanda[]>([]);
   const [pagadas, setPagadas] = useState<Comanda[]>([]);

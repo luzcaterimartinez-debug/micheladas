@@ -142,10 +142,12 @@ export async function deleteMesaApi(id: string): Promise<void> {
 export async function fetchComandas(opts?: {
   status?: string;
   mesaId?: string;
+  limit?: number;
 }): Promise<Comanda[]> {
   const params = new URLSearchParams();
   if (opts?.status) params.set("status", opts.status);
   if (opts?.mesaId) params.set("mesa_id", opts.mesaId);
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
   const q = params.toString() ? `?${params.toString()}` : "";
   const res = await fetch(`${getApiUrl()}/api/comandas${q}`, { headers: authHeaders() });
   const data = await res.json().catch(() => ({}));

@@ -393,7 +393,7 @@ def list_comandas(
     status_filter: str | None = None,
     mesa_id: str | None = None,
     pagado: bool | None = None,
-    limit: int = 200,
+    limit: int = 500,
 ) -> list[ComandaOut]:
     key = f"{COMANDAS_CACHE_PREFIX}list:{status_filter or ''}:{mesa_id or ''}:{pagado}:{limit}"
     return query_cache(
@@ -413,7 +413,7 @@ def _list_comandas_db(
     status_filter: str | None = None,
     mesa_id: str | None = None,
     pagado: bool | None = None,
-    limit: int = 200,
+    limit: int = 500,
 ) -> list[ComandaOut]:
     with get_db() as (_, cursor):
         query = f"""
@@ -436,7 +436,7 @@ def _list_comandas_db(
             params.append(1 if pagado else 0)
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
-        query += " ORDER BY orden_cola ASC, creado_en ASC LIMIT %s"
+        query += " ORDER BY CASE WHEN status IN ('pendiente', 'lista') THEN 0 ELSE 1 END ASC, creado_en DESC LIMIT %s"
         params.append(limit)
         rows = fetch_all(cursor, query, tuple(params))
         return [_row_to_comanda(cursor, r) for r in rows]

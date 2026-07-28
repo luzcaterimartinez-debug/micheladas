@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
 import { MeseroListasBanner } from "@/components/mesero/MeseroListasBanner";
 import { MeseroPasoCategoria } from "@/components/mesero/MeseroPasoCategoria";
-import { MeseroPasoProducto } from "@/components/mesero/MeseroPasoProducto";
+import { MeseroPasoProducto, type ProductPick } from "@/components/mesero/MeseroPasoProducto";
 import { MeseroPasoCliente } from "@/components/mesero/MeseroPasoCliente";
 import { MeseroPasoCarrito } from "@/components/mesero/MeseroPasoCarrito";
 import { MeseroPasoItem } from "@/components/mesero/MeseroPasoItem";
@@ -66,6 +66,9 @@ export function MeseroOrderWizard() {
   const [mesaId, setMesaId] = useState("");
   const [selectedCategoriaId, setSelectedCategoriaId] = useState("");
   const [selectedId, setSelectedId] = useState("");
+  const [productPicks, setProductPicks] = useState<ProductPick[]>([]);
+  /** Cola de productos con fases pendientes de personalizar. */
+  const [customizeQueue, setCustomizeQueue] = useState<ProductPick[]>([]);
   const [toppings, setToppings] = useState<string[]>([]);
   const [additionIds, setAdditionIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
@@ -168,42 +171,140 @@ export function MeseroOrderWizard() {
     setItemQuantity(1);
   }
 
+  function productNeedsFases(p: (typeof productos)[number]): boolean {
+    return buildMeseroSteps(p.pasos, p, faseIds).some(isFasePaso);
+  }
+
+  function buildCartItem(
+    p: (typeof productos)[number],
+    quantity: number,
+    opts?: {
+      toppings?: string[];
+      additions?: OrderItem["additions"];
+      notes?: string;
+    },
+  ): OrderItem {
+    const adds = opts?.additions ?? [];
+    return {
+      id: crypto.randomUUID(),
+      micheladaId: p.id,
+      micheladaName: p.name,
+      basePrice: p.price,
+      quantity,
+      selectedToppings: opts?.toppings ?? [],
+      additions: adds,
+      notes: opts?.notes?.trim() || undefined,
+      llevarExtra: llevarExtra || undefined,
+      total: calcItemLineTotal(p.price, adds, quantity, llevarExtra),
+    };
+  }
+
+  function startCustomize(pick: ProductPick, rest: ProductPick[] = []) {
+    const p = productos.find((x) => x.id === pick.id);
+    if (!p) return;
+    setSelectedId(pick.id);
+    setItemQuantity(pick.quantity);
+    setCustomizeQueue(rest);
+    resetItemBuilder();
+    setItemQuantity(pick.quantity);
+    const next = buildMeseroSteps(p.pasos, p, faseIds);
+    const idx = next.indexOf("producto");
+    if (idx >= 0 && idx < next.length - 1) setCurrentStep(next[idx + 1]);
+    else setCurrentStep("item");
+  }
+
+  function finishCustomizeAndContinue() {
+    const next = customizeQueue[0];
+    if (next) {
+      startCustomize(next, customizeQueue.slice(1));
+      return;
+    }
+    setSelectedId("");
+    setCustomizeQueue([]);
+    resetItemBuilder();
+    setCurrentStep("carrito");
+  }
+
+  function toggleProductPick(product: (typeof productos)[number]) {
+    setProductPicks((cur) => {
+      const exists = cur.find((p) => p.id === product.id);
+      if (exists) return cur.filter((p) => p.id !== product.id);
+      return [...cur, { id: product.id, quantity: 1 }];
+    });
+  }
+
+  function setProductPickQty(productId: string, quantity: number) {
+    setProductPicks((cur) =>
+      cur.map((p) => (p.id === productId ? { ...p, quantity } : p)),
+    );
+  }
+
+  function confirmProductPicks() {
+    const picks = productPicks.filter((p) => p.quantity > 0);
+    if (picks.length === 0) return;
+
+    const simpleItems: OrderItem[] = [];
+    const needCustomize: ProductPick[] = [];
+
+    for (const pick of picks) {
+      const p = productos.find((x) => x.id === pick.id);
+      if (!p) continue;
+      if (productNeedsFases(p)) needCustomize.push(pick);
+      else simpleItems.push(buildCartItem(p, pick.quantity));
+    }
+
+    if (simpleItems.length > 0) {
+      setCart((c) => [...c, ...simpleItems]);
+      const n = simpleItems.reduce((s, it) => s + (it.quantity ?? 1), 0);
+      toast.success(
+        n === 1
+          ? `${simpleItems[0].micheladaName} agregada`
+          : `${n} productos agregados al pedido`,
+      );
+    }
+
+    setProductPicks([]);
+
+    if (needCustomize.length > 0) {
+      const [first, ...rest] = needCustomize;
+      startCustomize(first, rest);
+      return;
+    }
+
+    setSelectedId("");
+    setCurrentStep("carrito");
+  }
+
   function selectCategoria(id: string) {
     setSelectedCategoriaId(id);
     setSelectedId("");
+    setProductPicks([]);
     setCurrentStep("producto");
   }
 
   function startNewItem() {
     resetItemBuilder();
     setSelectedId("");
+    setProductPicks([]);
+    setCustomizeQueue([]);
     setSelectedCategoriaId("");
     setCurrentStep("categoria");
   }
 
   function addToCart() {
     if (!michelada) return;
-    const item: OrderItem = {
-      id: crypto.randomUUID(),
-      micheladaId: michelada.id,
-      micheladaName: michelada.name,
-      basePrice: michelada.price,
-      quantity: itemQuantity,
-      selectedToppings: [...toppings],
+    const item = buildCartItem(michelada, itemQuantity, {
+      toppings,
       additions: selectedAdditions,
-      notes: notes.trim() || undefined,
-      llevarExtra: llevarExtra || undefined,
-      total: itemTotal,
-    };
+      notes,
+    });
     setCart((c) => [...c, item]);
-    resetItemBuilder();
-    setSelectedId("");
     toast.success(
       itemQuantity > 1
         ? `${itemQuantity}× ${michelada.name} agregadas`
         : `${michelada.name} agregada`,
     );
-    setCurrentStep("carrito");
+    finishCustomizeAndContinue();
   }
 
   function openSendConfirm() {
@@ -254,7 +355,7 @@ export function MeseroOrderWizard() {
       case "categoria":
         return selectedCategoriaId.length > 0;
       case "producto":
-        return !!selectedId;
+        return productPicks.some((p) => p.quantity > 0);
       case "adiciones":
         return true;
       case "notas":
@@ -360,19 +461,13 @@ export function MeseroOrderWizard() {
       {step === "producto" && (
         <MeseroPasoProducto
           categoria={categoriaSeleccionada}
-          selectedProductId={selectedId}
-          onSelectProduct={(m) => {
-            setSelectedId(m.id);
-            setToppings([]);
-            setAdditionIds([]);
-            setNotes("");
-            const next = buildMeseroSteps(m.pasos, m, faseIds);
-            const idx = next.indexOf("producto");
-            if (idx >= 0 && idx < next.length - 1) setCurrentStep(next[idx + 1]);
-          }}
+          picks={productPicks}
+          onToggleProduct={toggleProductPick}
+          onQuantityChange={setProductPickQty}
           onCambiarCategoria={() => {
             setSelectedCategoriaId("");
             setSelectedId("");
+            setProductPicks([]);
             setCurrentStep("categoria");
           }}
           onIrCategorias={() => setCurrentStep("categoria")}
@@ -516,7 +611,8 @@ export function MeseroOrderWizard() {
             )}
             {step !== "item" &&
               step !== "mesa" &&
-              step !== "categoria" && (
+              step !== "categoria" &&
+              step !== "producto" && (
               <Button
                 type="button"
                 className={cn(
@@ -528,6 +624,23 @@ export function MeseroOrderWizard() {
                 disabled={!canContinue()}
               >
                 {isFasePaso(step) ? "Continuar" : "Siguiente"}
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            )}
+            {step === "producto" && (
+              <Button
+                type="button"
+                className={cn(
+                  "flex-1 gap-1.5 h-12 text-base font-bold bg-slate-900 hover:bg-slate-800 text-white",
+                  TOUCH_BTN,
+                )}
+                onClick={confirmProductPicks}
+                disabled={!canContinue()}
+              >
+                {(() => {
+                  const n = productPicks.reduce((s, p) => s + p.quantity, 0);
+                  return n > 0 ? `Agregar (${n})` : "Agregar";
+                })()}
                 <ArrowRight className="h-5 w-5" />
               </Button>
             )}

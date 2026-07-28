@@ -138,16 +138,42 @@ def anular_pago(comanda_id: str) -> ComandaOut:
 def list_comandas_caja(*, fecha: date, pagado: bool | None = None) -> list[ComandaOut]:
     start, end = _day_bounds(fecha)
     with get_db() as (_, cursor):
-        query = f"""
-            SELECT {COMANDAS_SELECT}
-            FROM comandas
-            WHERE creado_en >= %s AND creado_en < %s
-        """
-        params: list[Any] = [start, end]
-        if pagado is not None:
-            query += " AND pagado = %s"
-            params.append(1 if pagado else 0)
-        query += " ORDER BY orden_cola ASC, creado_en ASC"
+        if pagado is True:
+            # Cobros del día: por hora de pago (fallback a creación si no hay pagado_en).
+            query = f"""
+                SELECT {COMANDAS_SELECT}
+                FROM comandas
+                WHERE pagado = 1
+                  AND (
+                    (pagado_en IS NOT NULL AND pagado_en >= %s AND pagado_en < %s)
+                    OR (pagado_en IS NULL AND creado_en >= %s AND creado_en < %s)
+                  )
+                ORDER BY COALESCE(pagado_en, creado_en) DESC
+            """
+            params: list[Any] = [start, end, start, end]
+        elif pagado is False:
+            query = f"""
+                SELECT {COMANDAS_SELECT}
+                FROM comandas
+                WHERE pagado = 0
+                  AND creado_en >= %s AND creado_en < %s
+                ORDER BY orden_cola ASC, creado_en ASC
+            """
+            params = [start, end]
+        else:
+            query = f"""
+                SELECT {COMANDAS_SELECT}
+                FROM comandas
+                WHERE (pagado = 0 AND creado_en >= %s AND creado_en < %s)
+                   OR (
+                     pagado = 1 AND (
+                       (pagado_en IS NOT NULL AND pagado_en >= %s AND pagado_en < %s)
+                       OR (pagado_en IS NULL AND creado_en >= %s AND creado_en < %s)
+                     )
+                   )
+                ORDER BY COALESCE(pagado_en, creado_en) DESC
+            """
+            params = [start, end, start, end, start, end]
         rows = fetch_all(cursor, query, tuple(params))
         return [_row_to_comanda(cursor, r) for r in rows]
 
@@ -166,9 +192,13 @@ def resumen_dia(fecha: date) -> CajaResumenOut:
               COALESCE(SUM(pago_tarjeta), 0) AS tarjeta,
               COALESCE(SUM(pago_transferencia), 0) AS transferencia
             FROM comandas
-            WHERE creado_en >= %s AND creado_en < %s AND pagado = 1
+            WHERE pagado = 1
+              AND (
+                (pagado_en IS NOT NULL AND pagado_en >= %s AND pagado_en < %s)
+                OR (pagado_en IS NULL AND creado_en >= %s AND creado_en < %s)
+              )
             """,
-            (start, end),
+            (start, end, start, end),
         )
         pendientes = fetch_one(
             cursor,
@@ -184,11 +214,16 @@ def resumen_dia(fecha: date) -> CajaResumenOut:
             """
             SELECT metodo_pago AS metodo, COUNT(*) AS cnt, COALESCE(SUM(monto_pagado), 0) AS tot
             FROM comandas
-            WHERE creado_en >= %s AND creado_en < %s AND pagado = 1 AND metodo_pago IS NOT NULL
+            WHERE pagado = 1
+              AND metodo_pago IS NOT NULL
+              AND (
+                (pagado_en IS NOT NULL AND pagado_en >= %s AND pagado_en < %s)
+                OR (pagado_en IS NULL AND creado_en >= %s AND creado_en < %s)
+              )
             GROUP BY metodo_pago
             ORDER BY tot DESC
             """,
-            (start, end),
+            (start, end, start, end),
         )
         corte = fetch_one(
             cursor,

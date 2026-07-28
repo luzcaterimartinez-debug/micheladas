@@ -26,11 +26,11 @@ export function MeseroPasoCategoria({
 
   return (
     <div className="space-y-4">
-      <MeseroStepHeader
-        stepLabel="Paso 3"
-        title="Elige el sabor"
-        description="Selecciona una categoría del menú Michelandia."
-      />
+        <MeseroStepHeader
+          stepLabel="Paso 3"
+          title="Elige el sabor"
+          description="Selecciona una categoría. Luego podrás marcar varios productos a la vez."
+        />
 
       {(mesa || clienteLabel) && (
         <div className="flex flex-wrap gap-2 text-xs">
