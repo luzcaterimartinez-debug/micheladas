@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { Users, Plus, Trash2, Move, Clock, Package, Check } from "lucide-react";
 import { useComandas, useMesas, type Mesa, type Comanda } from "@/lib/micheladas-store";
+import { isMesaVirtual } from "@/lib/pos-utils";
 
 const ESTADO_META: Record<Mesa["estado"], { label: string; cls: string }> = {
   libre: { label: "Libre", cls: "bg-secondary text-secondary-foreground" },
@@ -39,6 +40,8 @@ export function MesasPanel() {
   const [capacidad, setCapacidad] = useState(4);
   const [reassign, setReassign] = useState<Comanda | null>(null);
   const [reassignMesaId, setReassignMesaId] = useState<string>("");
+  const [pendingDelete, setPendingDelete] = useState<Mesa | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const activos = useMemo(
     () => comandas.filter((c) => c.status !== "entregada"),
@@ -55,15 +58,19 @@ export function MesasPanel() {
     return map;
   }, [activos]);
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!nombre.trim()) {
       toast.error("Nombre requerido");
       return;
     }
-    addMesa(nombre.trim(), capacidad);
-    setNombre("");
-    setCapacidad(4);
-    toast.success("Mesa agregada");
+    try {
+      await addMesa(nombre.trim(), capacidad);
+      setNombre("");
+      setCapacidad(4);
+      toast.success("Mesa agregada");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo agregar la mesa");
+    }
   }
 
   function openReassign(c: Comanda) {
@@ -76,9 +83,25 @@ export function MesasPanel() {
     const mesaId = reassignMesaId === "__none__" ? undefined : reassignMesaId;
     const mesaNombre = mesaId ? mesas.find((m) => m.id === mesaId)?.nombre : undefined;
     reassignMesa(reassign.id, mesaNombre);
-    if (mesaId) updateMesa(mesaId, { estado: "ocupada", cliente: reassign.cliente });
+    if (mesaId && !isMesaVirtual(mesaId)) {
+      updateMesa(mesaId, { estado: "ocupada", cliente: reassign.cliente });
+    }
     toast.success(`Comanda #${reassign.folio} reasignada`);
     setReassign(null);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await removeMesa(pendingDelete.id);
+      toast.success(`${pendingDelete.nombre} eliminada`);
+      setPendingDelete(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo eliminar la mesa");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const sinAsignar = comandasByMesa.get("__sin__") || [];
@@ -114,7 +137,7 @@ export function MesasPanel() {
               onChange={(e) => setCapacidad(Number(e.target.value))}
             />
           </div>
-          <Button onClick={handleAdd}>Agregar</Button>
+          <Button onClick={() => void handleAdd()}>Agregar</Button>
           <Button variant="ghost" onClick={resetMesas} className="ml-auto">
             Restaurar mesas
           </Button>
@@ -131,6 +154,7 @@ export function MesasPanel() {
             const meta = ESTADO_META[m.estado];
             const pedidos = activos.filter((c) => c.mesa === m.nombre);
             const totalMesa = pedidos.reduce((s, c) => s + c.total, 0);
+            const virtual = isMesaVirtual(m.id);
             return (
               <Card key={m.id} className="overflow-hidden">
                 <CardHeader className="pb-3">
@@ -140,12 +164,18 @@ export function MesasPanel() {
                       <p className="text-xs text-muted-foreground">
                         Capacidad: {m.capacidad}
                         {m.cliente && ` · ${m.cliente}`}
+                        {virtual && " · mostrador"}
                       </p>
                     </div>
-                    <Badge className={meta.cls}>{meta.label}</Badge>
+                    <Badge className={meta.cls}>{virtual ? "Libre" : meta.label}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {virtual ? (
+                    <p className="text-xs text-muted-foreground">
+                      Para llevar y barra no se ocupan como mesa de salón.
+                    </p>
+                  ) : (
                   <Select
                     value={m.estado}
                     onValueChange={(v) =>
@@ -164,6 +194,7 @@ export function MesasPanel() {
                       <SelectItem value="reservada">Reservada</SelectItem>
                     </SelectContent>
                   </Select>
+                  )}
 
                   {pedidos.length > 0 ? (
                     <>
@@ -230,14 +261,16 @@ export function MesasPanel() {
                     </p>
                   )}
 
+                  {virtual ? null : (
                   <Button
                     size="sm"
                     variant="ghost"
                     className="w-full text-destructive hover:text-destructive"
-                    onClick={() => removeMesa(m.id)}
+                    onClick={() => setPendingDelete(m)}
                   >
                     <Trash2 className="h-4 w-4 mr-1" /> Eliminar
                   </Button>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -303,6 +336,30 @@ export function MesasPanel() {
               Cancelar
             </Button>
             <Button onClick={confirmReassign}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => {
+          if (!o && !deleting) setPendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar {pendingDelete?.nombre}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Se quitará del salón. Si tiene pedidos activos, primero ciérralos o muévelos.
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" disabled={deleting} onClick={() => setPendingDelete(null)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
+              {deleting ? "Eliminando…" : "Eliminar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

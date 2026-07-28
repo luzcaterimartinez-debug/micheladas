@@ -63,10 +63,10 @@ function MesaTile({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const meta = MESA_META[mesa.estado];
+  const isSpecial = mesa.id === "llevar" || mesa.id === "barra";
+  const meta = MESA_META[isSpecial ? "libre" : mesa.estado];
   const activity = getMesaActivity(mesa.id, comandas);
   const hasLista = activity.listas > 0;
-  const isSpecial = mesa.id === "llevar" || mesa.id === "barra";
 
   return (
     <button
@@ -108,8 +108,10 @@ function MesaTile({
       </div>
       <div className="flex items-end justify-between gap-2 pl-[18px]">
         <div className="min-w-0">
-          <span className="text-[10px] text-slate-500 font-semibold uppercase">{meta.label}</span>
-          {mesa.cliente && (
+          <span className="text-[10px] text-slate-500 font-semibold uppercase">
+            {isSpecial ? "Disponible" : meta.label}
+          </span>
+          {!isSpecial && mesa.cliente && (
             <p className="text-xs font-semibold truncate mt-0.5 text-slate-800">{mesa.cliente}</p>
           )}
         </div>

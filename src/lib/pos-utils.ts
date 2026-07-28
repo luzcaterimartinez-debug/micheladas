@@ -31,7 +31,7 @@ export function getAllActivas(comandas: Comanda[]): Comanda[] {
   return comandas.filter(isComandaActiva);
 }
 
-const MESAS_SIN_LIBERAR = new Set(["llevar"]);
+const MESAS_VIRTUALES = new Set(["llevar", "barra"]);
 
 /** Mesas ocupadas o con pedidos activos del mesero (para marcar como atendida). */
 export function getMesasPorAtender(
@@ -41,15 +41,19 @@ export function getMesasPorAtender(
 ): Mesa[] {
   const idsConPedidos = new Set<string>();
   for (const c of comandas) {
-    if (!c.mesaId || MESAS_SIN_LIBERAR.has(c.mesaId)) continue;
+    if (!c.mesaId || MESAS_VIRTUALES.has(c.mesaId)) continue;
     if (!isComandaActiva(c)) continue;
     if (meseroId != null && c.meseroId != null && c.meseroId !== meseroId) continue;
     idsConPedidos.add(c.mesaId);
   }
 
   return mesas.filter((m) => {
-    if (MESAS_SIN_LIBERAR.has(m.id)) return false;
+    if (MESAS_VIRTUALES.has(m.id)) return false;
     if (m.estado === "ocupada" || m.estado === "reservada") return true;
     return idsConPedidos.has(m.id);
   });
+}
+
+export function isMesaVirtual(mesaId?: string | null): boolean {
+  return !!mesaId && MESAS_VIRTUALES.has(mesaId);
 }

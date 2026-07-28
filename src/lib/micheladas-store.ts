@@ -26,6 +26,8 @@ import {
   patchComandaInCache,
   removeComandaFromCache,
   applyMesaAtendidaLocally,
+  markMesaOcupadaLocally,
+  maybeLiberarMesaLocally,
 } from "@/lib/offline/sync-engine";
 import {
   createComandaApi,
@@ -331,6 +333,7 @@ export function useComandas() {
         const all = [...prev, nueva].sort(sortComandasByQueue);
         setCachedComandas(all);
         setComandas(all);
+        markMesaOcupadaLocally(c.mesaId, c.cliente, DEFAULT_MESAS);
         notifyComandaNueva(nueva);
         return nueva;
       }
@@ -342,6 +345,7 @@ export function useComandas() {
         enqueueOp({ type: "comanda:create", clientId, payload: c });
         mergeComandaInCache(nueva);
         setComandas((prev) => [...prev, nueva].sort(sortComandasByQueue));
+        markMesaOcupadaLocally(c.mesaId, c.cliente, DEFAULT_MESAS);
         notifyComandaNueva(nueva);
         return nueva;
       };
@@ -354,6 +358,7 @@ export function useComandas() {
         setComandas((prev) =>
           [...prev.filter((x) => x.id !== nueva.id), nueva].sort(sortComandasByQueue),
         );
+        markMesaOcupadaLocally(nueva.mesaId ?? c.mesaId, nueva.cliente, DEFAULT_MESAS);
         notifyComandaNueva(nueva);
         return nueva;
       } catch (err) {
@@ -362,21 +367,26 @@ export function useComandas() {
       }
     },
     updateStatus: async (id: string, status: Comanda["status"]) => {
+      const mesaIdOf = () => getCachedComandas().find((x) => x.id === id)?.mesaId;
+
       if (!getStoredSession()) {
         const all = getCachedComandas()
           .map((c) => (c.id === id ? { ...c, status } : c))
           .sort(sortComandasByQueue);
         setCachedComandas(all);
         setComandas(all);
+        if (status === "entregada") maybeLiberarMesaLocally(mesaIdOf(), DEFAULT_MESAS);
         return;
       }
 
       const applyLocal = () => {
+        const mesaId = mesaIdOf();
         patchComandaInCache(id, { status });
         enqueueOp({ type: "comanda:patch", comandaId: id, patch: { status } });
         setComandas((prev) =>
           prev.map((c) => (c.id === id ? { ...c, status } : c)).sort(sortComandasByQueue),
         );
+        if (status === "entregada") maybeLiberarMesaLocally(mesaId, DEFAULT_MESAS);
       };
 
       if (!shouldSyncWithServer()) {
@@ -385,11 +395,15 @@ export function useComandas() {
       }
 
       try {
+        const before = getCachedComandas().find((x) => x.id === id);
         const updated = await patchComandaApi(id, { status });
         mergeComandaInCache(updated);
         setComandas((prev) =>
           prev.map((c) => (c.id === id ? updated : c)).sort(sortComandasByQueue),
         );
+        if (status === "entregada") {
+          maybeLiberarMesaLocally(updated.mesaId ?? before?.mesaId, DEFAULT_MESAS);
+        }
       } catch (err) {
         if (isNetworkFailure(err)) applyLocal();
         else throw err;
@@ -496,7 +510,11 @@ export function useMesas() {
     const onSync = () => {
       if (shouldSyncWithServer()) void reload();
     };
+    const onMesasLocal = () => {
+      setMesas(getCachedMesas(DEFAULT_MESAS));
+    };
     window.addEventListener("michelada-sync-change", onSync);
+    window.addEventListener("michelada-mesas-change", onMesasLocal);
 
     const interval = window.setInterval(() => {
       if (shouldSyncWithServer()) void reload();
@@ -505,6 +523,7 @@ export function useMesas() {
     return () => {
       window.clearInterval(interval);
       window.removeEventListener("michelada-sync-change", onSync);
+      window.removeEventListener("michelada-mesas-change", onMesasLocal);
     };
   }, [reload]);
 
@@ -589,6 +608,9 @@ export function useMesas() {
       setCachedMesas([...getCachedMesas(DEFAULT_MESAS), nueva]);
     },
     removeMesa: async (id: string) => {
+      if (id === "llevar" || id === "barra") {
+        throw new Error("No se puede eliminar Para llevar ni Barra");
+      }
       if (!getStoredSession()) {
         const next = getCachedMesas(DEFAULT_MESAS).filter((m) => m.id !== id);
         setCachedMesas(next);

@@ -14,6 +14,7 @@ import {
 import { patchInventarioStock } from "@/lib/inventory-api";
 import { getFallbackMenu } from "@/lib/menu-utils";
 import type { Comanda, Mesa } from "@/lib/micheladas-store";
+import { isMesaVirtual } from "@/lib/pos-utils";
 
 import {
   getCachedComandas,
@@ -167,6 +168,38 @@ export function patchComandaInCache(id: string, patch: Partial<Comanda>): void {
 
 export function removeComandaFromCache(id: string): void {
   setCachedComandas(getCachedComandas().filter((c) => c.id !== id));
+}
+
+/** Marca mesa ocupada en caché local (mesas reales del salón). */
+export function markMesaOcupadaLocally(
+  mesaId: string | undefined,
+  cliente: string,
+  mesasFallback: Mesa[],
+): void {
+  if (!mesaId || isMesaVirtual(mesaId)) return;
+  const next = getCachedMesas(mesasFallback).map((m) =>
+    m.id === mesaId ? { ...m, estado: "ocupada" as const, cliente } : m,
+  );
+  setCachedMesas(next);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("michelada-mesas-change"));
+  }
+}
+
+/** Libera mesa en caché si ya no tiene comandas activas. */
+export function maybeLiberarMesaLocally(mesaId: string | undefined, mesasFallback: Mesa[]): void {
+  if (!mesaId || isMesaVirtual(mesaId)) return;
+  const activas = getCachedComandas().filter(
+    (c) => c.mesaId === mesaId && (c.status === "pendiente" || c.status === "lista"),
+  );
+  if (activas.length > 0) return;
+  const next = getCachedMesas(mesasFallback).map((m) =>
+    m.id === mesaId ? { ...m, estado: "libre" as const, cliente: undefined } : m,
+  );
+  setCachedMesas(next);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("michelada-mesas-change"));
+  }
 }
 
 /** Libera mesa y marca comandas activas como entregada (optimista / offline). */

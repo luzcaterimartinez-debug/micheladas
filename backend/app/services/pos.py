@@ -31,6 +31,9 @@ DEFAULT_MESAS: list[tuple[str, str, int, int]] = [
     ("llevar", "Para llevar", 0, 7),
 ]
 
+# No guardan estado ocupada/libre: son mostrador compartido, no asientos.
+MESAS_VIRTUALES = frozenset({"llevar", "barra"})
+
 COMANDAS_SELECT = """
   id, folio, orden_cola, cliente, mesa_id, mesa_nombre, total, status, creado_en, mesero_id,
   pagado, metodo_pago, monto_pagado, propina,
@@ -187,16 +190,30 @@ def _list_mesas_db() -> list[MesaOut]:
                 ORDER BY orden ASC, nombre ASC
                 """,
             )
-    return [
-        MesaOut(
-            id=str(r["id"]),
-            nombre=str(r["nombre"]),
-            capacidad=int(r["capacidad"]),
-            estado=r["estado"],
-            cliente=r.get("cliente"),
-        )
-        for r in rows
-    ]
+        # Barra / llevar nunca deben quedar "ocupadas".
+        if any(str(r["id"]) in MESAS_VIRTUALES and str(r["estado"]) != "libre" for r in rows):
+            cursor.execute(
+                """
+                UPDATE mesas
+                SET estado = 'libre', cliente = NULL
+                WHERE id IN ('llevar', 'barra') AND estado != 'libre'
+                """
+            )
+            conn.commit()
+            for r in rows:
+                if str(r["id"]) in MESAS_VIRTUALES:
+                    r["estado"] = "libre"
+                    r["cliente"] = None
+        return [
+            MesaOut(
+                id=str(r["id"]),
+                nombre=str(r["nombre"]),
+                capacidad=int(r["capacidad"]),
+                estado=r["estado"],
+                cliente=r.get("cliente"),
+            )
+            for r in rows
+        ]
 
 
 def seed_mesas_if_empty() -> None:
@@ -245,7 +262,16 @@ def create_mesa(body: MesaCreate) -> MesaOut:
 
 
 def delete_mesa(mesa_id: str) -> None:
+    if mesa_id in MESAS_VIRTUALES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede eliminar Para llevar ni Barra",
+        )
     with get_db() as (conn, cursor):
+        existing = fetch_one(cursor, "SELECT id FROM mesas WHERE id = %s", (mesa_id,))
+        if not existing:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mesa no encontrada")
+
         activas = fetch_one(
             cursor,
             """
@@ -259,11 +285,14 @@ def delete_mesa(mesa_id: str) -> None:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="No se puede eliminar: hay comandas activas en esta mesa",
             )
+        # Desvincula historial para no chocar con FK aunque no tenga ON DELETE SET NULL.
+        cursor.execute("UPDATE comandas SET mesa_id = NULL WHERE mesa_id = %s", (mesa_id,))
         cursor.execute("DELETE FROM mesas WHERE id = %s", (mesa_id,))
         if cursor.rowcount == 0:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mesa no encontrada")
         conn.commit()
     invalidate_mesas_cache()
+    invalidate_comandas_cache()
 
 
 def delete_comanda(comanda_id: str) -> None:
@@ -277,10 +306,10 @@ def delete_comanda(comanda_id: str) -> None:
 
 def marcar_mesa_atendida(mesa_id: str) -> MesaOut:
     """Cierra comandas activas de la mesa y la deja libre."""
-    if mesa_id == "llevar":
+    if mesa_id in MESAS_VIRTUALES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Para llevar no usa estado de mesa",
+            detail="Para llevar y barra no usan estado de mesa",
         )
     with get_db() as (conn, cursor):
         existing = fetch_one(cursor, "SELECT id FROM mesas WHERE id = %s", (mesa_id,))
@@ -318,6 +347,11 @@ def marcar_mesa_atendida(mesa_id: str) -> MesaOut:
 
 
 def update_mesa(mesa_id: str, patch: MesaUpdate) -> MesaOut:
+    if mesa_id in MESAS_VIRTUALES and patch.estado is not None and patch.estado != "libre":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Para llevar y barra no usan estado de mesa",
+        )
     with get_db() as (conn, cursor):
         existing = fetch_one(cursor, "SELECT id FROM mesas WHERE id = %s", (mesa_id,))
         if not existing:
@@ -327,10 +361,10 @@ def update_mesa(mesa_id: str, patch: MesaUpdate) -> MesaOut:
         params: list[Any] = []
         if patch.estado is not None:
             fields.append("estado = %s")
-            params.append(patch.estado)
+            params.append(patch.estado if mesa_id not in MESAS_VIRTUALES else "libre")
         if patch.cliente is not None:
             fields.append("cliente = %s")
-            params.append(patch.cliente.strip() or None)
+            params.append(None if mesa_id in MESAS_VIRTUALES else (patch.cliente.strip() or None))
         if patch.nombre is not None:
             fields.append("nombre = %s")
             params.append(patch.nombre.strip())
@@ -536,7 +570,7 @@ def create_comanda(body: ComandaCreate, mesero_id: int | None) -> ComandaOut:
                     i,
                 ),
             )
-        if mesa_id and mesa_id != "llevar":
+        if mesa_id and mesa_id not in MESAS_VIRTUALES:
             cursor.execute(
                 """
                 UPDATE mesas SET estado = 'ocupada', cliente = %s WHERE id = %s
@@ -593,21 +627,23 @@ def update_comanda(comanda_id: str, patch: ComandaUpdate) -> ComandaOut:
             )
 
         if patch.status == "entregada" and existing.get("mesa_id"):
-            pendientes = fetch_one(
-                cursor,
-                """
-                SELECT COUNT(*) AS n FROM comandas
-                WHERE mesa_id = %s AND status IN ('pendiente', 'lista') AND id != %s
-                """,
-                (existing["mesa_id"], comanda_id),
-            )
-            if pendientes and int(pendientes["n"]) == 0:
-                cursor.execute(
+            mesa_liberar = str(existing["mesa_id"])
+            if mesa_liberar not in MESAS_VIRTUALES:
+                pendientes = fetch_one(
+                    cursor,
                     """
-                    UPDATE mesas SET estado = 'libre', cliente = NULL WHERE id = %s
+                    SELECT COUNT(*) AS n FROM comandas
+                    WHERE mesa_id = %s AND status IN ('pendiente', 'lista') AND id != %s
                     """,
-                    (existing["mesa_id"],),
+                    (mesa_liberar, comanda_id),
                 )
+                if pendientes and int(pendientes["n"]) == 0:
+                    cursor.execute(
+                        """
+                        UPDATE mesas SET estado = 'libre', cliente = NULL WHERE id = %s
+                        """,
+                        (mesa_liberar,),
+                    )
 
         conn.commit()
         row = fetch_one(

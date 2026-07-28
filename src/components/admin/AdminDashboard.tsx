@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useComandas, useInventory, useMesas } from "@/lib/micheladas-store";
+import { isMesaVirtual } from "@/lib/pos-utils";
 import { fetchCajaResumen, type CajaResumen } from "@/lib/caja-api";
 import { localDateIso } from "@/lib/local-date";
 import { AlertTriangle, ClipboardList, DollarSign, Users, Package } from "lucide-react";
@@ -31,7 +32,7 @@ export function AdminDashboard() {
   const pendientes = comandas.filter((c) => c.status === "pendiente").length;
   const listas = comandas.filter((c) => c.status === "lista").length;
   const inventarioBajo = items.filter((i) => i.stock <= (i.minStock ?? 5)).length;
-  const mesasOcupadas = mesas.filter((m) => m.estado === "ocupada").length;
+  const mesasOcupadas = mesas.filter((m) => m.estado === "ocupada" && !isMesaVirtual(m.id)).length;
 
   const stats = [
     {

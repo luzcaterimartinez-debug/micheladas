@@ -34,7 +34,7 @@ import { sendToBarraAndOpenTicket } from "@/lib/send-to-barra";
 import { consumeMeseroCartRestore } from "@/lib/ticket-print-session";
 import { isFasePaso, opcionesForFase, parseFaseIdFromPaso } from "@/lib/fases";
 import { getStoredSession } from "@/lib/auth";
-import { getComandasListas, getMesaActivity } from "@/lib/pos-utils";
+import { getComandasListas, getMesaActivity, isMesaVirtual } from "@/lib/pos-utils";
 import { useMenu } from "@/lib/menu-context";
 import {
   calcItemLineTotal,
@@ -146,15 +146,22 @@ export function MeseroOrderWizard() {
   const mesaDetalle = mesas.find((m) => m.id === mesaDetalleId);
 
   function continueToCliente(id: string) {
-    const mesa = mesas.find((m) => m.id === id);
     setMesaId(id);
     setMesaDetalleId(null);
-    if (mesa?.cliente) setCliente(mesa.cliente);
-    else if (id === MESA_LLEVAR_ID) setCliente((c) => c || "Para llevar");
+    if (id === MESA_LLEVAR_ID) setCliente((c) => c || "Para llevar");
+    else if (!isMesaVirtual(id)) {
+      const mesa = mesas.find((m) => m.id === id);
+      if (mesa?.cliente) setCliente(mesa.cliente);
+    }
     setCurrentStep("cliente");
   }
 
   function selectMesa(id: string) {
+    // Para llevar / barra: siempre pedido nuevo (no atrapar en actividad).
+    if (isMesaVirtual(id)) {
+      continueToCliente(id);
+      return;
+    }
     const activity = getMesaActivity(id, comandas);
     setMesaId(id);
     if (activity.activas.length > 0) {
@@ -345,6 +352,8 @@ export function MeseroOrderWizard() {
           ? `Turno ${result.comanda.queueOrder} · Comanda #${result.comanda.folio} guardada.`
           : `Turno ${result.comanda.queueOrder} · Comanda #${result.comanda.folio} enviada a barra.`,
       );
+      void reloadMesas();
+      void reloadComandas();
     })();
   }
 
