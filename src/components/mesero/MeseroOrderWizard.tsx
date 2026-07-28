@@ -68,14 +68,17 @@ export function MeseroOrderWizard() {
   const [selectedCategoriaIds, setSelectedCategoriaIds] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [productPicks, setProductPicks] = useState<ProductPick[]>([]);
-  /** Productos elegidos pendientes de agregar (adiciones compartidas). */
+  /** Productos elegidos pendientes de agregar al carrito. */
   const [batchPicks, setBatchPicks] = useState<ProductPick[]>([]);
   /** Toppings/fases ya resueltos por producto dentro del lote. */
   const [batchToppingsById, setBatchToppingsById] = useState<Record<string, string[]>>({});
+  /** Adiciones elegidas por producto (id de producto → picks). */
+  const [batchAdditionsById, setBatchAdditionsById] = useState<
+    Record<string, { id: string; quantity: number }[]>
+  >({});
   /** Cola de productos que aún necesitan elegir fases. */
   const [faseQueue, setFaseQueue] = useState<ProductPick[]>([]);
   const [toppings, setToppings] = useState<string[]>([]);
-  const [additionPicks, setAdditionPicks] = useState<{ id: string; quantity: number }[]>([]);
   const [notes, setNotes] = useState("");
   const [itemQuantity, setItemQuantity] = useState(1);
   const [cart, setCart] = useState<OrderItem[]>([]);
@@ -109,36 +112,55 @@ export function MeseroOrderWizard() {
   const step = steps[stepIndex] ?? currentStep;
   const progress = ((stepIndex + 1) / steps.length) * 100;
 
-  const selectedAdditions = useMemo(
-    () =>
-      additionPicks
-        .map((pick) => {
-          const a = adiciones.find((x) => x.id === pick.id);
-          if (!a) return null;
-          return { id: a.id, name: a.name, price: a.price, quantity: pick.quantity };
-        })
-        .filter(Boolean) as OrderItem["additions"],
-    [adiciones, additionPicks],
-  );
+  function resolveAdditions(
+    picks: { id: string; quantity: number }[] | undefined,
+  ): OrderItem["additions"] {
+    if (!picks?.length) return [];
+    return picks
+      .map((pick) => {
+        const a = adiciones.find((x) => x.id === pick.id);
+        if (!a) return null;
+        return { id: a.id, name: a.name, price: a.price, quantity: pick.quantity };
+      })
+      .filter(Boolean) as OrderItem["additions"];
+  }
 
-  const batchProductSummary = useMemo(() => {
+  const batchCards = useMemo(() => {
     return batchPicks
       .map((pick) => {
         const p = productos.find((x) => x.id === pick.id);
         if (!p) return null;
-        return { id: pick.id, name: p.name, quantity: pick.quantity, price: p.price };
+        const adds = resolveAdditions(batchAdditionsById[pick.id]);
+        const lineTotal = calcItemLineTotal(
+          p.price,
+          adds,
+          pick.quantity,
+          llevarExtraPorUnidad(mesaId),
+        );
+        return {
+          id: pick.id,
+          name: p.name,
+          quantity: pick.quantity,
+          price: p.price,
+          additions: adds,
+          additionPicks: batchAdditionsById[pick.id] ?? [],
+          lineTotal,
+        };
       })
-      .filter(Boolean) as { id: string; name: string; quantity: number; price: number }[];
-  }, [batchPicks, productos]);
+      .filter(Boolean) as {
+      id: string;
+      name: string;
+      quantity: number;
+      price: number;
+      additions: OrderItem["additions"];
+      additionPicks: { id: string; quantity: number }[];
+      lineTotal: number;
+    }[];
+    // resolveAdditions depends on adiciones; include it via adiciones in deps
+  }, [batchPicks, productos, batchAdditionsById, adiciones, mesaId]);
 
   const batchUnits = batchPicks.reduce((s, p) => s + p.quantity, 0);
-  const batchPreviewTotal = useMemo(() => {
-    return batchPicks.reduce((sum, pick) => {
-      const p = productos.find((x) => x.id === pick.id);
-      if (!p) return sum;
-      return sum + calcItemLineTotal(p.price, selectedAdditions, pick.quantity, llevarExtraPorUnidad(mesaId));
-    }, 0);
-  }, [batchPicks, productos, selectedAdditions, mesaId]);
+  const batchPreviewTotal = batchCards.reduce((s, c) => s + c.lineTotal, 0);
 
   const llevarExtra = llevarExtraPorUnidad(mesaId);
   const cartTotal = cart.reduce((s, i) => s + i.total, 0);
@@ -202,7 +224,6 @@ export function MeseroOrderWizard() {
 
   function resetItemBuilder() {
     setToppings([]);
-    setAdditionPicks([]);
     setNotes("");
     setItemQuantity(1);
   }
@@ -210,26 +231,32 @@ export function MeseroOrderWizard() {
   function clearBatch() {
     setBatchPicks([]);
     setBatchToppingsById({});
+    setBatchAdditionsById({});
     setFaseQueue([]);
     setSelectedId("");
     setToppings([]);
-    setAdditionPicks([]);
     setNotes("");
     setItemQuantity(1);
   }
 
-  function toggleAdditionPick(id: string) {
-    setAdditionPicks((cur) => {
-      const exists = cur.find((p) => p.id === id);
-      if (exists) return cur.filter((p) => p.id !== id);
-      return [...cur, { id, quantity: 1 }];
+  function toggleProductAddition(productId: string, additionId: string) {
+    setBatchAdditionsById((cur) => {
+      const picks = cur[productId] ?? [];
+      const exists = picks.find((p) => p.id === additionId);
+      const next = exists
+        ? picks.filter((p) => p.id !== additionId)
+        : [...picks, { id: additionId, quantity: 1 }];
+      return { ...cur, [productId]: next };
     });
   }
 
-  function setAdditionPickQty(id: string, quantity: number) {
-    setAdditionPicks((cur) =>
-      cur.map((p) => (p.id === id ? { ...p, quantity } : p)),
-    );
+  function setProductAdditionQty(productId: string, additionId: string, quantity: number) {
+    setBatchAdditionsById((cur) => ({
+      ...cur,
+      [productId]: (cur[productId] ?? []).map((p) =>
+        p.id === additionId ? { ...p, quantity } : p,
+      ),
+    }));
   }
 
   function buildCartItem(
@@ -312,7 +339,7 @@ export function MeseroOrderWizard() {
     setProductPicks([]);
     setBatchPicks(picks);
     setBatchToppingsById({});
-    setAdditionPicks([]);
+    setBatchAdditionsById({});
     setNotes("");
     setFaseQueue([]);
 
@@ -363,7 +390,7 @@ export function MeseroOrderWizard() {
       items.push(
         buildCartItem(p, pick.quantity, {
           toppings: batchToppingsById[pick.id] ?? [],
-          additions: selectedAdditions,
+          additions: resolveAdditions(batchAdditionsById[pick.id]),
           notes: notesTrim || undefined,
         }),
       );
@@ -389,20 +416,6 @@ export function MeseroOrderWizard() {
     }
     if (step === "adiciones" && inBatch) {
       addBatchToCart();
-      return;
-    }
-    if (step === "adiciones" && michelada && !inBatch) {
-      // Flujo suelto (no debería pasar tras lote): agregar el ítem actual.
-      const item = buildCartItem(michelada, itemQuantity, {
-        toppings,
-        additions: selectedAdditions,
-        notes,
-      });
-      setCart((c) => [...c, item]);
-      toast.success(`${michelada.name} agregada`);
-      resetItemBuilder();
-      setSelectedId("");
-      setCurrentStep("carrito");
       return;
     }
     goNext();
@@ -614,123 +627,96 @@ export function MeseroOrderWizard() {
         <div className="space-y-4">
           <MeseroStepHeader
             title="Adiciones"
-            description={
-              inBatch
-                ? "Elige las adiciones una sola vez: se aplican a todos los productos del pedido."
-                : michelada
-                  ? `Extras opcionales para ${michelada.name}.`
-                  : "Extras opcionales."
-            }
+            description="Marca las adiciones de cada producto. Solo se cargan al producto de esa tarjeta."
           />
 
-          {inBatch && batchProductSummary.length > 0 && (
-            <ThemedPanel themeId="especiales">
+          {batchCards.map((card) => (
+            <ThemedPanel key={card.id} themeId="adiciones">
               <ThemedPanelHeader
-                themeId="especiales"
-                title="Productos"
-                subtitle={`${batchUnits} unidad${batchUnits === 1 ? "" : "es"}`}
+                themeId="adiciones"
+                title={card.quantity > 1 ? `${card.quantity}× ${card.name}` : card.name}
+                subtitle={`Base ${formatMenuPrice(card.price * card.quantity)} · Total ${formatMenuPrice(card.lineTotal)}`}
               />
-              <ul className="px-4 py-3 space-y-2">
-                {batchProductSummary.map((p) => (
-                  <li
-                    key={p.id}
-                    className="flex items-center justify-between gap-3 text-sm"
-                  >
-                    <span className="font-semibold text-slate-800 min-w-0 truncate">
-                      {p.quantity > 1 ? `${p.quantity}× ` : ""}
-                      {p.name}
-                    </span>
-                    <span className="font-extrabold tabular-nums text-slate-900 shrink-0">
-                      {formatMenuPrice(p.price * p.quantity)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </ThemedPanel>
-          )}
-
-          <ThemedPanel themeId="adiciones">
-            <ThemedPanelHeader
-              themeId="adiciones"
-              title="Adiciones"
-              subtitle={
-                inBatch
-                  ? "Se cargan a cada producto seleccionado"
-                  : michelada
-                    ? michelada.name
-                    : "Extras"
-              }
-            />
-            <div className="px-3 py-3 sm:px-4 sm:py-4 space-y-2">
-              {adiciones.map((a) => {
-                const pick = additionPicks.find((p) => p.id === a.id);
-                const qty = pick?.quantity ?? 0;
-                const selected = qty > 0;
-                return (
-                  <div
-                    key={a.id}
-                    className={cn(
-                      "rounded-xl px-3 py-3 transition-colors",
-                      selected
-                        ? "bg-slate-900/5 ring-2 ring-slate-900/15"
-                        : "hover:bg-slate-50",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleAdditionPick(a.id)}
+              <div className="px-3 py-3 sm:px-4 sm:py-4 space-y-2">
+                {adiciones.map((a) => {
+                  const pick = card.additionPicks.find((p) => p.id === a.id);
+                  const qty = pick?.quantity ?? 0;
+                  const selected = qty > 0;
+                  return (
+                    <div
+                      key={a.id}
                       className={cn(
-                        TOUCH_BTN,
-                        "w-full flex items-end gap-2 text-[15px] leading-snug text-left",
+                        "rounded-xl px-3 py-3 transition-colors",
+                        selected
+                          ? "bg-slate-900/5 ring-2 ring-slate-900/15"
+                          : "hover:bg-slate-50",
                       )}
                     >
-                      <span
+                      <button
+                        type="button"
+                        onClick={() => toggleProductAddition(card.id, a.id)}
                         className={cn(
-                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 mb-0.5",
-                          selected
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : "border-slate-300 bg-white",
+                          TOUCH_BTN,
+                          "w-full flex items-end gap-2 text-[15px] leading-snug text-left",
                         )}
-                        aria-hidden
                       >
-                        {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                      </span>
-                      <span className="font-semibold text-slate-800 flex-1 min-w-0">
-                        {a.name}
-                      </span>
-                      <span
-                        className="flex-1 border-b-2 border-dotted border-slate-400/70 mb-1 min-w-[1rem] max-w-[3rem]"
-                        aria-hidden
-                      />
-                      <span className="font-extrabold text-slate-900 tabular-nums shrink-0">
-                        {formatMenuPrice(a.price)}
-                      </span>
-                    </button>
-                    {selected && (
-                      <div className="mt-3 pl-8" onClick={(e) => e.stopPropagation()}>
-                        <QuantityStepper
-                          size="sm"
-                          value={qty}
-                          min={1}
-                          onChange={(quantity) => setAdditionPickQty(a.id, quantity)}
+                        <span
+                          className={cn(
+                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 mb-0.5",
+                            selected
+                              ? "border-slate-900 bg-slate-900 text-white"
+                              : "border-slate-300 bg-white",
+                          )}
+                          aria-hidden
+                        >
+                          {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                        </span>
+                        <span className="font-semibold text-slate-800 flex-1 min-w-0">
+                          {a.name}
+                        </span>
+                        <span
+                          className="flex-1 border-b-2 border-dotted border-slate-400/70 mb-1 min-w-[1rem] max-w-[3rem]"
+                          aria-hidden
                         />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {adiciones.length === 0 && (
-                <p className="text-sm text-slate-600 text-center py-6">Sin adiciones</p>
-              )}
-            </div>
-          </ThemedPanel>
+                        <span className="font-extrabold text-slate-900 tabular-nums shrink-0">
+                          {formatMenuPrice(a.price)}
+                        </span>
+                      </button>
+                      {selected && (
+                        <div className="mt-3 pl-8" onClick={(e) => e.stopPropagation()}>
+                          <QuantityStepper
+                            size="sm"
+                            value={qty}
+                            min={1}
+                            onChange={(quantity) =>
+                              setProductAdditionQty(card.id, a.id, quantity)
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {adiciones.length === 0 && (
+                  <p className="text-sm text-slate-600 text-center py-4">Sin adiciones</p>
+                )}
+                {card.additions.length > 0 && (
+                  <p className="text-xs text-slate-600 pt-2 border-t border-dashed border-slate-200">
+                    {card.additions.map((a) => formatAdditionLine(a, formatMenuPrice)).join(" · ")}
+                  </p>
+                )}
+              </div>
+            </ThemedPanel>
+          ))}
 
-          {inBatch && selectedAdditions.length > 0 && (
+          {batchCards.length === 0 && (
+            <p className="text-sm text-white/90 text-center py-6">No hay productos en el lote.</p>
+          )}
+
+          {batchCards.length > 0 && (
             <p className="text-xs font-semibold text-white/90 bg-black/20 rounded-xl px-3 py-2">
-              Adiciones:{" "}
-              {selectedAdditions.map((a) => formatAdditionLine(a, formatMenuPrice)).join(" · ")}
-              {" · "}
-              Total estimado {formatMenuPrice(batchPreviewTotal)}
+              {batchUnits} unidad{batchUnits === 1 ? "" : "es"} · Total estimado{" "}
+              {formatMenuPrice(batchPreviewTotal)}
             </p>
           )}
         </div>
