@@ -64,7 +64,7 @@ export function MeseroOrderWizard() {
   const [mesaDetalleId, setMesaDetalleId] = useState<string | null>(null);
   const [cliente, setCliente] = useState("");
   const [mesaId, setMesaId] = useState("");
-  const [selectedCategoriaId, setSelectedCategoriaId] = useState("");
+  const [selectedCategoriaIds, setSelectedCategoriaIds] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [productPicks, setProductPicks] = useState<ProductPick[]>([]);
   /** Cola de productos con fases pendientes de personalizar. */
@@ -89,7 +89,10 @@ export function MeseroOrderWizard() {
     () => categorias.filter((c) => c.activo !== false && c.productos.length > 0),
     [categorias],
   );
-  const categoriaSeleccionada = categoriasActivas.find((c) => c.id === selectedCategoriaId);
+  const categoriasSeleccionadas = useMemo(
+    () => categoriasActivas.filter((c) => selectedCategoriaIds.includes(c.id)),
+    [categoriasActivas, selectedCategoriaIds],
+  );
   const michelada = productos.find((m) => m.id === selectedId);
   const faseIds = useMemo(() => fases.map((f) => f.id), [fases]);
   const steps = useMemo(
@@ -275,10 +278,18 @@ export function MeseroOrderWizard() {
     setCurrentStep("carrito");
   }
 
-  function selectCategoria(id: string) {
-    setSelectedCategoriaId(id);
-    setSelectedId("");
+  function toggleCategoria(id: string) {
+    setSelectedCategoriaIds((cur) =>
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
+    );
     setProductPicks([]);
+    setSelectedId("");
+  }
+
+  function confirmCategorias() {
+    if (selectedCategoriaIds.length === 0) return;
+    setProductPicks([]);
+    setSelectedId("");
     setCurrentStep("producto");
   }
 
@@ -287,7 +298,7 @@ export function MeseroOrderWizard() {
     setSelectedId("");
     setProductPicks([]);
     setCustomizeQueue([]);
-    setSelectedCategoriaId("");
+    setSelectedCategoriaIds([]);
     setCurrentStep("categoria");
   }
 
@@ -353,7 +364,7 @@ export function MeseroOrderWizard() {
       case "cliente":
         return cliente.trim().length > 0;
       case "categoria":
-        return selectedCategoriaId.length > 0;
+        return selectedCategoriaIds.length > 0;
       case "producto":
         return productPicks.some((p) => p.quantity > 0);
       case "adiciones":
@@ -451,8 +462,8 @@ export function MeseroOrderWizard() {
       {step === "categoria" && (
         <MeseroPasoCategoria
           categorias={categoriasActivas}
-          selectedCategoriaId={selectedCategoriaId}
-          onSelectCategoria={selectCategoria}
+          selectedCategoriaIds={selectedCategoriaIds}
+          onToggleCategoria={toggleCategoria}
           mesa={mesaSeleccionada}
           cliente={cliente}
         />
@@ -460,12 +471,11 @@ export function MeseroOrderWizard() {
 
       {step === "producto" && (
         <MeseroPasoProducto
-          categoria={categoriaSeleccionada}
+          categorias={categoriasSeleccionadas}
           picks={productPicks}
           onToggleProduct={toggleProductPick}
           onQuantityChange={setProductPickQty}
           onCambiarCategoria={() => {
-            setSelectedCategoriaId("");
             setSelectedId("");
             setProductPicks([]);
             setCurrentStep("categoria");
@@ -624,6 +634,22 @@ export function MeseroOrderWizard() {
                 disabled={!canContinue()}
               >
                 {isFasePaso(step) ? "Continuar" : "Siguiente"}
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            )}
+            {step === "categoria" && (
+              <Button
+                type="button"
+                className={cn(
+                  "flex-1 gap-1.5 h-12 text-base font-bold bg-slate-900 hover:bg-slate-800 text-white",
+                  TOUCH_BTN,
+                )}
+                onClick={confirmCategorias}
+                disabled={!canContinue()}
+              >
+                {selectedCategoriaIds.length > 0
+                  ? `Continuar (${selectedCategoriaIds.length})`
+                  : "Continuar"}
                 <ArrowRight className="h-5 w-5" />
               </Button>
             )}

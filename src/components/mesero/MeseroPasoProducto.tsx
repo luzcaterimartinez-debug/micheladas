@@ -17,7 +17,7 @@ const TOUCH = "touch-manipulation active:scale-[0.98] transition-all duration-15
 export type ProductPick = { id: string; quantity: number };
 
 type Props = {
-  categoria?: MenuCategoria;
+  categorias: MenuCategoria[];
   picks: ProductPick[];
   onToggleProduct: (product: MicheladaType) => void;
   onQuantityChange: (productId: string, quantity: number) => void;
@@ -26,14 +26,14 @@ type Props = {
 };
 
 export function MeseroPasoProducto({
-  categoria,
+  categorias,
   picks,
   onToggleProduct,
   onQuantityChange,
   onCambiarCategoria,
   onIrCategorias,
 }: Props) {
-  if (!categoria) {
+  if (categorias.length === 0) {
     return (
       <div className="space-y-4 text-center py-8">
         <p className="text-sm text-white/90 font-medium">Elige una categoría para ver productos.</p>
@@ -51,10 +51,9 @@ export function MeseroPasoProducto({
     );
   }
 
-  const productos = categoria.productos;
-  const themeId = categoria.id;
   const pickMap = new Map(picks.map((p) => [p.id, p.quantity]));
   const selectedCount = picks.reduce((s, p) => s + p.quantity, 0);
+  const names = categorias.map((c) => c.name).join(", ");
 
   return (
     <div className="space-y-4">
@@ -62,7 +61,7 @@ export function MeseroPasoProducto({
         <MeseroStepHeader
           stepLabel="Productos"
           title="Elige productos"
-          description={`Marca uno o varios de ${categoria.name}. Ajusta la cantidad y continúa.`}
+          description={`Marca uno o varios de: ${names}. Ajusta la cantidad y continúa.`}
         />
         <button
           type="button"
@@ -83,77 +82,79 @@ export function MeseroPasoProducto({
         </p>
       )}
 
-      {productos.length === 0 ? (
-        <p className="text-sm text-white/90 text-center py-10 font-medium">
-          No hay productos en esta categoría.
-        </p>
-      ) : (
-        <ThemedPanel themeId={themeId}>
+      {categorias.map((categoria) => (
+        <ThemedPanel key={categoria.id} themeId={categoria.id}>
           <ThemedPanelHeader
-            themeId={themeId}
+            themeId={categoria.id}
             title={categoria.name}
             subtitle={categoria.description}
           />
-          <div className="px-3 py-3 sm:px-4 sm:py-4 space-y-2">
-            {productos.map((p) => {
-              const qty = pickMap.get(p.id) ?? 0;
-              const selected = qty > 0;
-              return (
-                <div
-                  key={p.id}
-                  className={cn(
-                    "rounded-xl px-3 py-3 transition-colors",
-                    selected
-                      ? "bg-slate-900/5 ring-2 ring-slate-900/15"
-                      : "hover:bg-slate-50",
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onToggleProduct(p)}
+          {categoria.productos.length === 0 ? (
+            <p className="text-sm text-slate-600 text-center py-6 px-3">
+              No hay productos en esta categoría.
+            </p>
+          ) : (
+            <div className="px-3 py-3 sm:px-4 sm:py-4 space-y-2">
+              {categoria.productos.map((p) => {
+                const qty = pickMap.get(p.id) ?? 0;
+                const selected = qty > 0;
+                return (
+                  <div
+                    key={p.id}
                     className={cn(
-                      TOUCH,
-                      "w-full flex items-end gap-2 text-[15px] leading-snug text-left",
+                      "rounded-xl px-3 py-3 transition-colors",
+                      selected
+                        ? "bg-slate-900/5 ring-2 ring-slate-900/15"
+                        : "hover:bg-slate-50",
                     )}
                   >
-                    <span
+                    <button
+                      type="button"
+                      onClick={() => onToggleProduct(p)}
                       className={cn(
-                        "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 mb-0.5",
-                        selected
-                          ? "border-slate-900 bg-slate-900 text-white"
-                          : "border-slate-300 bg-white",
+                        TOUCH,
+                        "w-full flex items-end gap-2 text-[15px] leading-snug text-left",
                       )}
-                      aria-hidden
                     >
-                      {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                    </span>
-                    <span className="font-semibold text-slate-800 flex-1 min-w-0">
-                      {productBaseLabel(p.name, categoria.name)}
-                    </span>
-                    <span
-                      className="flex-1 border-b-2 border-dotted border-slate-400/70 mb-1 min-w-[1rem] max-w-[3rem]"
-                      aria-hidden
-                    />
-                    <span className="font-extrabold text-slate-900 tabular-nums shrink-0">
-                      {formatMenuPrice(p.price)}
-                    </span>
-                  </button>
-                  {selected && (
-                    <div className="mt-3 pl-8" onClick={(e) => e.stopPropagation()}>
-                      <QuantityStepper
-                        size="sm"
-                        value={qty}
-                        min={1}
-                        onChange={(quantity) => onQuantityChange(p.id, quantity)}
+                      <span
+                        className={cn(
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 mb-0.5",
+                          selected
+                            ? "border-slate-900 bg-slate-900 text-white"
+                            : "border-slate-300 bg-white",
+                        )}
+                        aria-hidden
+                      >
+                        {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                      </span>
+                      <span className="font-semibold text-slate-800 flex-1 min-w-0">
+                        {productBaseLabel(p.name, categoria.name)}
+                      </span>
+                      <span
+                        className="flex-1 border-b-2 border-dotted border-slate-400/70 mb-1 min-w-[1rem] max-w-[3rem]"
+                        aria-hidden
                       />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                      <span className="font-extrabold text-slate-900 tabular-nums shrink-0">
+                        {formatMenuPrice(p.price)}
+                      </span>
+                    </button>
+                    {selected && (
+                      <div className="mt-3 pl-8" onClick={(e) => e.stopPropagation()}>
+                        <QuantityStepper
+                          size="sm"
+                          value={qty}
+                          min={1}
+                          onChange={(quantity) => onQuantityChange(p.id, quantity)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </ThemedPanel>
-      )}
+      ))}
 
       <button
         type="button"
@@ -161,7 +162,7 @@ export function MeseroPasoProducto({
         className="inline-flex items-center gap-2 text-sm font-bold text-white bg-black/20 hover:bg-black/30 rounded-full px-4 py-2 touch-manipulation"
       >
         <ArrowLeft className="h-4 w-4" />
-        Ver todos los sabores
+        Cambiar categorías
       </button>
     </div>
   );
