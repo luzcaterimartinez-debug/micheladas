@@ -60,7 +60,11 @@ function OrderItemRow({
   const subtitle = orderItemSubtitle(item);
   const extras: string[] = [
     ...tops,
-    ...item.additions.map((a) => (a.price > 0 ? `${a.name} +$${a.price}` : a.name)),
+    ...item.additions.map((a) => {
+      const q = Math.max(1, a.quantity ?? 1);
+      const name = q > 1 ? `${q}× ${a.name}` : a.name;
+      return a.price > 0 ? `${name} +$${a.price * q}` : name;
+    }),
   ];
 
   return (

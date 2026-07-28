@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   ClipboardList,
   Loader2,
   Plus,
@@ -9,12 +10,12 @@ import {
 import { toast } from "sonner";
 
 import {
-  MenuPriceRow,
   MeseroStepHeader,
   MichelandiaFooterBar,
   ThemedPanel,
   ThemedPanelHeader,
 } from "@/components/michelandia/michelandia-ui";
+import { QuantityStepper } from "@/components/QuantityStepper";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,6 +38,7 @@ import { getComandasListas, getMesaActivity } from "@/lib/pos-utils";
 import { useMenu } from "@/lib/menu-context";
 import {
   calcItemLineTotal,
+  formatAdditionLine,
   llevarExtraPorUnidad,
   MESA_LLEVAR_ID,
   useComandas,
@@ -46,6 +48,7 @@ import {
   type OrderItem,
 } from "@/lib/micheladas-store";
 import { buildMeseroSteps, getMeseroStepLabel, type MeseroFlowStep } from "@/lib/product-steps";
+import { formatMenuPrice } from "@/lib/michelandia-theme";
 import { cn } from "@/lib/utils";
 
 const TOUCH_BTN =
@@ -70,7 +73,7 @@ export function MeseroOrderWizard() {
   /** Cola de productos con fases pendientes de personalizar. */
   const [customizeQueue, setCustomizeQueue] = useState<ProductPick[]>([]);
   const [toppings, setToppings] = useState<string[]>([]);
-  const [additionIds, setAdditionIds] = useState<string[]>([]);
+  const [additionPicks, setAdditionPicks] = useState<{ id: string; quantity: number }[]>([]);
   const [notes, setNotes] = useState("");
   const [itemQuantity, setItemQuantity] = useState(1);
   const [cart, setCart] = useState<OrderItem[]>([]);
@@ -105,10 +108,14 @@ export function MeseroOrderWizard() {
 
   const selectedAdditions = useMemo(
     () =>
-      adiciones
-        .filter((a) => additionIds.includes(a.id))
-        .map(({ id, name, price }) => ({ id, name, price })),
-    [adiciones, additionIds],
+      additionPicks
+        .map((pick) => {
+          const a = adiciones.find((x) => x.id === pick.id);
+          if (!a) return null;
+          return { id: a.id, name: a.name, price: a.price, quantity: pick.quantity };
+        })
+        .filter(Boolean) as OrderItem["additions"],
+    [adiciones, additionPicks],
   );
 
   const llevarExtra = llevarExtraPorUnidad(mesaId);
@@ -169,9 +176,23 @@ export function MeseroOrderWizard() {
 
   function resetItemBuilder() {
     setToppings([]);
-    setAdditionIds([]);
+    setAdditionPicks([]);
     setNotes("");
     setItemQuantity(1);
+  }
+
+  function toggleAdditionPick(id: string) {
+    setAdditionPicks((cur) => {
+      const exists = cur.find((p) => p.id === id);
+      if (exists) return cur.filter((p) => p.id !== id);
+      return [...cur, { id, quantity: 1 }];
+    });
+  }
+
+  function setAdditionPickQty(id: string, quantity: number) {
+    setAdditionPicks((cur) =>
+      cur.map((p) => (p.id === id ? { ...p, quantity } : p)),
+    );
   }
 
   function buildCartItem(
@@ -492,21 +513,62 @@ export function MeseroOrderWizard() {
               title="Adiciones"
               subtitle={michelada ? michelada.name : "Extras para tu michelada"}
             />
-            <div className="px-2 py-2 sm:px-3 sm:py-3 space-y-1">
+            <div className="px-3 py-3 sm:px-4 sm:py-4 space-y-2">
               {adiciones.map((a) => {
-                const checked = additionIds.includes(a.id);
+                const pick = additionPicks.find((p) => p.id === a.id);
+                const qty = pick?.quantity ?? 0;
+                const selected = qty > 0;
                 return (
-                  <MenuPriceRow
+                  <div
                     key={a.id}
-                    label={checked ? `✓ ${a.name}` : a.name}
-                    price={a.price}
-                    selected={checked}
-                    onClick={() =>
-                      setAdditionIds((cur) =>
-                        cur.includes(a.id) ? cur.filter((x) => x !== a.id) : [...cur, a.id],
-                      )
-                    }
-                  />
+                    className={cn(
+                      "rounded-xl px-3 py-3 transition-colors",
+                      selected
+                        ? "bg-slate-900/5 ring-2 ring-slate-900/15"
+                        : "hover:bg-slate-50",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleAdditionPick(a.id)}
+                      className={cn(
+                        TOUCH_BTN,
+                        "w-full flex items-end gap-2 text-[15px] leading-snug text-left",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 mb-0.5",
+                          selected
+                            ? "border-slate-900 bg-slate-900 text-white"
+                            : "border-slate-300 bg-white",
+                        )}
+                        aria-hidden
+                      >
+                        {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                      </span>
+                      <span className="font-semibold text-slate-800 flex-1 min-w-0">
+                        {a.name}
+                      </span>
+                      <span
+                        className="flex-1 border-b-2 border-dotted border-slate-400/70 mb-1 min-w-[1rem] max-w-[3rem]"
+                        aria-hidden
+                      />
+                      <span className="font-extrabold text-slate-900 tabular-nums shrink-0">
+                        {formatMenuPrice(a.price)}
+                      </span>
+                    </button>
+                    {selected && (
+                      <div className="mt-3 pl-8" onClick={(e) => e.stopPropagation()}>
+                        <QuantityStepper
+                          size="sm"
+                          value={qty}
+                          min={1}
+                          onChange={(quantity) => setAdditionPickQty(a.id, quantity)}
+                        />
+                      </div>
+                    )}
+                  </div>
                 );
               })}
               {adiciones.length === 0 && (

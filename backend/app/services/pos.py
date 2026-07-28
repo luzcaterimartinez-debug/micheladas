@@ -82,11 +82,21 @@ def _parse_json_list(raw: Any) -> list:
 
 def _row_to_item(row: dict[str, Any]) -> OrderItemOut:
     additions_raw = _parse_json_list(row.get("adiciones_json"))
-    additions = [
-        {"id": str(a["id"]), "name": str(a["name"]), "price": float(a["price"])}
-        for a in additions_raw
-        if isinstance(a, dict) and "id" in a
-    ]
+    additions = []
+    for a in additions_raw:
+        if not isinstance(a, dict) or "id" not in a:
+            continue
+        qty = int(a.get("quantity") or 1)
+        if qty < 1:
+            qty = 1
+        additions.append(
+            {
+                "id": str(a["id"]),
+                "name": str(a["name"]),
+                "price": float(a["price"]),
+                "quantity": qty,
+            }
+        )
     return OrderItemOut(
         id=str(row["id"]),
         micheladaId=str(row["producto_id"]),

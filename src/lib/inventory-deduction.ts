@@ -89,8 +89,9 @@ export function buildOrderDeductions(
     for (const a of it.additions) {
       const def = adicionesCatalog.find((d) => d.id === a.id);
       const key = def?.stockKey ?? a.id;
-      const qty = def?.cantidad ?? 1;
-      add(totals, key, qty * itemQty);
+      const unitQty = def?.cantidad ?? 1;
+      const addUnits = Math.max(1, a.quantity ?? 1);
+      add(totals, key, unitQty * addUnits * itemQty);
     }
   }
 

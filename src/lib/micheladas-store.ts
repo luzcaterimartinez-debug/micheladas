@@ -84,7 +84,7 @@ export type OrderItem = {
   /** Unidades iguales de este ítem (default 1). */
   quantity?: number;
   selectedToppings: string[]; // topping ids
-  additions: { id: string; name: string; price: number }[];
+  additions: { id: string; name: string; price: number; quantity?: number }[];
   notes?: string;
   /** Cargo extra por unidad (p. ej. para llevar = 1000). */
   llevarExtra?: number;
@@ -753,6 +753,22 @@ export function orderItemQuantity(item: OrderItem): number {
   return q > 0 ? Math.floor(q) : 1;
 }
 
+export function additionQuantity(a: { quantity?: number }): number {
+  const q = a.quantity ?? 1;
+  return q > 0 ? Math.floor(q) : 1;
+}
+
+/** Etiqueta de adición con cantidad (ej. "2× Cereza +$6.000"). */
+export function formatAdditionLine(
+  a: { name: string; price: number; quantity?: number },
+  formatPrice: (n: number) => string = (n) => `$${n}`,
+): string {
+  const qty = additionQuantity(a);
+  const line = a.price * qty;
+  const name = qty > 1 ? `${qty}× ${a.name}` : a.name;
+  return line > 0 ? `${name} +${formatPrice(line)}` : name;
+}
+
 /** Id de mesa virtual para pedidos para llevar. */
 export const MESA_LLEVAR_ID = "llevar";
 
@@ -772,7 +788,7 @@ export function calcItemTotal(
   additions: OrderItem["additions"],
   llevarExtra = 0,
 ) {
-  const adds = additions.reduce((sum, a) => sum + a.price, 0);
+  const adds = additions.reduce((sum, a) => sum + a.price * additionQuantity(a), 0);
   return basePrice + adds + Math.max(0, llevarExtra);
 }
 

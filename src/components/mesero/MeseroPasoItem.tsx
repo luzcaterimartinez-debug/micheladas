@@ -9,11 +9,12 @@ import {
 } from "@/components/michelandia/michelandia-ui";
 import { formatMenuPrice } from "@/lib/michelandia-theme";
 import type { Mesa, MicheladaType } from "@/lib/micheladas-store";
+import { formatAdditionLine } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
 
 const TOUCH = "touch-manipulation active:scale-[0.98] transition-all duration-150";
 
-type AdditionLine = { name: string; price: number };
+type AdditionLine = { name: string; price: number; quantity?: number };
 
 type Props = {
   michelada: MicheladaType;
@@ -46,7 +47,7 @@ export function MeseroPasoItem({
   const clienteLabel = cliente?.trim();
   const extras: string[] = [
     ...toppingLabels,
-    ...additions.map((a) => (a.price > 0 ? `${a.name} +${formatMenuPrice(a.price)}` : a.name)),
+    ...additions.map((a) => formatAdditionLine(a, formatMenuPrice)),
   ];
   if (llevarExtra > 0) {
     extras.push(`Para llevar +${formatMenuPrice(llevarExtra)}`);

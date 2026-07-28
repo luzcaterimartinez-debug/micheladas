@@ -213,7 +213,10 @@ export function renderComandaTicket(
   const rows = c.items
     .map((it) => {
       const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos);
-      const adds = it.additions.map((a) => a.name);
+      const adds = it.additions.map((a) => {
+        const q = Math.max(1, a.quantity ?? 1);
+        return q > 1 ? `${q}× ${a.name}` : a.name;
+      });
       const label = orderItemLabel(it);
       const extras: string[] = [];
       if (tops.length) extras.push(`+ ${tops.join(", ")}`);
@@ -324,7 +327,10 @@ export function renderComandaTicketPlainText(
     lines.push(`${label}  $${it.total}`);
     const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos);
     if (tops.length) lines.push(`  + ${tops.join(", ")}`);
-    const adds = it.additions.map((a) => a.name);
+    const adds = it.additions.map((a) => {
+      const q = Math.max(1, a.quantity ?? 1);
+      return q > 1 ? `${q}× ${a.name}` : a.name;
+    });
     if (adds.length) lines.push(`  Adic: ${adds.join(", ")}`);
     if ((it.llevarExtra ?? 0) > 0) lines.push(`  Para llevar +$${it.llevarExtra}`);
     if (it.notes) lines.push(`  * ${it.notes}`);

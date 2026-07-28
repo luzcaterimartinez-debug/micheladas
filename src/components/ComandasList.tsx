@@ -73,7 +73,13 @@ export function ComandasList() {
                     )}
                     {it.additions.length > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Adiciones: {it.additions.map((a) => a.name).join(", ")}
+                        Adiciones:{" "}
+                        {it.additions
+                          .map((a) => {
+                            const q = Math.max(1, a.quantity ?? 1);
+                            return q > 1 ? `${q}× ${a.name}` : a.name;
+                          })
+                          .join(", ")}
                       </p>
                     )}
                     {it.notes && (

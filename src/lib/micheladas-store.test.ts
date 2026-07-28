@@ -19,4 +19,10 @@ describe("calcItemTotal", () => {
     expect(calcItemTotal(5000, [], LLEVAR_EXTRA)).toBe(6000);
     expect(calcItemLineTotal(5000, [], 2, LLEVAR_EXTRA)).toBe(12000);
   });
+
+  it("multiplica precio de adición por cantidad", () => {
+    expect(
+      calcItemTotal(10000, [{ id: "cereza", name: "Cereza", price: 3000, quantity: 2 }]),
+    ).toBe(16000);
+  });
 });

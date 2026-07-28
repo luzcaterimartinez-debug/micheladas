@@ -9,6 +9,7 @@ class AdicionItem(BaseModel):
     id: str
     name: str
     price: float
+    quantity: int = Field(default=1, ge=1, le=99)
 
 
 class OrderItemOut(BaseModel):

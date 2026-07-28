@@ -253,7 +253,9 @@ def apply_order_deductions(cursor: Any, items: list[OrderItemIn]) -> None:
             stock_key = ad_row.get("stock_key") if ad_row else None
             if not stock_key and adicion.id:
                 stock_key = adicion.id
-            ad_qty = float(ad_row["cantidad"] or 1) if ad_row else 1.0
+            unit_qty = float(ad_row["cantidad"] or 1) if ad_row else 1.0
+            add_units = max(1, int(getattr(adicion, "quantity", None) or 1))
+            ad_qty = unit_qty * add_units
             if stock_key and ad_qty > 0:
                 inv = fetch_one(
                     cursor, "SELECT clave FROM inventario WHERE clave = %s", (stock_key,)

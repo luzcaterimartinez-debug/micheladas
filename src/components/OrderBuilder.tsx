@@ -39,7 +39,7 @@ export function OrderBuilder() {
   const { decrementBatch, reload: reloadInventario } = useInventory();
   const [selectedId, setSelectedId] = useState<string>("");
   const [toppings, setToppings] = useState<string[]>([]);
-  const [additions, setAdditions] = useState<string[]>([]);
+  const [additionPicks, setAdditionPicks] = useState<{ id: string; quantity: number }[]>([]);
   const [notes, setNotes] = useState("");
   const [itemQuantity, setItemQuantity] = useState(1);
   const [cliente, setCliente] = useState("");
@@ -60,8 +60,15 @@ export function OrderBuilder() {
   const { mesas } = useMesas();
 
   const selectedAdditions = useMemo(
-    () => adiciones.filter((a) => additions.includes(a.id)).map(({ id, name, price }) => ({ id, name, price })),
-    [adiciones, additions],
+    () =>
+      additionPicks
+        .map((pick) => {
+          const a = adiciones.find((x) => x.id === pick.id);
+          if (!a) return null;
+          return { id: a.id, name: a.name, price: a.price, quantity: pick.quantity };
+        })
+        .filter(Boolean) as OrderItem["additions"],
+    [adiciones, additionPicks],
   );
 
   const llevarExtra = llevarExtraPorUnidad(mesaId === "__none__" ? null : mesaId);
@@ -95,7 +102,7 @@ export function OrderBuilder() {
 
   function resetBuilder() {
     setToppings([]);
-    setAdditions([]);
+    setAdditionPicks([]);
     setNotes("");
     setItemQuantity(1);
   }
@@ -262,29 +269,49 @@ export function OrderBuilder() {
           <CardHeader>
             <CardTitle>Adiciones</CardTitle>
           </CardHeader>
-          <CardContent className="grid sm:grid-cols-2 gap-2">
+          <CardContent className="space-y-2">
             {adiciones.map((a) => {
-              const checked = additions.includes(a.id);
+              const pick = additionPicks.find((p) => p.id === a.id);
+              const qty = pick?.quantity ?? 0;
+              const selected = qty > 0;
               return (
-                <label
+                <div
                   key={a.id}
-                  className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 cursor-pointer ${
-                    checked ? "border-primary bg-primary/5" : "border-border hover:bg-muted"
+                  className={`rounded-lg border px-3 py-2 ${
+                    selected ? "border-primary bg-primary/5" : "border-border"
                   }`}
                 >
-                  <span className="flex items-center gap-2">
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={() =>
-                        setAdditions((cur) =>
-                          cur.includes(a.id) ? cur.filter((x) => x !== a.id) : [...cur, a.id],
-                        )
-                      }
-                    />
-                    <span className="text-sm font-medium">{a.name}</span>
-                  </span>
-                  <Badge variant="outline">+${a.price}</Badge>
-                </label>
+                  <label className="flex items-center justify-between gap-2 cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <Checkbox
+                        checked={selected}
+                        onCheckedChange={() =>
+                          setAdditionPicks((cur) => {
+                            const exists = cur.find((p) => p.id === a.id);
+                            if (exists) return cur.filter((p) => p.id !== a.id);
+                            return [...cur, { id: a.id, quantity: 1 }];
+                          })
+                        }
+                      />
+                      <span className="text-sm font-medium">{a.name}</span>
+                    </span>
+                    <Badge variant="outline">+${a.price}</Badge>
+                  </label>
+                  {selected && (
+                    <div className="mt-2 pl-7">
+                      <QuantityStepper
+                        size="sm"
+                        value={qty}
+                        min={1}
+                        onChange={(quantity) =>
+                          setAdditionPicks((cur) =>
+                            cur.map((p) => (p.id === a.id ? { ...p, quantity } : p)),
+                          )
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })}
           </CardContent>
@@ -380,7 +407,13 @@ export function OrderBuilder() {
                         )}
                         {it.additions.length > 0 && (
                           <p className="text-xs text-muted-foreground">
-                            Adiciones: {it.additions.map((a) => a.name).join(", ")}
+                            Adiciones:{" "}
+                            {it.additions
+                              .map((a) => {
+                                const q = Math.max(1, a.quantity ?? 1);
+                                return q > 1 ? `${q}× ${a.name}` : a.name;
+                              })
+                              .join(", ")}
                           </p>
                         )}
                         {it.notes && (

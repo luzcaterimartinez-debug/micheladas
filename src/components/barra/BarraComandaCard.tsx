@@ -99,7 +99,12 @@ export function BarraComandaCard({ comanda: c, onMarkLista, onMarkEntregada, com
                 {it.additions.length > 0 && (
                   <p className="text-sm mt-1">
                     <span className="font-medium">Adiciones:</span>{" "}
-                    {it.additions.map((a) => a.name).join(", ")}
+                    {it.additions
+                      .map((a) => {
+                        const q = Math.max(1, a.quantity ?? 1);
+                        return q > 1 ? `${q}× ${a.name}` : a.name;
+                      })
+                      .join(", ")}
                   </p>
                 )}
                 {it.notes && (

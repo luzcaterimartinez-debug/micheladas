@@ -6,7 +6,7 @@ import { MeseroStepHeader, ThemedPanel, ThemedPanelHeader } from "@/components/m
 import { formatMenuPrice } from "@/lib/michelandia-theme";
 import { faseOpcionNames, orderItemLabel, orderItemSubtitle } from "@/lib/comanda-display";
 import type { Mesa, MicheladaType, OrderItem } from "@/lib/micheladas-store";
-import { orderItemQuantity } from "@/lib/micheladas-store";
+import { formatAdditionLine, orderItemQuantity } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
 
 const TOUCH = "touch-manipulation active:scale-[0.98] transition-all duration-150";
@@ -36,7 +36,7 @@ function CartItemRow({
   const subtitle = orderItemSubtitle(item);
   const extras: string[] = [
     ...tops,
-    ...item.additions.map((a) => (a.price > 0 ? `${a.name} +${formatMenuPrice(a.price)}` : a.name)),
+    ...item.additions.map((a) => formatAdditionLine(a, formatMenuPrice)),
   ];
   if ((item.llevarExtra ?? 0) > 0) {
     extras.push(`Para llevar +${formatMenuPrice(item.llevarExtra!)}`);

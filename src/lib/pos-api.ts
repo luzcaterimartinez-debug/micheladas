@@ -46,7 +46,12 @@ function mapOrderItem(raw: Record<string, unknown>, mesaId?: string): OrderItem 
     basePrice: Number(raw.basePrice),
     quantity: raw.quantity != null ? Number(raw.quantity) : 1,
     selectedToppings: (raw.selectedToppings as string[]) ?? [],
-    additions: (raw.additions as OrderItem["additions"]) ?? [],
+    additions: ((raw.additions as OrderItem["additions"]) ?? []).map((a) => ({
+      id: String(a.id),
+      name: String(a.name),
+      price: Number(a.price),
+      quantity: Math.max(1, Number(a.quantity ?? 1)),
+    })),
     notes: raw.notes != null ? String(raw.notes) : undefined,
     llevarExtra,
     total: Number(raw.total),
