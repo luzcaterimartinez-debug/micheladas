@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { MapPin, Pencil, User } from "lucide-react";
+import { MapPin, Pencil, User, X } from "lucide-react";
 
 import { MeseroStepHeader, ThemedPanel } from "@/components/michelandia/michelandia-ui";
 import { Input } from "@/components/ui/input";
@@ -80,19 +80,35 @@ export function MeseroPasoCliente({
               {trimmed.length}/{maxLen}
             </span>
           </div>
-          <Input
-            id="cliente"
-            value={cliente}
-            onChange={(e) => onClienteChange(e.target.value)}
-            placeholder="Ej. Juan, María…"
-            maxLength={maxLen}
-            autoFocus
-            autoComplete="off"
-            className={cn(
-              "h-14 text-lg sm:text-base rounded-xl border-slate-300 bg-white",
-              "focus-visible:ring-2 focus-visible:ring-[#1e88e5]/30",
+          <div className="relative">
+            <Input
+              id="cliente"
+              value={cliente}
+              onChange={(e) => onClienteChange(e.target.value)}
+              placeholder="Ej. Juan, María…"
+              maxLength={maxLen}
+              autoFocus
+              autoComplete="off"
+              className={cn(
+                "h-14 text-lg sm:text-base rounded-xl border-slate-300 bg-white pr-12",
+                "focus-visible:ring-2 focus-visible:ring-[#1e88e5]/30",
+              )}
+            />
+            {cliente.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onClienteChange("")}
+                className={cn(
+                  TOUCH,
+                  "absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 inline-flex items-center justify-center rounded-full",
+                  "text-slate-500 hover:text-slate-800 hover:bg-slate-100",
+                )}
+                aria-label="Limpiar nombre"
+              >
+                <X className="h-5 w-5" />
+              </button>
             )}
-          />
+          </div>
 
           {suggestions.length > 0 && (
             <div className="space-y-2">

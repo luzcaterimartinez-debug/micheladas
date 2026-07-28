@@ -174,10 +174,6 @@ export function MeseroOrderWizard() {
     setItemQuantity(1);
   }
 
-  function productNeedsFases(p: (typeof productos)[number]): boolean {
-    return buildMeseroSteps(p.pasos, p, faseIds).some(isFasePaso);
-  }
-
   function buildCartItem(
     p: (typeof productos)[number],
     quantity: number,
@@ -246,36 +242,10 @@ export function MeseroOrderWizard() {
     const picks = productPicks.filter((p) => p.quantity > 0);
     if (picks.length === 0) return;
 
-    const simpleItems: OrderItem[] = [];
-    const needCustomize: ProductPick[] = [];
-
-    for (const pick of picks) {
-      const p = productos.find((x) => x.id === pick.id);
-      if (!p) continue;
-      if (productNeedsFases(p)) needCustomize.push(pick);
-      else simpleItems.push(buildCartItem(p, pick.quantity));
-    }
-
-    if (simpleItems.length > 0) {
-      setCart((c) => [...c, ...simpleItems]);
-      const n = simpleItems.reduce((s, it) => s + (it.quantity ?? 1), 0);
-      toast.success(
-        n === 1
-          ? `${simpleItems[0].micheladaName} agregada`
-          : `${n} productos agregados al pedido`,
-      );
-    }
-
     setProductPicks([]);
-
-    if (needCustomize.length > 0) {
-      const [first, ...rest] = needCustomize;
-      startCustomize(first, rest);
-      return;
-    }
-
-    setSelectedId("");
-    setCurrentStep("carrito");
+    // Cada producto se personaliza por separado (fases + adiciones + notas).
+    const [first, ...rest] = picks;
+    startCustomize(first, rest);
   }
 
   function toggleCategoria(id: string) {
@@ -506,10 +476,22 @@ export function MeseroOrderWizard() {
         <div className="space-y-4">
           <MeseroStepHeader
             title="Adiciones"
-            description="Extras opcionales para la michelada."
+            description={
+              michelada
+                ? `Extras opcionales para ${michelada.name}${
+                    customizeQueue.length > 0
+                      ? ` · quedan ${customizeQueue.length} más`
+                      : ""
+                  }.`
+                : "Extras opcionales para la michelada."
+            }
           />
           <ThemedPanel themeId="adiciones">
-            <ThemedPanelHeader themeId="adiciones" title="Adiciones" subtitle="Extras para tu michelada" />
+            <ThemedPanelHeader
+              themeId="adiciones"
+              title="Adiciones"
+              subtitle={michelada ? michelada.name : "Extras para tu michelada"}
+            />
             <div className="px-2 py-2 sm:px-3 sm:py-3 space-y-1">
               {adiciones.map((a) => {
                 const checked = additionIds.includes(a.id);
@@ -539,7 +521,11 @@ export function MeseroOrderWizard() {
         <div className="space-y-4">
           <MeseroStepHeader
             title="Notas para barra"
-            description="Instrucciones especiales (opcional)."
+            description={
+              michelada
+                ? `Instrucciones especiales para ${michelada.name} (opcional).`
+                : "Instrucciones especiales (opcional)."
+            }
           />
           <ThemedPanel themeId="tradicional">
             <div className="px-4 py-4 sm:px-5 sm:py-5">
