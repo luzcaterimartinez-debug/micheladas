@@ -7,6 +7,7 @@ from mysql.connector import MySQLConnection, pooling
 from mysql.connector.cursor import MySQLCursorDict
 
 from app.config import get_settings
+from app.tz import MYSQL_TIME_ZONE
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +44,22 @@ def get_pool() -> pooling.MySQLConnectionPool:
     return _pool
 
 
+def _apply_session_timezone(conn: MySQLConnection) -> None:
+    """Fuerza hora Colombia en CURRENT_TIMESTAMP / CURDATE / comparaciones."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SET time_zone = %s", (MYSQL_TIME_ZONE,))
+    finally:
+        cursor.close()
+
+
 def get_connection() -> MySQLConnection:
-    return get_pool().get_connection()
+    conn = get_pool().get_connection()
+    try:
+        _apply_session_timezone(conn)
+    except Exception as exc:
+        logger.warning("No se pudo fijar time_zone MySQL a %s: %s", MYSQL_TIME_ZONE, exc)
+    return conn
 
 
 def check_database() -> tuple[bool, str | None]:

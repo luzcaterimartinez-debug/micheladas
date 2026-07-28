@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { queueLabel, sortComandasByQueue } from "@/lib/comanda-queue";
 import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
+import { formatAppTime } from "@/lib/local-date";
 import { useComandas, type Comanda } from "@/lib/micheladas-store";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
 import { Check, Clock, Trash2, Package } from "lucide-react";
@@ -54,7 +55,7 @@ export function ComandasList() {
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                {new Date(c.createdAt).toLocaleTimeString()}
+                {formatAppTime(c.createdAt)}
               </p>
             </CardHeader>
             <CardContent className="space-y-3">

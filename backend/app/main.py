@@ -7,6 +7,9 @@ import logging
 from app.config import get_settings, production_config_errors
 from app.database import check_database
 from app.routers import admin, admin_menu, auth, caja, comandas, gastos, inventario, menu, mesas, nomina, reportes
+from app.tz import APP_TZ_NAME, ensure_process_timezone
+
+ensure_process_timezone()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -20,8 +23,9 @@ app = FastAPI(
 # Configurar CORS una vez con settings iniciales
 _settings_on_start = get_settings()
 logger.info(
-    "API iniciada — env=%s, mysql=%s:%s/%s, user=%s, origins=%s",
+    "API iniciada — env=%s, tz=%s, mysql=%s:%s/%s, user=%s, origins=%s",
     _settings_on_start.app_env,
+    APP_TZ_NAME,
     _settings_on_start.mysql_host,
     _settings_on_start.mysql_port,
     _settings_on_start.mysql_database,

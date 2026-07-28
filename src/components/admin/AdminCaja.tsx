@@ -50,7 +50,7 @@ import { cn } from "@/lib/utils";
 import { localDateIso } from "@/lib/local-date";
 
 function money(n: number) {
-  return `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function AdminCaja() {

@@ -15,12 +15,13 @@ from app.models.gastos import (
     GastoUpdate,
     GastosResumenOut,
 )
+from app.tz import today_co, to_ms
 
 
 def _gasto_out(row: dict[str, Any]) -> GastoOut:
     creado = row.get("creado_en")
     if isinstance(creado, datetime):
-        creado_ms = int(creado.timestamp() * 1000)
+        creado_ms = to_ms(creado)
     else:
         creado_ms = 0
     fecha = row["fecha"]
@@ -105,7 +106,7 @@ def resumen_gastos(
     if fecha is not None:
         desde = hasta = fecha
     elif desde is None and hasta is None:
-        hoy = date.today()
+        hoy = today_co()
         desde = hasta = hoy
     elif desde is None:
         desde = hasta

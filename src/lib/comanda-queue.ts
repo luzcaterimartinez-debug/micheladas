@@ -1,4 +1,5 @@
 import type { Comanda } from "@/lib/micheladas-store";
+import { isSameAppDay } from "@/lib/local-date";
 
 /** Orden de cola del día (1 = siguiente en barra / impresión). */
 export function sortComandasByQueue(a: Comanda, b: Comanda): number {
@@ -9,9 +10,8 @@ export function sortComandasByQueue(a: Comanda, b: Comanda): number {
 }
 
 export function nextQueueOrderForToday(comandas: Comanda[]): number {
-  const today = new Date().toDateString();
   const max = comandas
-    .filter((c) => new Date(c.createdAt).toDateString() === today)
+    .filter((c) => isSameAppDay(c.createdAt))
     .reduce((m, c) => Math.max(m, c.queueOrder ?? 0), 0);
   return max + 1;
 }

@@ -37,7 +37,7 @@ export function AdminDashboard() {
   const stats = [
     {
       title: "Ventas hoy",
-      value: `$${ventasHoy.toLocaleString("es-MX")}`,
+      value: `$${ventasHoy.toLocaleString("es-CO")}`,
       sub: cajaHoy
         ? `${comandasHoy} comandas · ${moneyShort(cajaHoy.ventasPagadas)} cobrado`
         : "Cargando…",
@@ -162,5 +162,5 @@ export function AdminDashboard() {
 }
 
 function moneyShort(n: number) {
-  return `$${n.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`;
+  return `$${n.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`;
 }

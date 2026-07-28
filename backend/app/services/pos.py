@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -20,6 +19,7 @@ from app.models.pos import (
     MesaUpdate,
     OrderItemOut,
 )
+from app.tz import to_ms as _ts_ms
 
 DEFAULT_MESAS: list[tuple[str, str, int, int]] = [
     ("m1", "Mesa 1", 4, 1),
@@ -58,14 +58,6 @@ def invalidate_pos_cache() -> None:
 
 def _comandas_cache_ttl() -> float:
     return float(get_settings().query_cache_comandas_ttl_seconds)
-
-
-def _ts_ms(dt: datetime | None) -> int:
-    if dt is None:
-        return int(datetime.now(timezone.utc).timestamp() * 1000)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return int(dt.timestamp() * 1000)
 
 
 def _parse_json_list(raw: Any) -> list:

@@ -39,7 +39,7 @@ const ESTADO_LABEL: Record<string, string> = {
 };
 
 function money(n: number) {
-  return `$${n.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  return `$${n.toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 function SerieChart({ serie }: { serie: ReporteData["serie"] }) {

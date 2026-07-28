@@ -13,6 +13,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { queueLabel } from "@/lib/comanda-queue";
 import { faseOpcionNames, openComandaTicketView, orderItemLabel, orderItemSubtitle } from "@/lib/comanda-display";
+import { formatAppDateTime } from "@/lib/local-date";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
@@ -184,7 +185,7 @@ export function ComandaViewDialog({
               {comanda.mesa && <span>Mesa {comanda.mesa}</span>}
               {!isPreview && !isConfirm && (
                 <span>
-                  {new Date(comanda.createdAt).toLocaleString("es-MX", {
+                  {formatAppDateTime(comanda.createdAt, {
                     day: "numeric",
                     month: "short",
                     hour: "2-digit",

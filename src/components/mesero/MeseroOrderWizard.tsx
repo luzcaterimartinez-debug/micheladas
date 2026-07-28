@@ -25,11 +25,9 @@ import { MeseroPasoCategoria } from "@/components/mesero/MeseroPasoCategoria";
 import { MeseroPasoProducto, type ProductPick } from "@/components/mesero/MeseroPasoProducto";
 import { MeseroPasoCliente } from "@/components/mesero/MeseroPasoCliente";
 import { MeseroPasoCarrito } from "@/components/mesero/MeseroPasoCarrito";
-import { MeseroPasoItem } from "@/components/mesero/MeseroPasoItem";
 import { MeseroPasoFase } from "@/components/mesero/MeseroPasoFase";
 import { MeseroPasoMesa } from "@/components/mesero/MeseroPasoMesa";
 import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
-import { faseOpcionNames } from "@/lib/comanda-display";
 import { sendToBarraAndOpenTicket } from "@/lib/send-to-barra";
 import { consumeMeseroCartRestore } from "@/lib/ticket-print-session";
 import { isFasePaso, opcionesForFase, parseFaseIdFromPaso } from "@/lib/fases";
@@ -47,7 +45,7 @@ import {
   type Comanda,
   type OrderItem,
 } from "@/lib/micheladas-store";
-import { buildMeseroSteps, getMeseroStepLabel, type MeseroFlowStep } from "@/lib/product-steps";
+import { buildBatchMeseroSteps, buildMeseroSteps, getMeseroStepLabel, productHasFaseSteps, type MeseroFlowStep } from "@/lib/product-steps";
 import { formatMenuPrice } from "@/lib/michelandia-theme";
 import { cn } from "@/lib/utils";
 
@@ -70,8 +68,12 @@ export function MeseroOrderWizard() {
   const [selectedCategoriaIds, setSelectedCategoriaIds] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [productPicks, setProductPicks] = useState<ProductPick[]>([]);
-  /** Cola de productos con fases pendientes de personalizar. */
-  const [customizeQueue, setCustomizeQueue] = useState<ProductPick[]>([]);
+  /** Productos elegidos pendientes de agregar (adiciones compartidas). */
+  const [batchPicks, setBatchPicks] = useState<ProductPick[]>([]);
+  /** Toppings/fases ya resueltos por producto dentro del lote. */
+  const [batchToppingsById, setBatchToppingsById] = useState<Record<string, string[]>>({});
+  /** Cola de productos que aún necesitan elegir fases. */
+  const [faseQueue, setFaseQueue] = useState<ProductPick[]>([]);
   const [toppings, setToppings] = useState<string[]>([]);
   const [additionPicks, setAdditionPicks] = useState<{ id: string; quantity: number }[]>([]);
   const [notes, setNotes] = useState("");
@@ -98,10 +100,11 @@ export function MeseroOrderWizard() {
   );
   const michelada = productos.find((m) => m.id === selectedId);
   const faseIds = useMemo(() => fases.map((f) => f.id), [fases]);
-  const steps = useMemo(
-    () => buildMeseroSteps(michelada?.pasos, michelada, faseIds),
-    [michelada, faseIds],
-  );
+  const inBatch = batchPicks.length > 0;
+  const steps = useMemo(() => {
+    if (inBatch) return buildBatchMeseroSteps(michelada, faseIds);
+    return buildMeseroSteps(michelada?.pasos, michelada, faseIds);
+  }, [inBatch, michelada, faseIds]);
   const stepIndex = Math.max(0, steps.indexOf(currentStep));
   const step = steps[stepIndex] ?? currentStep;
   const progress = ((stepIndex + 1) / steps.length) * 100;
@@ -118,10 +121,26 @@ export function MeseroOrderWizard() {
     [adiciones, additionPicks],
   );
 
+  const batchProductSummary = useMemo(() => {
+    return batchPicks
+      .map((pick) => {
+        const p = productos.find((x) => x.id === pick.id);
+        if (!p) return null;
+        return { id: pick.id, name: p.name, quantity: pick.quantity, price: p.price };
+      })
+      .filter(Boolean) as { id: string; name: string; quantity: number; price: number }[];
+  }, [batchPicks, productos]);
+
+  const batchUnits = batchPicks.reduce((s, p) => s + p.quantity, 0);
+  const batchPreviewTotal = useMemo(() => {
+    return batchPicks.reduce((sum, pick) => {
+      const p = productos.find((x) => x.id === pick.id);
+      if (!p) return sum;
+      return sum + calcItemLineTotal(p.price, selectedAdditions, pick.quantity, llevarExtraPorUnidad(mesaId));
+    }, 0);
+  }, [batchPicks, productos, selectedAdditions, mesaId]);
+
   const llevarExtra = llevarExtraPorUnidad(mesaId);
-  const itemTotal = michelada
-    ? calcItemLineTotal(michelada.price, selectedAdditions, itemQuantity, llevarExtra)
-    : 0;
   const cartTotal = cart.reduce((s, i) => s + i.total, 0);
   const mesaSeleccionada =
     mesas.find((m) => m.id === mesaId) ??
@@ -188,6 +207,17 @@ export function MeseroOrderWizard() {
     setItemQuantity(1);
   }
 
+  function clearBatch() {
+    setBatchPicks([]);
+    setBatchToppingsById({});
+    setFaseQueue([]);
+    setSelectedId("");
+    setToppings([]);
+    setAdditionPicks([]);
+    setNotes("");
+    setItemQuantity(1);
+  }
+
   function toggleAdditionPick(id: string) {
     setAdditionPicks((cur) => {
       const exists = cur.find((p) => p.id === id);
@@ -226,30 +256,39 @@ export function MeseroOrderWizard() {
     };
   }
 
-  function startCustomize(pick: ProductPick, rest: ProductPick[] = []) {
+  function startFaseCustomize(pick: ProductPick, rest: ProductPick[] = []) {
     const p = productos.find((x) => x.id === pick.id);
     if (!p) return;
     setSelectedId(pick.id);
     setItemQuantity(pick.quantity);
-    setCustomizeQueue(rest);
-    resetItemBuilder();
-    setItemQuantity(pick.quantity);
-    const next = buildMeseroSteps(p.pasos, p, faseIds);
-    const idx = next.indexOf("producto");
-    if (idx >= 0 && idx < next.length - 1) setCurrentStep(next[idx + 1]);
-    else setCurrentStep("item");
-  }
-
-  function finishCustomizeAndContinue() {
-    const next = customizeQueue[0];
-    if (next) {
-      startCustomize(next, customizeQueue.slice(1));
+    setFaseQueue(rest);
+    setToppings(batchToppingsById[pick.id] ?? []);
+    setNotes("");
+    const faseSteps = buildMeseroSteps(p.pasos, p, faseIds).filter(isFasePaso);
+    if (faseSteps.length > 0) {
+      setCurrentStep(faseSteps[0]);
+      return;
+    }
+    if (rest[0]) {
+      startFaseCustomize(rest[0], rest.slice(1));
       return;
     }
     setSelectedId("");
-    setCustomizeQueue([]);
-    resetItemBuilder();
-    setCurrentStep("carrito");
+    setCurrentStep("adiciones");
+  }
+
+  function finishProductFasesAndContinue(currentToppings: string[]) {
+    if (selectedId) {
+      setBatchToppingsById((prev) => ({ ...prev, [selectedId]: currentToppings }));
+    }
+    const next = faseQueue[0];
+    if (next) {
+      startFaseCustomize(next, faseQueue.slice(1));
+      return;
+    }
+    setSelectedId("");
+    setToppings([]);
+    setCurrentStep("adiciones");
   }
 
   function toggleProductPick(product: (typeof productos)[number]) {
@@ -271,9 +310,24 @@ export function MeseroOrderWizard() {
     if (picks.length === 0) return;
 
     setProductPicks([]);
-    // Cada producto se personaliza por separado (fases + adiciones + notas).
-    const [first, ...rest] = picks;
-    startCustomize(first, rest);
+    setBatchPicks(picks);
+    setBatchToppingsById({});
+    setAdditionPicks([]);
+    setNotes("");
+    setFaseQueue([]);
+
+    const needingFases = picks.filter((pick) => {
+      const p = productos.find((x) => x.id === pick.id);
+      return !!p && productHasFaseSteps(p, faseIds);
+    });
+
+    if (needingFases.length > 0) {
+      startFaseCustomize(needingFases[0], needingFases.slice(1));
+      return;
+    }
+
+    setSelectedId("");
+    setCurrentStep("adiciones");
   }
 
   function toggleCategoria(id: string) {
@@ -293,27 +347,81 @@ export function MeseroOrderWizard() {
 
   function startNewItem() {
     resetItemBuilder();
-    setSelectedId("");
-    setProductPicks([]);
-    setCustomizeQueue([]);
+    clearBatch();
     setSelectedCategoriaIds([]);
+    setProductPicks([]);
     setCurrentStep("categoria");
   }
 
-  function addToCart() {
-    if (!michelada) return;
-    const item = buildCartItem(michelada, itemQuantity, {
-      toppings,
-      additions: selectedAdditions,
-      notes,
-    });
-    setCart((c) => [...c, item]);
-    toast.success(
-      itemQuantity > 1
-        ? `${itemQuantity}× ${michelada.name} agregadas`
-        : `${michelada.name} agregada`,
-    );
-    finishCustomizeAndContinue();
+  function addBatchToCart() {
+    if (batchPicks.length === 0) return;
+    const notesTrim = notes.trim();
+    const items: OrderItem[] = [];
+    for (const pick of batchPicks) {
+      const p = productos.find((x) => x.id === pick.id);
+      if (!p) continue;
+      items.push(
+        buildCartItem(p, pick.quantity, {
+          toppings: batchToppingsById[pick.id] ?? [],
+          additions: selectedAdditions,
+          notes: notesTrim || undefined,
+        }),
+      );
+    }
+    if (items.length === 0) return;
+    setCart((c) => [...c, ...items]);
+    const units = items.reduce((s, i) => s + (i.quantity ?? 1), 0);
+    toast.success(units === 1 ? "1 producto agregado" : `${units} productos agregados`);
+    clearBatch();
+    setCurrentStep("carrito");
+  }
+
+  function handleContinue() {
+    if (isFasePaso(step) && inBatch) {
+      const idx = steps.indexOf(currentStep);
+      const next = idx >= 0 ? steps[idx + 1] : undefined;
+      if (next && isFasePaso(next)) {
+        goNext();
+        return;
+      }
+      finishProductFasesAndContinue(toppings);
+      return;
+    }
+    if (step === "adiciones" && inBatch) {
+      addBatchToCart();
+      return;
+    }
+    if (step === "adiciones" && michelada && !inBatch) {
+      // Flujo suelto (no debería pasar tras lote): agregar el ítem actual.
+      const item = buildCartItem(michelada, itemQuantity, {
+        toppings,
+        additions: selectedAdditions,
+        notes,
+      });
+      setCart((c) => [...c, item]);
+      toast.success(`${michelada.name} agregada`);
+      resetItemBuilder();
+      setSelectedId("");
+      setCurrentStep("carrito");
+      return;
+    }
+    goNext();
+  }
+
+  function handleBack() {
+    if (step === "adiciones" && inBatch) {
+      setProductPicks(batchPicks);
+      clearBatch();
+      setCurrentStep("producto");
+      return;
+    }
+    if (isFasePaso(step) && inBatch) {
+      setProductPicks(batchPicks);
+      clearBatch();
+      setCurrentStep("producto");
+      return;
+    }
+    goBack();
   }
 
   function openSendConfirm() {
@@ -368,7 +476,7 @@ export function MeseroOrderWizard() {
       case "producto":
         return productPicks.some((p) => p.quantity > 0);
       case "adiciones":
-        return true;
+        return inBatch ? batchPicks.length > 0 : !!michelada;
       case "notas":
         return true;
       case "item":
@@ -507,20 +615,51 @@ export function MeseroOrderWizard() {
           <MeseroStepHeader
             title="Adiciones"
             description={
-              michelada
-                ? `Extras opcionales para ${michelada.name}${
-                    customizeQueue.length > 0
-                      ? ` · quedan ${customizeQueue.length} más`
-                      : ""
-                  }.`
-                : "Extras opcionales para la michelada."
+              inBatch
+                ? "Elige las adiciones una sola vez: se aplican a todos los productos del pedido."
+                : michelada
+                  ? `Extras opcionales para ${michelada.name}.`
+                  : "Extras opcionales."
             }
           />
+
+          {inBatch && batchProductSummary.length > 0 && (
+            <ThemedPanel themeId="especiales">
+              <ThemedPanelHeader
+                themeId="especiales"
+                title="Productos"
+                subtitle={`${batchUnits} unidad${batchUnits === 1 ? "" : "es"}`}
+              />
+              <ul className="px-4 py-3 space-y-2">
+                {batchProductSummary.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <span className="font-semibold text-slate-800 min-w-0 truncate">
+                      {p.quantity > 1 ? `${p.quantity}× ` : ""}
+                      {p.name}
+                    </span>
+                    <span className="font-extrabold tabular-nums text-slate-900 shrink-0">
+                      {formatMenuPrice(p.price * p.quantity)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </ThemedPanel>
+          )}
+
           <ThemedPanel themeId="adiciones">
             <ThemedPanelHeader
               themeId="adiciones"
               title="Adiciones"
-              subtitle={michelada ? michelada.name : "Extras para tu michelada"}
+              subtitle={
+                inBatch
+                  ? "Se cargan a cada producto seleccionado"
+                  : michelada
+                    ? michelada.name
+                    : "Extras"
+              }
             />
             <div className="px-3 py-3 sm:px-4 sm:py-4 space-y-2">
               {adiciones.map((a) => {
@@ -585,6 +724,15 @@ export function MeseroOrderWizard() {
               )}
             </div>
           </ThemedPanel>
+
+          {inBatch && selectedAdditions.length > 0 && (
+            <p className="text-xs font-semibold text-white/90 bg-black/20 rounded-xl px-3 py-2">
+              Adiciones:{" "}
+              {selectedAdditions.map((a) => formatAdditionLine(a, formatMenuPrice)).join(" · ")}
+              {" · "}
+              Total estimado {formatMenuPrice(batchPreviewTotal)}
+            </p>
+          )}
         </div>
       )}
 
@@ -611,22 +759,6 @@ export function MeseroOrderWizard() {
             </div>
           </ThemedPanel>
         </div>
-      )}
-
-      {step === "item" && michelada && (
-        <MeseroPasoItem
-          michelada={michelada}
-          toppingLabels={faseOpcionNames(michelada.id, toppings, productos)}
-          additions={selectedAdditions}
-          notes={notes}
-          itemTotal={itemTotal}
-          quantity={itemQuantity}
-          onQuantityChange={setItemQuantity}
-          mesa={mesaSeleccionada}
-          cliente={cliente}
-          llevarExtra={llevarExtra}
-          onAddToCart={addToCart}
-        />
       )}
 
       {step === "carrito" && (
@@ -670,14 +802,13 @@ export function MeseroOrderWizard() {
                   "flex-1 gap-1.5 h-12 text-base font-bold border-slate-800/20 bg-white/80",
                   TOUCH_BTN,
                 )}
-                onClick={goBack}
+                onClick={handleBack}
               >
                 <ArrowLeft className="h-5 w-5" />
                 Atrás
               </Button>
             )}
-            {step !== "item" &&
-              step !== "mesa" &&
+            {step !== "mesa" &&
               step !== "categoria" &&
               step !== "producto" && (
               <Button
@@ -687,10 +818,16 @@ export function MeseroOrderWizard() {
                   TOUCH_BTN,
                   stepIndex === 0 && "flex-1",
                 )}
-                onClick={goNext}
+                onClick={handleContinue}
                 disabled={!canContinue()}
               >
-                {isFasePaso(step) ? "Continuar" : "Siguiente"}
+                {step === "adiciones" && inBatch
+                  ? batchUnits > 1
+                    ? `Agregar ${batchUnits} al pedido`
+                    : "Agregar al pedido"
+                  : isFasePaso(step)
+                    ? "Continuar"
+                    : "Siguiente"}
                 <ArrowRight className="h-5 w-5" />
               </Button>
             )}
@@ -722,19 +859,9 @@ export function MeseroOrderWizard() {
               >
                 {(() => {
                   const n = productPicks.reduce((s, p) => s + p.quantity, 0);
-                  return n > 0 ? `Agregar (${n})` : "Agregar";
+                  return n > 0 ? `Continuar (${n})` : "Continuar";
                 })()}
                 <ArrowRight className="h-5 w-5" />
-              </Button>
-            )}
-            {step === "item" && (
-              <Button
-                type="button"
-                variant="outline"
-                className={cn("flex-1 h-12 text-base font-bold border-slate-800/20 bg-white/80", TOUCH_BTN)}
-                onClick={goBack}
-              >
-                Atrás
               </Button>
             )}
           </div>

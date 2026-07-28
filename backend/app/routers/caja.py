@@ -15,6 +15,7 @@ from app.services.caja import (
     registrar_pago,
     resumen_dia,
 )
+from app.tz import today_co
 
 router = APIRouter(prefix="/api/caja", tags=["caja"])
 
@@ -26,7 +27,7 @@ def get_resumen(
     _: AdminUser,
     fecha: date | None = Query(default=None),
 ) -> CajaResumenOut:
-    return resumen_dia(fecha or date.today())
+    return resumen_dia(fecha or today_co())
 
 
 @router.get("/comandas", response_model=list[ComandaOut])
@@ -35,7 +36,7 @@ def get_comandas_caja(
     fecha: date | None = Query(default=None),
     pagado: bool | None = Query(default=None),
 ) -> list[ComandaOut]:
-    return list_comandas_caja(fecha=fecha or date.today(), pagado=pagado)
+    return list_comandas_caja(fecha=fecha or today_co(), pagado=pagado)
 
 
 @router.post("/pagos/{comanda_id}", response_model=ComandaOut)

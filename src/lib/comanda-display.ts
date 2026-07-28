@@ -1,4 +1,5 @@
 import { queueLabel } from "@/lib/comanda-queue";
+import { formatAppDateTime } from "@/lib/local-date";
 import { enqueuePrint } from "@/lib/print-queue";
 import { DEFAULT_PRINTER, isRawBtPreferred } from "@/lib/printer-config";
 import { tryPrintRawBt, tryPrintRawBtFromUserGesture } from "@/lib/rawbt-print";
@@ -235,7 +236,7 @@ export function renderComandaTicket(
     })
     .join("");
 
-  const hora = new Date(c.createdAt).toLocaleString("es-MX", {
+  const hora = formatAppDateTime(c.createdAt, {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -274,7 +275,7 @@ export function renderComandaTicket(
 }
 
 export function renderTestTicket(): string {
-  const now = new Date().toLocaleString("es-MX");
+  const now = formatAppDateTime(Date.now());
   return `<!doctype html><html><head><meta charset="utf-8"><title>Prueba</title>
   <style>${ticketStyles()}</style></head><body>
   <div class="wrap">
@@ -304,7 +305,7 @@ export function renderComandaTicketPlainText(
   productos: MicheladaType[] = MICHELADAS,
 ): string {
   const turno = c.queueOrder > 0 ? c.queueOrder : c.folio;
-  const hora = new Date(c.createdAt).toLocaleString("es-MX", {
+  const hora = formatAppDateTime(c.createdAt, {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -341,7 +342,7 @@ export function renderComandaTicketPlainText(
 }
 
 export function renderTestTicketPlainText(): string {
-  const now = new Date().toLocaleString("es-MX");
+  const now = formatAppDateTime(Date.now());
   return [
     "MICHELANDIA",
     "",

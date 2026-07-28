@@ -37,7 +37,7 @@ import {
 } from "@/lib/gastos-api";
 
 function money(n: number) {
-  return `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function monthStartIso() {

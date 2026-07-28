@@ -1,4 +1,5 @@
 import { openComandaTicketView, printComanda } from "@/lib/comanda-display";
+import { localDateIso } from "@/lib/local-date";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
 
 export const COMANDA_NUEVA_EVENT = "michelada-comanda-nueva";
@@ -6,7 +7,7 @@ export const COMANDA_NUEVA_EVENT = "michelada-comanda-nueva";
 const PRINTED_KEY = "micheladas_printed_comandas";
 
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateIso();
 }
 
 export function loadPrintedIds(): Set<string> {

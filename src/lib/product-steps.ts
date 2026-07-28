@@ -60,6 +60,29 @@ export function buildMeseroSteps(
     }
   }
 
-  flow.push("adiciones", "item", "carrito");
+  flow.push("adiciones", "carrito");
   return flow;
+}
+
+/** Flujo en lote: fases del producto actual (si aplica) + adiciones compartidas → carrito. */
+export function buildBatchMeseroSteps(
+  michelada: Pick<MicheladaType, "pasos" | "faseOpciones"> | undefined,
+  faseIds?: string[],
+): MeseroFlowStep[] {
+  const flow: MeseroFlowStep[] = ["mesa", "cliente", "categoria", "producto"];
+  if (michelada) {
+    const full = buildMeseroSteps(michelada.pasos, michelada, faseIds);
+    for (const s of full) {
+      if (isFasePaso(s)) flow.push(s);
+    }
+  }
+  flow.push("adiciones", "carrito");
+  return flow;
+}
+
+export function productHasFaseSteps(
+  michelada: Pick<MicheladaType, "pasos" | "faseOpciones">,
+  faseIds?: string[],
+): boolean {
+  return buildMeseroSteps(michelada.pasos, michelada, faseIds).some(isFasePaso);
 }

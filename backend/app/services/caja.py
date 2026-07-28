@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -16,21 +16,11 @@ from app.models.caja import (
 )
 from app.models.pos import ComandaOut
 from app.services.pos import COMANDAS_SELECT, _row_to_comanda, invalidate_pos_cache
-
-
-def _ts_ms(dt: datetime | None) -> int | None:
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        from datetime import timezone
-
-        dt = dt.replace(tzinfo=timezone.utc)
-    return int(dt.timestamp() * 1000)
+from app.tz import day_bounds, today_co, to_ms_optional
 
 
 def _day_bounds(fecha: date) -> tuple[datetime, datetime]:
-    start = datetime.combine(fecha, datetime.min.time())
-    return start, start + timedelta(days=1)
+    return day_bounds(fecha)
 
 
 def _montos_pago(total: float, body: PagoCreate) -> tuple[float, float, float, float, float]:
@@ -256,7 +246,7 @@ def resumen_dia(fecha: date) -> CajaResumenOut:
 
 
 def crear_corte(body: CorteCreate, usuario_id: int) -> CorteOut:
-    fecha = body.fecha or date.today()
+    fecha = body.fecha or today_co()
     resumen = resumen_dia(fecha)
 
     if resumen.comandasPendientes > 0:
@@ -346,7 +336,7 @@ def _corte_out(row: dict[str, Any]) -> CorteOut:
         comandasPagadas=int(row["comandas_pagadas"]),
         comandasPendientes=int(row["comandas_pendientes"]),
         notas=row.get("notas"),
-        cerradoEn=_ts_ms(row.get("cerrado_en")) or 0,
+        cerradoEn=to_ms_optional(row.get("cerrado_en")) or 0,
         cerradoPorId=int(row["cerrado_por"]),
         cerradoPorNombre=row.get("cerrado_por_nombre"),
     )

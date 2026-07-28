@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -16,6 +16,7 @@ from app.models.reportes import (
     ReporteProductoRow,
     ReporteSeriePunto,
 )
+from app.tz import day_bounds, today_co
 
 MESES_ES = (
     "",
@@ -41,11 +42,10 @@ def _period_bounds(
     anio: int | None,
     mes: int | None,
 ) -> tuple[datetime, datetime, str, str, str]:
-    today = date.today()
+    today = today_co()
     if periodo == "dia":
         d = fecha or today
-        start = datetime.combine(d, datetime.min.time())
-        end = start + timedelta(days=1)
+        start, end = day_bounds(d)
         label = d.strftime("%d/%m/%Y")
         return start, end, label, d.isoformat(), d.isoformat()
 
