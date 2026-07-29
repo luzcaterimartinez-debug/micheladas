@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { AlertTriangle, Boxes, Loader2, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Boxes, Check, Loader2, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -16,28 +16,112 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useInventory } from "@/lib/micheladas-store";
+import { useInventory, type InventoryItem } from "@/lib/micheladas-store";
 import { getStoredSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
+function parseStockInput(raw: string): number | null {
+  const trimmed = raw.trim().replace(",", ".");
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+function StockEditor({
+  item,
+  disabled,
+  onSave,
+}: {
+  item: InventoryItem;
+  disabled: boolean;
+  onSave: (stock: number) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState(String(item.stock));
+  const [saving, setSaving] = useState(false);
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusedRef.current && !saving) {
+      setDraft(String(item.stock));
+    }
+  }, [item.stock, saving]);
+
+  async function commit() {
+    const parsed = parseStockInput(draft);
+    if (parsed == null) {
+      setDraft(String(item.stock));
+      toast.error("Cantidad inválida");
+      return;
+    }
+    if (parsed === item.stock) {
+      setDraft(String(item.stock));
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(parsed);
+      setDraft(String(parsed));
+      toast.success(`${item.name}: ${parsed} ${item.unit}`);
+    } catch (err) {
+      setDraft(String(item.stock));
+      toast.error(err instanceof Error ? err.message : "No se pudo guardar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        type="text"
+        inputMode="decimal"
+        value={draft}
+        disabled={disabled || saving}
+        onFocus={() => {
+          focusedRef.current = true;
+        }}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          focusedRef.current = false;
+          void commit();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+          }
+          if (e.key === "Escape") {
+            setDraft(String(item.stock));
+            e.currentTarget.blur();
+          }
+        }}
+        className="flex-1 min-w-0 h-11 text-base sm:text-sm sm:max-w-[7rem]"
+        aria-label={`Stock de ${item.name}`}
+      />
+      <span className="text-sm font-medium text-muted-foreground shrink-0 w-8">{item.unit}</span>
+      {saving ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+      ) : (
+        <Check
+          className={cn(
+            "h-4 w-4 shrink-0",
+            draft.trim() !== String(item.stock) ? "text-amber-500" : "text-transparent",
+          )}
+          aria-hidden
+        />
+      )}
+    </div>
+  );
+}
+
 export function InventoryPanel() {
-  const { items, loading, error, reload, setStock, reset, removeItem } = useInventory();
-  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const { items, loading, error, reload, setStock, reset, removeItem } = useInventory({
+    pauseAutoReload: true,
+  });
   const [resetting, setResetting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ key: string; name: string } | null>(null);
   const isAdmin = getStoredSession()?.user.rol === "admin";
-
-  async function handleStockChange(key: string, value: number) {
-    setSavingKey(key);
-    try {
-      await setStock(key, value);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "No se pudo guardar");
-    } finally {
-      setSavingKey(null);
-    }
-  }
 
   async function handleReset() {
     if (!confirm("¿Restaurar todo el inventario a los valores iniciales?")) return;
@@ -91,9 +175,9 @@ export function InventoryPanel() {
 
       <div className="rounded-xl border bg-card p-3 sm:p-4 space-y-3">
         <p className="text-sm text-muted-foreground leading-relaxed">
-          {getStoredSession()
-            ? "Sincronizado con la base de datos. Se descuenta al enviar cada comanda a barra."
-            : "Modo local: los cambios se guardan en este navegador."}
+          {isAdmin
+            ? "Escribe la cantidad y sal del campo (o Enter) para guardar."
+            : "Solo el administrador puede modificar el stock."}
         </p>
         <div
           className={cn(
@@ -155,29 +239,16 @@ export function InventoryPanel() {
                     )}
                   </CardTitle>
                   <p className="text-[11px] text-muted-foreground font-mono truncate">{i.key}</p>
-                  <p className="text-xs text-muted-foreground">Mínimo: {min} {i.unit}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Mínimo: {min} {i.unit}
+                  </p>
                 </CardHeader>
                 <CardContent className="space-y-3 px-4 pb-4 sm:px-6 sm:pb-6">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={0}
-                      step="any"
-                      inputMode="decimal"
-                      value={i.stock}
-                      disabled={!isAdmin || savingKey === i.key}
-                      onChange={(e) =>
-                        void handleStockChange(i.key, Math.max(0, Number(e.target.value) || 0))
-                      }
-                      className="flex-1 min-w-0 h-11 text-base sm:text-sm sm:max-w-[7rem]"
-                    />
-                    <span className="text-sm font-medium text-muted-foreground shrink-0 w-8">
-                      {i.unit}
-                    </span>
-                    {savingKey === i.key && (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
-                    )}
-                  </div>
+                  <StockEditor
+                    item={i}
+                    disabled={!isAdmin}
+                    onSave={(stock) => setStock(i.key, stock)}
+                  />
                   {isAdmin && (
                     <Button
                       type="button"

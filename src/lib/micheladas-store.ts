@@ -626,7 +626,8 @@ export function useMesas() {
   };
 }
 
-export function useInventory() {
+export function useInventory(opts?: { pauseAutoReload?: boolean }) {
+  const pauseAutoReload = opts?.pauseAutoReload === true;
   const [items, setItems] = useState<InventoryItem[]>(DEFAULT_INVENTORY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -669,11 +670,12 @@ export function useInventory() {
       window.addEventListener("michelada-store-change", handler);
       return () => window.removeEventListener("michelada-store-change", handler);
     }
+    if (pauseAutoReload) return;
     const interval = window.setInterval(() => {
       if (shouldSyncWithServer()) void reload();
     }, 15000);
     return () => window.clearInterval(interval);
-  }, [reload]);
+  }, [reload, pauseAutoReload]);
 
   const setStockLocal = (key: string, stock: number) => {
     const next = getCachedInventario(DEFAULT_INVENTORY).map((i) =>
@@ -697,18 +699,13 @@ export function useInventory() {
     error,
     reload,
     setStock: async (key: string, stock: number) => {
-      if (!getStoredSession()) {
-        setStockLocal(key, stock);
-        return;
-      }
+      const before = getCachedInventario(DEFAULT_INVENTORY).find((i) => i.key === key);
+      setStockLocal(key, stock);
 
-      const applyLocal = () => {
-        setStockLocal(key, stock);
-        enqueueOp({ type: "inventario:patch", key, stock });
-      };
+      if (!getStoredSession()) return;
 
       if (!shouldSyncWithServer()) {
-        applyLocal();
+        enqueueOp({ type: "inventario:patch", key, stock });
         return;
       }
 
@@ -719,8 +716,12 @@ export function useInventory() {
           getCachedInventario(DEFAULT_INVENTORY).map((i) => (i.key === key ? updated : i)),
         );
       } catch (err) {
-        if (isNetworkFailure(err)) applyLocal();
-        else throw err;
+        if (isNetworkFailure(err)) {
+          enqueueOp({ type: "inventario:patch", key, stock });
+          return;
+        }
+        if (before) setStockLocal(key, before.stock);
+        throw err;
       }
     },
     decrement: (key: string, qty: number) => {
