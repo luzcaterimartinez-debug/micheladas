@@ -99,18 +99,18 @@ export function BarraPanel({ userName, onLogout }: BarraPanelProps) {
   async function markLista(id: string) {
     try {
       await updateStatus(id, "lista");
-      toast.success("Comanda lista para el mesero");
+      toast.success("Lista para el mesero");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al actualizar");
+      toast.error(err instanceof Error ? err.message : "No se pudo marcar lista");
     }
   }
 
   async function markEntregada(id: string) {
     try {
       await updateStatus(id, "entregada");
-      toast.success("Comanda entregada");
+      toast.success("Pedido atendido");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al actualizar");
+      toast.error(err instanceof Error ? err.message : "No se pudo marcar atendido");
     }
   }
 

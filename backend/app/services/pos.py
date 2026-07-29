@@ -431,16 +431,12 @@ def list_comandas(
     pagado: bool | None = None,
     limit: int = 500,
 ) -> list[ComandaOut]:
-    key = f"{COMANDAS_CACHE_PREFIX}list:{status_filter or ''}:{mesa_id or ''}:{pagado}:{limit}"
-    return query_cache(
-        key,
-        lambda: _list_comandas_db(
-            status_filter=status_filter,
-            mesa_id=mesa_id,
-            pagado=pagado,
-            limit=limit,
-        ),
-        ttl_seconds=_comandas_cache_ttl(),
+    # Sin caché: barra/mesero necesitan el status al instante (multi-instancia / Vercel).
+    return _list_comandas_db(
+        status_filter=status_filter,
+        mesa_id=mesa_id,
+        pagado=pagado,
+        limit=limit,
     )
 
 
@@ -599,7 +595,7 @@ def update_comanda(comanda_id: str, patch: ComandaUpdate) -> ComandaOut:
         fields: list[str] = []
         params: list[Any] = []
         if patch.status is not None:
-            fields.append("status = %s")
+            fields.append("`status` = %s")
             params.append(patch.status)
         if patch.cliente is not None:
             fields.append("cliente = %s")

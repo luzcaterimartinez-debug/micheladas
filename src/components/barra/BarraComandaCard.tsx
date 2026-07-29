@@ -1,5 +1,6 @@
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
 import { Check, Clock, Package } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,17 +9,30 @@ import { queueLabel } from "@/lib/comanda-queue";
 import { faseOpcionNames, orderItemLabel, orderItemSubtitle, timeAgo } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda } from "@/lib/micheladas-store";
+import { cn } from "@/lib/utils";
 
 type Props = {
   comanda: Comanda;
-  onMarkLista: (id: string) => void;
-  onMarkEntregada: (id: string) => void;
+  onMarkLista: (id: string) => void | Promise<void>;
+  onMarkEntregada: (id: string) => void | Promise<void>;
   compact?: boolean;
 };
 
 export function BarraComandaCard({ comanda: c, onMarkLista, onMarkEntregada, compact }: Props) {
   const { productos } = useMenu();
+  const [busy, setBusy] = useState<"lista" | "atendido" | null>(null);
   const urgent = c.status === "pendiente" && Date.now() - c.createdAt > 10 * 60 * 1000;
+  const canComplete = c.status === "pendiente" || c.status === "lista";
+
+  async function run(action: "lista" | "atendido", fn: () => void | Promise<void>) {
+    if (busy) return;
+    setBusy(action);
+    try {
+      await fn();
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
     <Card
@@ -68,7 +82,7 @@ export function BarraComandaCard({ comanda: c, onMarkLista, onMarkEntregada, com
             {c.status === "entregada" && (
               <Badge variant="outline" className="gap-1">
                 <Check className="h-3 w-3" />
-                Entregada
+                Atendido
               </Badge>
             )}
             <p className="text-xs text-muted-foreground mt-1">{timeAgo(c.createdAt)}</p>
@@ -117,30 +131,39 @@ export function BarraComandaCard({ comanda: c, onMarkLista, onMarkEntregada, com
           })}
         </ul>
 
-        <div className="flex flex-wrap gap-2">
-          <ComandaViewDialog comanda={c} iconOnly={compact} label={compact ? "Ver" : "Ver comanda"} />
-          {c.status === "pendiente" && (
+        <div className="flex flex-col gap-2">
+          {canComplete && (
             <Button
-              size={compact ? "sm" : "lg"}
-              className="flex-1 min-w-[140px] gap-2"
-              onClick={() => onMarkLista(c.id)}
+              type="button"
+              size="lg"
+              className={cn(
+                "w-full min-h-14 gap-2 text-base font-bold touch-manipulation",
+                "bg-emerald-600 hover:bg-emerald-700 text-white",
+              )}
+              disabled={busy !== null}
+              onClick={() => void run("atendido", () => onMarkEntregada(c.id))}
             >
-              <Check className="h-4 w-4" />
-              Lista para servir
+              <Check className="h-5 w-5" />
+              {busy === "atendido" ? "Marcando…" : "Atendido"}
             </Button>
           )}
-          {c.status === "lista" && (
-            <Button
-              size="sm"
-              variant="secondary"
-              className="gap-2"
-              onClick={() => onMarkEntregada(c.id)}
-            >
-              <Check className="h-4 w-4" />
-              Entregada
-            </Button>
-          )}
-          <ComandaViewDialog comanda={c} trigger="print" iconOnly size="sm" variant="outline" />
+          <div className="flex flex-wrap gap-2">
+            <ComandaViewDialog comanda={c} iconOnly={compact} label={compact ? "Ver" : "Ver comanda"} />
+            {c.status === "pendiente" && (
+              <Button
+                type="button"
+                size={compact ? "default" : "lg"}
+                variant="secondary"
+                className="flex-1 min-h-11 gap-2 touch-manipulation"
+                disabled={busy !== null}
+                onClick={() => void run("lista", () => onMarkLista(c.id))}
+              >
+                <Package className="h-4 w-4" />
+                {busy === "lista" ? "…" : "Lista (mesero)"}
+              </Button>
+            )}
+            <ComandaViewDialog comanda={c} trigger="print" iconOnly size="sm" variant="outline" />
+          </div>
         </div>
       </CardContent>
     </Card>

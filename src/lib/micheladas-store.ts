@@ -367,46 +367,42 @@ export function useComandas() {
       }
     },
     updateStatus: async (id: string, status: Comanda["status"]) => {
-      const mesaIdOf = () => getCachedComandas().find((x) => x.id === id)?.mesaId;
+      const before = getCachedComandas().find((x) => x.id === id);
+      const mesaIdOf = () => before?.mesaId ?? getCachedComandas().find((x) => x.id === id)?.mesaId;
 
-      if (!getStoredSession()) {
-        const all = getCachedComandas()
-          .map((c) => (c.id === id ? { ...c, status } : c))
-          .sort(sortComandasByQueue);
-        setCachedComandas(all);
-        setComandas(all);
-        if (status === "entregada") maybeLiberarMesaLocally(mesaIdOf(), DEFAULT_MESAS);
-        return;
-      }
+      // Optimista: la barra debe ver el cambio al instante.
+      patchComandaInCache(id, { status });
+      setComandas((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status } : c)).sort(sortComandasByQueue),
+      );
+      if (status === "entregada") maybeLiberarMesaLocally(mesaIdOf(), DEFAULT_MESAS);
 
-      const applyLocal = () => {
-        const mesaId = mesaIdOf();
-        patchComandaInCache(id, { status });
-        enqueueOp({ type: "comanda:patch", comandaId: id, patch: { status } });
-        setComandas((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, status } : c)).sort(sortComandasByQueue),
-        );
-        if (status === "entregada") maybeLiberarMesaLocally(mesaId, DEFAULT_MESAS);
-      };
+      if (!getStoredSession()) return;
 
       if (!shouldSyncWithServer()) {
-        applyLocal();
+        enqueueOp({ type: "comanda:patch", comandaId: id, patch: { status } });
         return;
       }
 
       try {
-        const before = getCachedComandas().find((x) => x.id === id);
         const updated = await patchComandaApi(id, { status });
         mergeComandaInCache(updated);
         setComandas((prev) =>
           prev.map((c) => (c.id === id ? updated : c)).sort(sortComandasByQueue),
         );
-        if (status === "entregada") {
-          maybeLiberarMesaLocally(updated.mesaId ?? before?.mesaId, DEFAULT_MESAS);
-        }
       } catch (err) {
-        if (isNetworkFailure(err)) applyLocal();
-        else throw err;
+        if (isNetworkFailure(err)) {
+          enqueueOp({ type: "comanda:patch", comandaId: id, patch: { status } });
+          return;
+        }
+        // Revertir si el servidor rechazó el cambio.
+        if (before) {
+          mergeComandaInCache(before);
+          setComandas((prev) =>
+            prev.map((c) => (c.id === id ? before : c)).sort(sortComandasByQueue),
+          );
+        }
+        throw err;
       }
     },
     remove: async (id: string) => {
