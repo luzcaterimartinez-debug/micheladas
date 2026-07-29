@@ -5,6 +5,7 @@ import type { FaseOpcion } from "@/lib/fases";
 import type { Addition, Comanda, MicheladaType, OrderItem } from "@/lib/micheladas-store";
 import { isAppOnline } from "@/lib/offline/network";
 import { getPendingCount } from "@/lib/offline/outbox";
+import { armMeseroFreshStart } from "@/lib/ticket-print-session";
 
 export type BarraOrderPayload = {
   cliente: string;
@@ -24,6 +25,8 @@ type SendDeps = {
   reloadInventario: () => Promise<void>;
   adiciones: Addition[];
   faseOpciones: FaseOpcion[];
+  /** Limpia carrito / wizard justo antes de ir a /ticket (evita reenvíos con atrás). */
+  beforeOpenTicket?: () => void;
 };
 
 export type SendToBarraResult =
@@ -49,6 +52,9 @@ export async function sendToBarraAndOpenTicket(
     } else {
       void deps.reloadInventario();
     }
+
+    armMeseroFreshStart();
+    deps.beforeOpenTicket?.();
 
     const opened = openComandaTicketView(comanda, productos, false);
     if (!opened) {

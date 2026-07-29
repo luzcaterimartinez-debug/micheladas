@@ -109,14 +109,14 @@ function TicketPrintPage() {
           `,
         }}
       />
-      <p id="ticket-print-hint">Comanda enviada. Imprime el ticket o vuelve a la app.</p>
+      <p id="ticket-print-hint">Comanda enviada. Imprime el ticket o vuelve para tomar otro pedido.</p>
       <div dangerouslySetInnerHTML={{ __html: body }} />
       <div id="ticket-print-actions">
         <button type="button" className="primary" onClick={() => window.print()}>
           Imprimir comanda
         </button>
         <button type="button" onClick={handleBack}>
-          Volver a la app
+          Nuevo pedido
         </button>
       </div>
     </div>

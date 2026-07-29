@@ -29,7 +29,11 @@ import { MeseroPasoFase } from "@/components/mesero/MeseroPasoFase";
 import { MeseroPasoMesa } from "@/components/mesero/MeseroPasoMesa";
 import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
 import { sendToBarraAndOpenTicket } from "@/lib/send-to-barra";
-import { consumeMeseroCartRestore } from "@/lib/ticket-print-session";
+import {
+  clearMeseroFreshStart,
+  consumeMeseroCartRestore,
+  shouldForceMeseroFreshStart,
+} from "@/lib/ticket-print-session";
 import { isFasePaso, opcionesForFase, parseFaseIdFromPaso } from "@/lib/fases";
 import { getStoredSession } from "@/lib/auth";
 import { getComandasListas, getMesaActivity, isMesaVirtual } from "@/lib/pos-utils";
@@ -84,13 +88,47 @@ export function MeseroOrderWizard() {
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [sending, setSending] = useState(false);
 
+  function resetCompletedOrder() {
+    setCart([]);
+    setCliente("");
+    setMesaId("");
+    setMesaDetalleId(null);
+    setSelectedCategoriaIds([]);
+    setSelectedId("");
+    setProductPicks([]);
+    setBatchPicks([]);
+    setBatchToppingsById({});
+    setBatchAdditionsById({});
+    setFaseQueue([]);
+    setToppings([]);
+    setNotes("");
+    setItemQuantity(1);
+    setSending(false);
+    setCurrentStep("mesa");
+  }
+
   useEffect(() => {
+    if (shouldForceMeseroFreshStart()) {
+      resetCompletedOrder();
+      return;
+    }
     const restored = consumeMeseroCartRestore();
     if (!restored) return;
     setCart(restored.cart);
     setCliente(restored.cliente);
     setMesaId(restored.mesaId);
     if (restored.cart.length > 0) setCurrentStep("carrito");
+  }, []);
+
+  // Si el mesero usa "atrás" del navegador (bfcache), no reabrir el pedido ya enviado.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted && shouldForceMeseroFreshStart()) {
+        resetCompletedOrder();
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
 
   const categoriasActivas = useMemo(
@@ -187,6 +225,7 @@ export function MeseroOrderWizard() {
   const mesaDetalle = mesas.find((m) => m.id === mesaDetalleId);
 
   function continueToCliente(id: string) {
+    clearMeseroFreshStart();
     setMesaId(id);
     setMesaDetalleId(null);
     if (id === MESA_LLEVAR_ID) setCliente((c) => c || "Para llevar");
@@ -442,29 +481,28 @@ export function MeseroOrderWizard() {
       if (cart.length === 0) toast.error("Agrega al menos una michelada");
       return;
     }
+    const snapshot = {
+      cliente: cliente.trim() || "Cliente",
+      mesaId: mesaId || undefined,
+      mesa: mesaSeleccionada?.nombre,
+      items: cart,
+      total: cartTotal,
+      clientId: crypto.randomUUID(),
+    };
     void (async () => {
       setSending(true);
-      const clientId = crypto.randomUUID();
-      const result = await sendToBarraAndOpenTicket(
-        {
-          cliente: cliente.trim() || "Cliente",
-          mesaId: mesaId || undefined,
-          mesa: mesaSeleccionada?.nombre,
-          items: cart,
-          total: cartTotal,
-          clientId,
+      const result = await sendToBarraAndOpenTicket(snapshot, productos, {
+        addComanda,
+        decrementBatch,
+        reloadInventario,
+        adiciones,
+        faseOpciones,
+        beforeOpenTicket: () => {
+          resetCompletedOrder();
         },
-        productos,
-        {
-          addComanda,
-          decrementBatch,
-          reloadInventario,
-          adiciones,
-          faseOpciones,
-        },
-      );
-      setSending(false);
+      });
       if (!result.ok) {
+        setSending(false);
         toast.error(result.error);
         return;
       }

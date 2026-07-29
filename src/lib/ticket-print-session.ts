@@ -7,6 +7,8 @@ export const PRINT_RETURN_URL_KEY = "michelada-print-return-url";
 export const PRINT_AUTO_KEY = "michelada-print-auto";
 export const PENDING_BARRA_ORDER_KEY = "michelada-pending-barra-order";
 export const MESERO_CART_RESTORE_KEY = "michelada-mesero-cart-restore";
+/** Tras enviar a barra: al volver (o bfcache/atrás) no restaurar el pedido anterior. */
+export const MESERO_FRESH_START_KEY = "michelada-mesero-fresh-start";
 
 export type PendingBarraOrder = {
   cliente: string;
@@ -52,7 +54,8 @@ export function openComandaTicketPage(
       sessionStorage.removeItem(PENDING_BARRA_ORDER_KEY);
     }
 
-    if (options?.cartRestore) {
+    // Nunca restaurar carrito tras un envío exitoso (evita pedidos duplicados).
+    if (options?.cartRestore && !shouldForceMeseroFreshStart()) {
       sessionStorage.setItem(MESERO_CART_RESTORE_KEY, JSON.stringify(options.cartRestore));
     } else {
       sessionStorage.removeItem(MESERO_CART_RESTORE_KEY);
@@ -90,8 +93,31 @@ export function clearPendingBarraOrder(): void {
   sessionStorage.removeItem(MESERO_CART_RESTORE_KEY);
 }
 
+/** Marca que el pedido ya se envió: al volver no se reabre el carrito anterior. */
+export function armMeseroFreshStart(): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(MESERO_FRESH_START_KEY, "1");
+  sessionStorage.removeItem(MESERO_CART_RESTORE_KEY);
+  sessionStorage.removeItem(PENDING_BARRA_ORDER_KEY);
+}
+
+export function shouldForceMeseroFreshStart(): boolean {
+  if (typeof window === "undefined") return false;
+  return sessionStorage.getItem(MESERO_FRESH_START_KEY) === "1";
+}
+
+/** El mesero eligió mesa / empezó un pedido nuevo a propósito. */
+export function clearMeseroFreshStart(): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(MESERO_FRESH_START_KEY);
+}
+
 export function consumeMeseroCartRestore(): MeseroCartRestore | null {
   if (typeof window === "undefined") return null;
+  if (shouldForceMeseroFreshStart()) {
+    sessionStorage.removeItem(MESERO_CART_RESTORE_KEY);
+    return null;
+  }
   try {
     const raw = sessionStorage.getItem(MESERO_CART_RESTORE_KEY);
     if (!raw) return null;

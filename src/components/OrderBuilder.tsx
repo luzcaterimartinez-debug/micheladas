@@ -19,7 +19,11 @@ import {
 } from "@/components/ui/select";
 import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
 import { sendToBarraAndOpenTicket } from "@/lib/send-to-barra";
-import { consumeMeseroCartRestore } from "@/lib/ticket-print-session";
+import {
+  clearMeseroFreshStart,
+  consumeMeseroCartRestore,
+  shouldForceMeseroFreshStart,
+} from "@/lib/ticket-print-session";
 import { useMenu } from "@/lib/menu-context";
 import { QuantityStepper } from "@/components/QuantityStepper";
 import {
@@ -47,12 +51,38 @@ export function OrderBuilder() {
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [sending, setSending] = useState(false);
 
+  function resetCompletedOrder() {
+    setCart([]);
+    setCliente("");
+    setMesaId("__none__");
+    setSelectedId("");
+    setToppings([]);
+    setAdditionPicks([]);
+    setNotes("");
+    setItemQuantity(1);
+    setSending(false);
+  }
+
   useEffect(() => {
+    if (shouldForceMeseroFreshStart()) {
+      resetCompletedOrder();
+      return;
+    }
     const restored = consumeMeseroCartRestore();
     if (!restored) return;
     setCart(restored.cart);
     setCliente(restored.cliente);
     setMesaId(restored.mesaId || "__none__");
+  }, []);
+
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted && shouldForceMeseroFreshStart()) {
+        resetCompletedOrder();
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
 
   const activeId = selectedId || productos[0]?.id || "";
@@ -135,29 +165,28 @@ export function OrderBuilder() {
       if (cart.length === 0) toast.error("Agrega al menos una michelada");
       return;
     }
+    const snapshot = {
+      cliente: cliente.trim() || "Cliente",
+      mesaId: mesaId !== "__none__" ? mesaId : undefined,
+      mesa: mesaNombre,
+      items: cart,
+      total: cartTotal,
+      clientId: crypto.randomUUID(),
+    };
     void (async () => {
       setSending(true);
-      const clientId = crypto.randomUUID();
-      const result = await sendToBarraAndOpenTicket(
-        {
-          cliente: cliente.trim() || "Cliente",
-          mesaId: mesaId !== "__none__" ? mesaId : undefined,
-          mesa: mesaNombre,
-          items: cart,
-          total: cartTotal,
-          clientId,
+      const result = await sendToBarraAndOpenTicket(snapshot, productos, {
+        addComanda,
+        decrementBatch,
+        reloadInventario,
+        adiciones,
+        faseOpciones,
+        beforeOpenTicket: () => {
+          resetCompletedOrder();
         },
-        productos,
-        {
-          addComanda,
-          decrementBatch,
-          reloadInventario,
-          adiciones,
-          faseOpciones,
-        },
-      );
-      setSending(false);
+      });
       if (!result.ok) {
+        setSending(false);
         toast.error(result.error);
         return;
       }
@@ -368,7 +397,13 @@ export function OrderBuilder() {
           </div>
           <div>
             <Label>Mesa</Label>
-            <Select value={mesaId} onValueChange={setMesaId}>
+            <Select
+              value={mesaId}
+              onValueChange={(v) => {
+                clearMeseroFreshStart();
+                setMesaId(v);
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Sin asignar" />
               </SelectTrigger>
