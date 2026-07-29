@@ -1,16 +1,27 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useComandas, useInventory, useMesas } from "@/lib/micheladas-store";
 import { isMesaVirtual } from "@/lib/pos-utils";
 import { fetchCajaResumen, type CajaResumen } from "@/lib/caja-api";
 import { localDateIso } from "@/lib/local-date";
-import { AlertTriangle, ClipboardList, DollarSign, Users, Package } from "lucide-react";
+import { AlertTriangle, ClipboardList, DollarSign, Loader2, Package, RefreshCw, Users } from "lucide-react";
 
 export function AdminDashboard() {
-  const { comandas } = useComandas();
-  const { items } = useInventory();
-  const { mesas } = useMesas();
+  const { comandas, reload: reloadComandas } = useComandas();
+  const { items, reload: reloadInventario } = useInventory();
+  const { mesas, reload: reloadMesas } = useMesas();
   const [cajaHoy, setCajaHoy] = useState<CajaResumen | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadCaja = useCallback(async () => {
+    try {
+      const r = await fetchCajaResumen(localDateIso());
+      setCajaHoy(r);
+    } catch {
+      setCajaHoy(null);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,6 +36,16 @@ export function AdminDashboard() {
       cancelled = true;
     };
   }, [comandas.length]);
+
+  async function handleRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await Promise.all([reloadComandas(), reloadInventario(), reloadMesas(), loadCaja()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   const ventasHoy = (cajaHoy?.ventasPagadas ?? 0) + (cajaHoy?.ventasPendientes ?? 0);
   const comandasHoy =
@@ -76,9 +97,25 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Resumen del día</h2>
-        <p className="text-sm text-muted-foreground">Vista general de operación e inventario</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Resumen del día</h2>
+          <p className="text-sm text-muted-foreground">Vista general de operación e inventario</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11 gap-2 touch-manipulation shrink-0"
+          disabled={refreshing}
+          onClick={() => void handleRefresh()}
+        >
+          {refreshing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
+          {refreshing ? "Actualizando…" : "Actualizar"}
+        </Button>
       </div>
 
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
