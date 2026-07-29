@@ -4,6 +4,7 @@ import { PosHeader } from "@/components/PosHeader";
 import { toast } from "sonner";
 
 import { BarraAutoPrintBanner } from "@/components/barra/BarraAutoPrintBanner";
+import { BarraClientesAtender } from "@/components/barra/BarraClientesAtender";
 import { BarraComandaCard } from "@/components/barra/BarraComandaCard";
 import {
   isAutoPrintEnabled,
@@ -141,166 +142,180 @@ export function BarraPanel({ userName, onLogout }: BarraPanelProps) {
           printedCount={printedCount}
         />
 
-        {/* Escritorio: columnas kanban */}
-        <div className="hidden lg:grid lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          <section>
-            <ColumnHeader
-              title="Por preparar"
-              count={pendientes.length}
-              icon={Clock}
-              accent={pendientes.length > 0}
-            />
-            {emptyPendientes ? (
-              <div className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">
-                <RefreshCw className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                <p className="text-sm">Sin pedidos pendientes</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {pendientes.map((c) => (
-                  <BarraComandaCard
-                    key={c.id}
-                    comanda={c}
-                    onMarkLista={markLista}
-                    onMarkEntregada={markEntregada}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+        <BarraClientesAtender
+          comandas={comandas}
+          onMarkEntregada={markEntregada}
+          onMarkLista={markLista}
+        />
 
-          <section>
-            <ColumnHeader title="Listas para mesero" count={listas.length} icon={Package} />
-            {listas.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8 border border-dashed rounded-xl">
-                Nada listo aún
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {listas.map((c) => (
-                  <BarraComandaCard
-                    key={c.id}
-                    comanda={c}
-                    onMarkLista={markLista}
-                    onMarkEntregada={markEntregada}
-                    compact
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="xl:block hidden">
-            <ColumnHeader title="Entregadas hoy" count={entregadas.length} icon={Check} />
-            {entregadas.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">—</p>
-            ) : (
-              <div className="space-y-3 max-h-[70vh] overflow-y-auto">
-                {entregadas.map((c) => (
-                  <BarraComandaCard
-                    key={c.id}
-                    comanda={c}
-                    onMarkLista={markLista}
-                    onMarkEntregada={markEntregada}
-                    compact
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-
-        {/* Móvil / tablet */}
-        <div className="lg:hidden">
-          <Tabs value={mobileTab} onValueChange={(v) => setMobileTab(v as FilterTab)}>
-            <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="activas" className="gap-1 text-xs sm:text-sm">
-                <Clock className="h-3.5 w-3.5" />
-                Cola ({pendientes.length})
-              </TabsTrigger>
-              <TabsTrigger value="listas" className="gap-1 text-xs sm:text-sm">
-                <Package className="h-3.5 w-3.5" />
-                Listas ({listas.length})
-              </TabsTrigger>
-              <TabsTrigger value="historial" className="gap-1 text-xs sm:text-sm">
-                <Check className="h-3.5 w-3.5" />
-                Hechas
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="activas" className="space-y-4 mt-0">
-              {pendientes.length === 0 ? (
-                <p className="text-center text-muted-foreground py-12">Sin pedidos en cola</p>
-              ) : (
-                pendientes.map((c) => (
-                  <BarraComandaCard
-                    key={c.id}
-                    comanda={c}
-                    onMarkLista={markLista}
-                    onMarkEntregada={markEntregada}
-                  />
-                ))
-              )}
-            </TabsContent>
-
-            <TabsContent value="listas" className="space-y-4 mt-0">
-              {listas.length === 0 ? (
-                <p className="text-center text-muted-foreground py-12">Sin comandas listas</p>
-              ) : (
-                listas.map((c) => (
-                  <BarraComandaCard
-                    key={c.id}
-                    comanda={c}
-                    onMarkLista={markLista}
-                    onMarkEntregada={markEntregada}
-                    compact
-                  />
-                ))
-              )}
-            </TabsContent>
-
-            <TabsContent value="historial" className="space-y-3 mt-0">
-              {entregadas.length === 0 ? (
-                <p className="text-center text-muted-foreground py-12">Sin entregas recientes</p>
-              ) : (
-                entregadas.map((c) => (
-                  <BarraComandaCard
-                    key={c.id}
-                    comanda={c}
-                    onMarkLista={markLista}
-                    onMarkEntregada={markEntregada}
-                    compact
-                  />
-                ))
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        {/* Historial en pantallas medianas */}
-        <div className="hidden md:block lg:hidden mt-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full"
-            onClick={() => setShowHistorial((v) => !v)}
-          >
-            {showHistorial ? "Ocultar" : "Ver"} entregadas ({entregadas.length})
-          </Button>
-          {showHistorial && (
-            <div className="mt-3 space-y-3">
-              {entregadas.map((c) => (
-                <BarraComandaCard
-                  key={c.id}
-                  comanda={c}
-                  onMarkLista={markLista}
-                  onMarkEntregada={markEntregada}
-                  compact
+        {/* Detalle de preparación (opcional) */}
+        <details className="rounded-xl border bg-card group">
+          <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-4 py-3 font-semibold text-sm flex items-center justify-between gap-2 touch-manipulation">
+            <span>Detalle de preparación</span>
+            <span className="text-xs font-normal text-muted-foreground">
+              {pendientes.length} por preparar · {listas.length} listas
+            </span>
+          </summary>
+          <div className="px-4 pb-4 space-y-4 border-t">
+            <div className="hidden lg:grid lg:grid-cols-2 xl:grid-cols-3 gap-6 pt-4">
+              <section>
+                <ColumnHeader
+                  title="Por preparar"
+                  count={pendientes.length}
+                  icon={Clock}
+                  accent={pendientes.length > 0}
                 />
-              ))}
+                {emptyPendientes ? (
+                  <div className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">
+                    <RefreshCw className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Sin pedidos pendientes</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {pendientes.map((c) => (
+                      <BarraComandaCard
+                        key={c.id}
+                        comanda={c}
+                        onMarkLista={markLista}
+                        onMarkEntregada={markEntregada}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section>
+                <ColumnHeader title="Listas para mesero" count={listas.length} icon={Package} />
+                {listas.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8 border border-dashed rounded-xl">
+                    Nada listo aún
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {listas.map((c) => (
+                      <BarraComandaCard
+                        key={c.id}
+                        comanda={c}
+                        onMarkLista={markLista}
+                        onMarkEntregada={markEntregada}
+                        compact
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="xl:block hidden">
+                <ColumnHeader title="Entregadas hoy" count={entregadas.length} icon={Check} />
+                {entregadas.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">—</p>
+                ) : (
+                  <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+                    {entregadas.map((c) => (
+                      <BarraComandaCard
+                        key={c.id}
+                        comanda={c}
+                        onMarkLista={markLista}
+                        onMarkEntregada={markEntregada}
+                        compact
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
-          )}
-        </div>
+
+            <div className="lg:hidden pt-4">
+              <Tabs value={mobileTab} onValueChange={(v) => setMobileTab(v as FilterTab)}>
+                <TabsList className="grid w-full grid-cols-3 mb-4">
+                  <TabsTrigger value="activas" className="gap-1 text-xs sm:text-sm">
+                    <Clock className="h-3.5 w-3.5" />
+                    Cola ({pendientes.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="listas" className="gap-1 text-xs sm:text-sm">
+                    <Package className="h-3.5 w-3.5" />
+                    Listas ({listas.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="historial" className="gap-1 text-xs sm:text-sm">
+                    <Check className="h-3.5 w-3.5" />
+                    Hechas
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="activas" className="space-y-4 mt-0">
+                  {pendientes.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-12">Sin pedidos en cola</p>
+                  ) : (
+                    pendientes.map((c) => (
+                      <BarraComandaCard
+                        key={c.id}
+                        comanda={c}
+                        onMarkLista={markLista}
+                        onMarkEntregada={markEntregada}
+                      />
+                    ))
+                  )}
+                </TabsContent>
+
+                <TabsContent value="listas" className="space-y-4 mt-0">
+                  {listas.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-12">Sin comandas listas</p>
+                  ) : (
+                    listas.map((c) => (
+                      <BarraComandaCard
+                        key={c.id}
+                        comanda={c}
+                        onMarkLista={markLista}
+                        onMarkEntregada={markEntregada}
+                        compact
+                      />
+                    ))
+                  )}
+                </TabsContent>
+
+                <TabsContent value="historial" className="space-y-3 mt-0">
+                  {entregadas.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-12">Sin entregas recientes</p>
+                  ) : (
+                    entregadas.map((c) => (
+                      <BarraComandaCard
+                        key={c.id}
+                        comanda={c}
+                        onMarkLista={markLista}
+                        onMarkEntregada={markEntregada}
+                        compact
+                      />
+                    ))
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            <div className="hidden md:block lg:hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowHistorial((v) => !v)}
+              >
+                {showHistorial ? "Ocultar" : "Ver"} entregadas ({entregadas.length})
+              </Button>
+              {showHistorial && (
+                <div className="mt-3 space-y-3">
+                  {entregadas.map((c) => (
+                    <BarraComandaCard
+                      key={c.id}
+                      comanda={c}
+                      onMarkLista={markLista}
+                      onMarkEntregada={markEntregada}
+                      compact
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </details>
       </main>
     </div>
   );
