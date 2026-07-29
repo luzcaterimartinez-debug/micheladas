@@ -237,8 +237,19 @@ export function MeseroOrderWizard() {
   }
 
   function selectMesa(id: string) {
-    // Para llevar / barra: siempre pedido nuevo (no atrapar en actividad).
-    if (isMesaVirtual(id)) {
+    // Para llevar: siempre pedido nuevo (mostrador sin asiento).
+    if (id === MESA_LLEVAR_ID) {
+      continueToCliente(id);
+      return;
+    }
+    // Barra: si hay pedidos activos, mostrar clientes para atender; si no, pedido nuevo.
+    if (id === "barra") {
+      const activity = getMesaActivity(id, comandas);
+      setMesaId(id);
+      if (activity.activas.length > 0) {
+        setMesaDetalleId(id);
+        return;
+      }
       continueToCliente(id);
       return;
     }

@@ -67,6 +67,7 @@ function MesaTile({
   const meta = MESA_META[isSpecial ? "libre" : mesa.estado];
   const activity = getMesaActivity(mesa.id, comandas);
   const hasLista = activity.listas > 0;
+  const hasActivas = activity.activas.length > 0;
 
   return (
     <button
@@ -81,7 +82,9 @@ function MesaTile({
         isSpecial && "min-h-[4.25rem]",
       )}
       style={{
-        border: `3px solid ${meta.border}`,
+        border: `3px solid ${
+          isSpecial && hasActivas ? "#1e88e5" : meta.border
+        }`,
         boxShadow: selected
           ? `0 8px 24px rgba(0,0,0,0.12)`
           : `0 6px 18px rgba(0,0,0,0.08)`,
@@ -92,7 +95,10 @@ function MesaTile({
       )}
       <div className="flex items-center gap-2.5 min-w-0 pr-4">
         <span
-          className={cn("h-2.5 w-2.5 shrink-0 rounded-full", meta.dot)}
+          className={cn(
+            "h-2.5 w-2.5 shrink-0 rounded-full",
+            isSpecial && hasActivas ? "bg-[#1e88e5]" : meta.dot,
+          )}
           aria-hidden
         />
         <div className="min-w-0">
@@ -109,21 +115,45 @@ function MesaTile({
       <div className="flex items-end justify-between gap-2 pl-[18px]">
         <div className="min-w-0">
           <span className="text-[10px] text-slate-500 font-semibold uppercase">
-            {isSpecial ? "Disponible" : meta.label}
+            {isSpecial
+              ? hasActivas
+                ? `${activity.activas.length} pedido${activity.activas.length === 1 ? "" : "s"}`
+                : "Nuevo pedido"
+              : meta.label}
           </span>
           {!isSpecial && mesa.cliente && (
             <p className="text-xs font-semibold truncate mt-0.5 text-slate-800">{mesa.cliente}</p>
           )}
+          {isSpecial && hasActivas && (
+            <p className="text-[10px] text-slate-600 mt-0.5 font-medium">
+              Toca para atender o agregar
+            </p>
+          )}
         </div>
-        {activity.activas.length > 0 && (
+        {hasActivas && (
           <span className="text-xs font-bold tabular-nums text-slate-700 shrink-0">
             ${activity.totalCuenta}
           </span>
         )}
       </div>
-      <div className="pl-[18px]">
-        <MesaCardActivityBadges activity={activity} />
-      </div>
+      {!isSpecial && (
+        <div className="pl-[18px]">
+          <MesaCardActivityBadges activity={activity} />
+        </div>
+      )}
+      {isSpecial && hasActivas && (
+        <div className="pl-[18px] text-[10px] text-slate-500">
+          {activity.pendientes > 0 && (
+            <span>{activity.pendientes} en preparación</span>
+          )}
+          {activity.pendientes > 0 && activity.listas > 0 && <span> · </span>}
+          {activity.listas > 0 && (
+            <span className="text-emerald-600 font-medium">
+              {activity.listas} listo{activity.listas === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+      )}
     </button>
   );
 }

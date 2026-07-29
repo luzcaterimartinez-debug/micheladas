@@ -36,7 +36,7 @@ export function MeseroMesaActividad({
   async function entregar(c: Comanda) {
     try {
       await onMarcarEntregada(c.id);
-      toast.success(`Comanda #${c.folio} entregada`);
+      toast.success(`${c.cliente} · #${c.folio} atendido`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al actualizar");
     }
@@ -49,7 +49,7 @@ export function MeseroMesaActividad({
           <p className="font-bold text-lg">{mesaNombre}</p>
           <p className="text-sm text-muted-foreground">
             {activity.activas.length} pedido{activity.activas.length === 1 ? "" : "s"} activo
-            {activity.activas.length === 1 ? "" : "s"}{" "}
+            {activity.activas.length === 1 ? "" : "s"}
             {activity.totalCuenta > 0 && (
               <span className="font-semibold text-foreground"> · ${activity.totalCuenta}</span>
             )}
@@ -102,17 +102,15 @@ export function MeseroMesaActividad({
               </div>
               <div className="flex gap-2">
                 <ComandaViewDialog comanda={c} size="sm" variant="ghost" label="Detalle" />
-                {c.status === "lista" && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="gap-1 flex-1 min-w-[8rem]"
-                    onClick={() => void entregar(c)}
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                    Marcar entregada
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  className="gap-1 flex-1 min-h-11 min-w-[8rem] font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => void entregar(c)}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Atendido
+                </Button>
               </div>
             </li>
           );
