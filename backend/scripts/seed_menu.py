@@ -14,8 +14,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import get_db
 from app.services.inventario import ensure_inventario_seeded, sync_consumo_producto
+from scripts.migrate_fase_cerveza import ensure_fase_cerveza
 
 PASOS = json.dumps(["notas"])
+PASOS_CERVEZA = json.dumps(["fase:cerveza", "notas"])
 
 BASES = [
     ("ginger", "Ginger"),
@@ -119,7 +121,9 @@ def _upsert_producto(
     descripcion: str,
     categoria_id: str,
     orden: int,
+    pasos: str | None = None,
 ) -> None:
+    pasos_json = pasos if pasos is not None else PASOS
     cursor.execute(
         """
         INSERT INTO menu_productos (id, nombre, precio, descripcion, activo, orden, pasos, categoria_id)
@@ -133,7 +137,7 @@ def _upsert_producto(
           categoria_id = VALUES(categoria_id),
           activo = 1
         """,
-        (pid, nombre, precio, descripcion, orden, PASOS, categoria_id),
+        (pid, nombre, precio, descripcion, orden, pasos_json, categoria_id),
     )
 
 
@@ -181,6 +185,7 @@ def main() -> None:
                     descripcion=desc or nombre,
                     categoria_id=cat_id,
                     orden=i + 1,
+                    pasos=PASOS_CERVEZA if base_id == "cerveza" else PASOS,
                 )
                 productos += 1
 
@@ -262,9 +267,11 @@ def main() -> None:
                 [{"clave": c, "cantidad": q} for c, q in consumo],
             )
 
+        n_cerv = ensure_fase_cerveza(cursor)
+
     print(
         f"Menú Michelandia: {productos} productos, {len(ADICIONES)} adiciones, "
-        f"{len(BEBIDAS)} bebidas, consumo sincronizado."
+        f"{len(BEBIDAS)} bebidas, fase cerveza ({n_cerv} productos), consumo sincronizado."
     )
 
 

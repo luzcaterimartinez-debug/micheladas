@@ -120,6 +120,21 @@ describe("buildOrderDeductions", () => {
         description: "",
         faseOpciones: [],
       },
+      {
+        id: "tradicional_cerveza",
+        name: "Tradicional · Cerveza",
+        price: 11000,
+        description: "",
+        faseOpciones: [
+          {
+            id: "tipo_corona",
+            name: "Corona",
+            faseId: "cerveza",
+            stockKey: "corona",
+            cantidad: 1,
+          },
+        ],
+      },
     ];
     const cart: OrderItem[] = [
       {
@@ -140,11 +155,21 @@ describe("buildOrderDeductions", () => {
         additions: [],
         total: 14000,
       },
+      {
+        id: "3",
+        micheladaId: "tradicional_cerveza",
+        micheladaName: "Tradicional · Cerveza",
+        basePrice: 11000,
+        selectedToppings: ["tipo_corona"],
+        additions: [],
+        total: 11000,
+      },
     ];
     const totals = buildOrderDeductions(cart, adiciones, michelandia, []);
     expect(totals.ginger).toBe(1);
     expect(totals.soda).toBe(1);
-    expect(totals.limon).toBe(4);
+    expect(totals.limon).toBe(6);
+    expect(totals.corona).toBe(1);
     expect(totals.cerveza).toBeUndefined();
   });
 

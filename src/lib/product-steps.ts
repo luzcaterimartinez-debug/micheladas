@@ -64,7 +64,7 @@ export function buildMeseroSteps(
   return flow;
 }
 
-/** Flujo en lote: fases del producto actual (si aplica) + adiciones compartidas → carrito. */
+/** Flujo en lote: fases del producto actual (si aplica) + adiciones + notas → carrito. */
 export function buildBatchMeseroSteps(
   michelada: Pick<MicheladaType, "pasos" | "faseOpciones"> | undefined,
   faseIds?: string[],
@@ -76,7 +76,7 @@ export function buildBatchMeseroSteps(
       if (isFasePaso(s)) flow.push(s);
     }
   }
-  flow.push("adiciones", "carrito");
+  flow.push("adiciones", "notas", "carrito");
   return flow;
 }
 

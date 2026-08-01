@@ -14,6 +14,9 @@ type Props = {
   opciones: FaseOpcion[];
   selectedIds: string[];
   onToggle: (opcionId: string) => void;
+  /** Una sola opción (p. ej. tipo de cerveza). */
+  singleSelect?: boolean;
+  required?: boolean;
 };
 
 export function MeseroPasoFase({
@@ -22,12 +25,18 @@ export function MeseroPasoFase({
   opciones,
   selectedIds,
   onToggle,
+  singleSelect = false,
+  required = false,
 }: Props) {
   return (
     <div className="space-y-4">
       <MeseroStepHeader
         title={faseName}
-        description={`Opcional: elige ${faseName.toLowerCase()} para ${productoName}, o continúa sin seleccionar.`}
+        description={
+          required
+            ? `Elige ${faseName.toLowerCase()} para ${productoName}.`
+            : `Opcional: elige ${faseName.toLowerCase()} para ${productoName}, o continúa sin seleccionar.`
+        }
       />
 
       <ThemedPanel themeId="tradicional">

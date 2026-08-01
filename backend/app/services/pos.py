@@ -9,7 +9,11 @@ from fastapi import HTTPException, status
 from app.cache import cache_invalidate, query_cache
 from app.config import get_settings
 from app.database import fetch_all, fetch_one, get_db
-from app.services.inventario import apply_order_deductions, invalidate_inventario_cache
+from app.services.inventario import (
+    apply_order_deductions,
+    invalidate_inventario_cache,
+    restore_order_deductions,
+)
 from app.models.pos import (
     ComandaCreate,
     ComandaOut,
@@ -582,15 +586,58 @@ def create_comanda(body: ComandaCreate, mesero_id: int | None) -> ComandaOut:
         return _row_to_comanda(cursor, row)
 
 
+def _replace_comanda_items(cursor: Any, comanda_id: str, items: list[Any]) -> None:
+    old_items = _load_items(cursor, comanda_id)
+    if old_items:
+        restore_order_deductions(cursor, old_items)
+    cursor.execute("DELETE FROM comanda_items WHERE comanda_id = %s", (comanda_id,))
+    for i, item in enumerate(items):
+        cursor.execute(
+            """
+            INSERT INTO comanda_items (
+              id, comanda_id, producto_id, producto_nombre, tamano, precio_base, cantidad,
+              toppings_json, adiciones_json, notas, total, orden
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                item.id or str(uuid.uuid4()),
+                comanda_id,
+                item.micheladaId,
+                item.micheladaName,
+                item.size,
+                item.basePrice,
+                item.quantity,
+                json.dumps(item.selectedToppings),
+                json.dumps([a.model_dump() for a in item.additions]),
+                item.notes,
+                item.total,
+                i,
+            ),
+        )
+    apply_order_deductions(cursor, items)
+
+
 def update_comanda(comanda_id: str, patch: ComandaUpdate) -> ComandaOut:
     with get_db() as (conn, cursor):
         existing = fetch_one(
             cursor,
-            "SELECT id, mesa_id, status FROM comandas WHERE id = %s",
+            "SELECT id, mesa_id, status, pagado FROM comandas WHERE id = %s",
             (comanda_id,),
         )
         if not existing:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comanda no encontrada")
+
+        if patch.items is not None:
+            if existing.get("pagado"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No se puede editar un pedido ya cobrado",
+                )
+            if existing.get("status") == "entregada":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No se puede editar un pedido ya entregado",
+                )
 
         fields: list[str] = []
         params: list[Any] = []
@@ -606,6 +653,15 @@ def update_comanda(comanda_id: str, patch: ComandaUpdate) -> ComandaOut:
             params.append(mesa_id)
             fields.append("mesa_nombre = %s")
             params.append(mesa_nombre)
+        if patch.items is not None:
+            new_total = (
+                float(patch.total)
+                if patch.total is not None
+                else sum(float(it.total) for it in patch.items)
+            )
+            fields.append("total = %s")
+            params.append(new_total)
+            _replace_comanda_items(cursor, comanda_id, patch.items)
 
         if fields:
             params.append(comanda_id)
@@ -634,6 +690,8 @@ def update_comanda(comanda_id: str, patch: ComandaUpdate) -> ComandaOut:
                     )
 
         conn.commit()
+        if patch.items is not None:
+            invalidate_inventario_cache()
         row = fetch_one(
             cursor,
             f"""

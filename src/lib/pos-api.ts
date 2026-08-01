@@ -183,7 +183,14 @@ export async function createComandaApi(
 
 export async function patchComandaApi(
   id: string,
-  patch: { status?: Comanda["status"]; mesa?: string; mesaId?: string; cliente?: string },
+  patch: {
+    status?: Comanda["status"];
+    mesa?: string;
+    mesaId?: string;
+    cliente?: string;
+    items?: Comanda["items"];
+    total?: number;
+  },
 ): Promise<Comanda> {
   const res = await fetch(`${getApiUrl()}/api/comandas/${id}`, {
     method: "PATCH",

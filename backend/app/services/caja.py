@@ -142,12 +142,17 @@ def list_comandas_caja(*, fecha: date, pagado: bool | None = None) -> list[Coman
             """
             params: list[Any] = [start, end, start, end]
         elif pagado is False:
+            # Por cobrar: prioriza el día elegido, pero incluye otras sin cobrar
+            # (pedidos atendidos en barra que aún no se cobraron en caja).
             query = f"""
                 SELECT {COMANDAS_SELECT}
                 FROM comandas
                 WHERE pagado = 0
-                  AND creado_en >= %s AND creado_en < %s
-                ORDER BY orden_cola ASC, creado_en ASC
+                ORDER BY
+                  CASE WHEN creado_en >= %s AND creado_en < %s THEN 0 ELSE 1 END,
+                  orden_cola ASC,
+                  creado_en DESC
+                LIMIT 200
             """
             params = [start, end]
         else:

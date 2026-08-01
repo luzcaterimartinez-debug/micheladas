@@ -464,7 +464,7 @@ export function MeseroOrderWizard() {
       finishProductFasesAndContinue(toppings);
       return;
     }
-    if (step === "adiciones" && inBatch) {
+    if (step === "notas" && inBatch) {
       addBatchToCart();
       return;
     }
@@ -546,7 +546,13 @@ export function MeseroOrderWizard() {
       case "carrito":
         return cart.length > 0;
       default:
-        return isFasePaso(step);
+        if (!isFasePaso(step)) return false;
+        if (parseFaseIdFromPaso(step) === "cerveza") {
+          return toppings.some((id) =>
+            opcionesForFase(michelada!, "cerveza").some((o) => o.id === id),
+          );
+        }
+        return true;
     }
   }
 
@@ -657,16 +663,26 @@ export function MeseroOrderWizard() {
       {isFasePaso(step) && michelada && (() => {
         const faseId = parseFaseIdFromPaso(step)!;
         const faseName = fases.find((f) => f.id === faseId)?.name ?? faseId;
+        const opciones = opcionesForFase(michelada, faseId);
+        const isCerveza = faseId === "cerveza";
         return (
           <MeseroPasoFase
             faseName={faseName}
             productoName={michelada.name}
-            opciones={opcionesForFase(michelada, faseId)}
+            opciones={opciones}
             selectedIds={toppings}
+            singleSelect={isCerveza}
+            required={isCerveza}
             onToggle={(id) =>
-              setToppings((cur) =>
-                cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
-              )
+              setToppings((cur) => {
+                if (!isCerveza) {
+                  return cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+                }
+                const cervezaIds = new Set(opciones.map((o) => o.id));
+                const kept = cur.filter((x) => !cervezaIds.has(x));
+                if (cur.includes(id)) return kept;
+                return [...kept, id];
+              })
             }
           />
         );
@@ -776,9 +792,13 @@ export function MeseroOrderWizard() {
           <MeseroStepHeader
             title="Notas para barra"
             description={
-              michelada
-                ? `Instrucciones especiales para ${michelada.name} (opcional).`
-                : "Instrucciones especiales (opcional)."
+              inBatch
+                ? batchUnits > 1
+                  ? `Instrucciones especiales para los ${batchUnits} productos (opcional).`
+                  : "Instrucciones especiales para este producto (opcional)."
+                : michelada
+                  ? `Instrucciones especiales para ${michelada.name} (opcional).`
+                  : "Instrucciones especiales (opcional)."
             }
           />
           <ThemedPanel themeId="tradicional">
@@ -856,7 +876,7 @@ export function MeseroOrderWizard() {
                 onClick={handleContinue}
                 disabled={!canContinue()}
               >
-                {step === "adiciones" && inBatch
+                {step === "notas" && inBatch
                   ? batchUnits > 1
                     ? `Agregar ${batchUnits} al pedido`
                     : "Agregar al pedido"

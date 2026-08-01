@@ -63,7 +63,7 @@ function ColumnHeader({
 }
 
 export function BarraPanel({ userName, onLogout }: BarraPanelProps) {
-  const { comandas, updateStatus, reload } = useComandas();
+  const { comandas, updateStatus, updatePedido, reload } = useComandas();
   const { productos } = useMenu();
   const [autoPrint, setAutoPrint] = useState(isAutoPrintEnabled);
   const [mobileTab, setMobileTab] = useState<FilterTab>("activas");
@@ -115,6 +115,13 @@ export function BarraPanel({ userName, onLogout }: BarraPanelProps) {
     }
   }
 
+  async function handleUpdatePedido(
+    id: string,
+    patch: { cliente: string; items: Comanda["items"]; total: number },
+  ) {
+    await updatePedido(id, patch);
+  }
+
   const emptyPendientes = pendientes.length === 0;
 
   return (
@@ -146,6 +153,7 @@ export function BarraPanel({ userName, onLogout }: BarraPanelProps) {
           comandas={comandas}
           onMarkEntregada={markEntregada}
           onMarkLista={markLista}
+          onUpdatePedido={handleUpdatePedido}
         />
 
         {/* Detalle de preparación (opcional) */}

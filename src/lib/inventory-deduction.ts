@@ -28,6 +28,10 @@ function bebidaBaseFromProductoId(productoId: string): string | null {
 function defaultProductConsumo(productoId: string): ConsumoLine[] {
   if (BEBIDAS_CONSUMO[productoId]) return BEBIDAS_CONSUMO[productoId];
   const bebida = bebidaBaseFromProductoId(productoId);
+  if (bebida === "cerveza") {
+    // Marca vía fase "Tipo de cerveza"
+    return [{ clave: "limon", cantidad: 2 }];
+  }
   if (bebida) {
     return [
       { clave: bebida, cantidad: 1 },

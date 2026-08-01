@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMeseroSteps, getMeseroStepLabel } from "@/lib/product-steps";
+import { buildBatchMeseroSteps, buildMeseroSteps, getMeseroStepLabel } from "@/lib/product-steps";
 import type { Fase } from "@/lib/fases";
 import type { MicheladaType } from "@/lib/micheladas-store";
 
@@ -30,6 +30,13 @@ describe("product-steps", () => {
     expect(steps).not.toContain("fase:nectar");
     expect(steps).toContain("notas");
     expect(steps).toContain("carrito");
+  });
+
+  it("buildBatchMeseroSteps incluye notas antes del carrito", () => {
+    const steps = buildBatchMeseroSteps(producto, ["topping", "nectar"]);
+    expect(steps).toContain("fase:topping");
+    expect(steps.indexOf("adiciones")).toBeLessThan(steps.indexOf("notas"));
+    expect(steps.indexOf("notas")).toBeLessThan(steps.indexOf("carrito"));
   });
 
   it("getMeseroStepLabel usa nombre de fase", () => {

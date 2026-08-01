@@ -18,10 +18,11 @@ import {
   setCachedMesas,
 } from "@/lib/offline/local-cache";
 import { isNetworkFailure, isRetryableSyncError, shouldSyncWithServer } from "@/lib/offline/network";
-import { enqueueOp } from "@/lib/offline/outbox";
 import {
   buildOptimisticComanda,
+  discardLocalComanda,
   flushOutbox,
+  foldOutboxIntoComandas,
   mergeComandaInCache,
   patchComandaInCache,
   removeComandaFromCache,
@@ -29,6 +30,7 @@ import {
   markMesaOcupadaLocally,
   maybeLiberarMesaLocally,
 } from "@/lib/offline/sync-engine";
+import { enqueueOp } from "@/lib/offline/outbox";
 import {
   createComandaApi,
   createMesaApi,
@@ -272,15 +274,16 @@ export function useComandas() {
 
     try {
       if (cached.length > 0) {
-        setComandas([...cached].sort(sortComandasByQueue));
+        setComandas(foldOutboxIntoComandas([...cached]).sort(sortComandasByQueue));
       }
       await flushOutbox();
       const data = await fetchComandas({ status: "pendiente,lista,entregada", limit: 500 });
-      setCachedComandas(data);
-      setComandas([...data].sort(sortComandasByQueue));
+      const merged = foldOutboxIntoComandas(data);
+      setCachedComandas(merged);
+      setComandas(merged);
       setError(null);
     } catch (err) {
-      setComandas([...cached].sort(sortComandasByQueue));
+      setComandas(foldOutboxIntoComandas([...cached]).sort(sortComandasByQueue));
       if (isNetworkFailure(err) || !shouldSyncWithServer()) {
         setError(null);
       } else {
@@ -395,6 +398,13 @@ export function useComandas() {
           enqueueOp({ type: "comanda:patch", comandaId: id, patch: { status } });
           return;
         }
+        const msg = err instanceof Error ? err.message.toLowerCase() : "";
+        // Pedido fantasma solo en caché local / ya borrado en servidor.
+        if (msg.includes("no encontrada") || msg.includes("404")) {
+          discardLocalComanda(id);
+          setComandas((prev) => prev.filter((c) => c.id !== id));
+          return;
+        }
         // Revertir si el servidor rechazó el cambio.
         if (before) {
           mergeComandaInCache(before);
@@ -464,6 +474,84 @@ export function useComandas() {
       } catch (err) {
         if (isNetworkFailure(err)) applyLocal();
         else throw err;
+      }
+    },
+    updatePedido: async (
+      id: string,
+      patch: { cliente?: string; items: OrderItem[]; total: number },
+    ) => {
+      const before = getCachedComandas().find((x) => x.id === id);
+      const localPatch = {
+        cliente: patch.cliente,
+        items: patch.items,
+        total: patch.total,
+      };
+
+      const applyLocal = () => {
+        patchComandaInCache(id, localPatch);
+        enqueueOp({ type: "comanda:patch", comandaId: id, patch: localPatch });
+        setComandas((prev) =>
+          prev
+            .map((c) =>
+              c.id === id
+                ? {
+                    ...c,
+                    cliente: patch.cliente?.trim() || c.cliente,
+                    items: patch.items,
+                    total: patch.total,
+                  }
+                : c,
+            )
+            .sort(sortComandasByQueue),
+        );
+      };
+
+      if (!getStoredSession()) {
+        applyLocal();
+        return getCachedComandas().find((x) => x.id === id)!;
+      }
+
+      // Optimista para que barra vea el cambio al instante.
+      patchComandaInCache(id, localPatch);
+      setComandas((prev) =>
+        prev
+          .map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  cliente: patch.cliente?.trim() || c.cliente,
+                  items: patch.items,
+                  total: patch.total,
+                }
+              : c,
+          )
+          .sort(sortComandasByQueue),
+      );
+
+      if (!shouldSyncWithServer()) {
+        enqueueOp({ type: "comanda:patch", comandaId: id, patch: localPatch });
+        return getCachedComandas().find((x) => x.id === id)!;
+      }
+
+      try {
+        const updated = await patchComandaApi(id, localPatch);
+        mergeComandaInCache(updated);
+        setComandas((prev) =>
+          prev.map((c) => (c.id === id ? updated : c)).sort(sortComandasByQueue),
+        );
+        return updated;
+      } catch (err) {
+        if (isNetworkFailure(err)) {
+          enqueueOp({ type: "comanda:patch", comandaId: id, patch: localPatch });
+          return getCachedComandas().find((x) => x.id === id)!;
+        }
+        if (before) {
+          mergeComandaInCache(before);
+          setComandas((prev) =>
+            prev.map((c) => (c.id === id ? before : c)).sort(sortComandasByQueue),
+          );
+        }
+        throw err;
       }
     },
   };

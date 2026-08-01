@@ -184,7 +184,10 @@ export function AdminCaja() {
             <Wallet className="h-5 w-5 text-primary" />
             Caja
           </h2>
-          <p className="text-sm text-muted-foreground">Cobros, métodos de pago y corte del día</p>
+          <p className="text-sm text-muted-foreground">
+            Cobros, métodos de pago y corte del día. Marcar Atendido en barra no registra la venta:
+            aquí debes cobrar cada pedido.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-auto" />
@@ -210,8 +213,15 @@ export function AdminCaja() {
               <CardTitle className="text-sm text-muted-foreground">Por cobrar</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-amber-600">{money(resumen.ventasPendientes)}</p>
-              <p className="text-xs text-muted-foreground">{resumen.comandasPendientes} comanda(s)</p>
+              <p className="text-2xl font-bold text-amber-600">
+                {money(pendientes.reduce((s, c) => s + c.total, 0))}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {pendientes.length} comanda(s) sin cobrar
+                {resumen.comandasPendientes > 0 && pendientes.length !== resumen.comandasPendientes
+                  ? ` · ${resumen.comandasPendientes} de hoy`
+                  : ""}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -249,7 +259,7 @@ export function AdminCaja() {
           {pendientes.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground">
-                No hay comandas pendientes de cobro en esta fecha.
+                No hay comandas pendientes de cobro.
               </CardContent>
             </Card>
           ) : (

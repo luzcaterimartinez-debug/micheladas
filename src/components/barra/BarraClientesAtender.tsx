@@ -1,19 +1,21 @@
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, Clock, MapPin, Package } from "lucide-react";
+import { Check, ChevronDown, Clock, MapPin, Package, Pencil } from "lucide-react";
 
+import { BarraEditarPedidoDialog } from "@/components/barra/BarraEditarPedidoDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { queueLabel } from "@/lib/comanda-queue";
 import { faseOpcionNames, orderItemLabel, orderItemSubtitle, timeAgo } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
-import type { Comanda } from "@/lib/micheladas-store";
+import type { Comanda, OrderItem } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
 
 type Props = {
   comandas: Comanda[];
   onMarkEntregada: (id: string) => void | Promise<void>;
   onMarkLista?: (id: string) => void | Promise<void>;
+  onUpdatePedido: (id: string, patch: { cliente: string; items: OrderItem[]; total: number }) => Promise<void>;
 };
 
 function ClienteRow({
@@ -21,11 +23,13 @@ function ClienteRow({
   busy,
   onAtender,
   onLista,
+  onEdit,
 }: {
   comanda: Comanda;
   busy: boolean;
   onAtender: () => void;
   onLista?: () => void;
+  onEdit: () => void;
 }) {
   const { productos } = useMenu();
   const [open, setOpen] = useState(false);
@@ -74,20 +78,36 @@ function ClienteRow({
             </p>
           </div>
 
-          <Button
-            type="button"
-            size="lg"
-            className={cn(
-              "shrink-0 min-h-12 sm:min-h-14 min-w-[6.75rem] sm:min-w-[8.5rem] px-3 sm:px-4",
-              "gap-1.5 text-sm sm:text-base font-black touch-manipulation",
-              "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md",
-            )}
-            disabled={busy}
-            onClick={onAtender}
-          >
-            <Check className="h-5 w-5 shrink-0" strokeWidth={3} />
-            {busy ? "…" : "Atendido"}
-          </Button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              className={cn(
+                "min-h-12 sm:min-h-14 min-w-[6.5rem] px-3 gap-1.5",
+                "text-sm font-bold touch-manipulation",
+              )}
+              disabled={busy}
+              onClick={onEdit}
+            >
+              <Pencil className="h-4 w-4 shrink-0" />
+              Editar
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              className={cn(
+                "min-h-12 sm:min-h-14 min-w-[6.75rem] sm:min-w-[8.5rem] px-3 sm:px-4",
+                "gap-1.5 text-sm sm:text-base font-black touch-manipulation",
+                "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md",
+              )}
+              disabled={busy}
+              onClick={onAtender}
+            >
+              <Check className="h-5 w-5 shrink-0" strokeWidth={3} />
+              {busy ? "…" : "Atendido"}
+            </Button>
+          </div>
         </div>
 
         <div className="px-3 sm:px-4 pb-3 -mt-1">
@@ -151,8 +171,14 @@ function ClienteRow({
   );
 }
 
-export function BarraClientesAtender({ comandas, onMarkEntregada, onMarkLista }: Props) {
+export function BarraClientesAtender({
+  comandas,
+  onMarkEntregada,
+  onMarkLista,
+  onUpdatePedido,
+}: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Comanda | null>(null);
 
   const activas = useMemo(
     () =>
@@ -186,9 +212,9 @@ export function BarraClientesAtender({ comandas, onMarkEntregada, onMarkLista }:
     <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
       <div className="flex items-center justify-between gap-2 border-b bg-emerald-600 px-4 py-3.5 text-white">
         <div>
-          <p className="text-base font-black leading-none">Clientes por atender</p>
+          <p className="text-base font-black leading-none">Clientes que pidieron</p>
           <p className="text-xs text-white/85 mt-1.5">
-            Lista desplegable · botón Atendido en cada cliente
+            Lista activa · Editar o marcar Atendido
           </p>
         </div>
         <Badge className="bg-white text-emerald-800 hover:bg-white font-black tabular-nums text-sm px-2.5 py-1">
@@ -209,9 +235,24 @@ export function BarraClientesAtender({ comandas, onMarkEntregada, onMarkLista }:
               busy={busyId === c.id}
               onAtender={() => void atender(c.id)}
               onLista={onMarkLista ? () => void marcarLista(c.id) : undefined}
+              onEdit={() => setEditing(c)}
             />
           ))}
         </div>
+      )}
+
+      {editing && (
+        <BarraEditarPedidoDialog
+          comanda={editing}
+          open={!!editing}
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
+          onSave={async (patch) => {
+            await onUpdatePedido(editing.id, patch);
+            setEditing(null);
+          }}
+        />
       )}
     </div>
   );

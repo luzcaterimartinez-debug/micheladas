@@ -1,5 +1,5 @@
 import { getStoredSession } from "@/lib/auth";
-import { nextQueueOrderForToday } from "@/lib/comanda-queue";
+import { nextQueueOrderForToday, sortComandasByQueue } from "@/lib/comanda-queue";
 import { fetchMenu } from "@/lib/menu-api";
 import { fetchInventario } from "@/lib/inventory-api";
 import {
@@ -35,21 +35,47 @@ import {
   shouldSyncWithServer,
   writeLocal,
 } from "./network";
-import { getPendingCount, listOutbox, removeOp, type OutboxOp } from "./outbox";
+import { getPendingCount, listOutbox, removeOp, removeOutboxOpsForComanda, type OutboxOp } from "./outbox";
 
 let flushing = false;
 let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
 
+function isNotFoundError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return msg.includes("no encontrada") || msg.includes("no encontrado") || msg.includes("404");
+}
+
 async function applyOp(op: OutboxOp): Promise<void> {
   switch (op.type) {
-    case "comanda:create":
-      await createComandaApi(op.payload, op.clientId);
+    case "comanda:create": {
+      const created = await createComandaApi(op.payload, op.clientId);
+      mergeComandaInCache(created);
       break;
+    }
     case "comanda:patch":
-      await patchComandaApi(op.comandaId, op.patch);
+      try {
+        const updated = await patchComandaApi(op.comandaId, op.patch);
+        mergeComandaInCache(updated);
+      } catch (err) {
+        if (isNotFoundError(err)) {
+          discardLocalComanda(op.comandaId);
+          return;
+        }
+        throw err;
+      }
       break;
     case "comanda:delete":
-      await deleteComandaApi(op.comandaId);
+      try {
+        await deleteComandaApi(op.comandaId);
+        removeComandaFromCache(op.comandaId);
+      } catch (err) {
+        if (isNotFoundError(err)) {
+          discardLocalComanda(op.comandaId);
+          return;
+        }
+        throw err;
+      }
       break;
     case "mesa:atendida":
       await marcarMesaAtendidaApi(op.mesaId);
@@ -74,7 +100,7 @@ export async function pullFreshData(): Promise<void> {
       fetchMenu(),
     ]);
 
-    setCachedComandas(comandas);
+    setCachedComandas(foldOutboxIntoComandas(comandas));
     setCachedMesas(mesas);
     setCachedInventario(inventario);
     setCachedMenu(menu);
@@ -147,6 +173,31 @@ export function buildOptimisticComanda(
     createdAt: Date.now(),
     status: "pendiente",
   };
+}
+
+/**
+ * Aplica operaciones pendientes del outbox sobre la lista del servidor,
+ * para que un "Atendido" offline no reaparezca al refrescar.
+ */
+export function foldOutboxIntoComandas(serverComandas: Comanda[]): Comanda[] {
+  let list = [...serverComandas];
+  for (const op of listOutbox()) {
+    if (op.type === "comanda:create") {
+      if (!list.some((c) => c.id === op.clientId)) {
+        list.push(buildOptimisticComanda(op.payload, op.clientId));
+      }
+    } else if (op.type === "comanda:patch") {
+      list = list.map((c) => (c.id === op.comandaId ? { ...c, ...op.patch } : c));
+    } else if (op.type === "comanda:delete") {
+      list = list.filter((c) => c.id !== op.comandaId);
+    }
+  }
+  return list.sort(sortComandasByQueue);
+}
+
+export function discardLocalComanda(comandaId: string): void {
+  removeOutboxOpsForComanda(comandaId);
+  removeComandaFromCache(comandaId);
 }
 
 export function mergeComandaInCache(comanda: Comanda): void {

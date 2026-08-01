@@ -136,6 +136,9 @@ def _consumo_por_producto(producto_id: str) -> list[tuple[str, float]]:
     if producto_id in BEBIDAS_CONSUMO:
         return list(BEBIDAS_CONSUMO[producto_id])
     bebida = _bebida_base_from_producto_id(producto_id)
+    if bebida == "cerveza":
+        # La marca (Coronita, Corona, etc.) se descuenta vía fase "Tipo de cerveza".
+        return [("limon", 2.0)]
     if bebida:
         return [(bebida, 1.0), ("limon", 2.0)]
     base: list[tuple[str, float]] = [("cerveza", 1.0), ("limon", 2.0)]
@@ -218,8 +221,7 @@ def _sync_producto_consumo(cursor: Any) -> None:
         sync_consumo_producto(cursor, row["id"])
 
 
-def apply_order_deductions(cursor: Any, items: list[OrderItemIn]) -> None:
-    """Descuenta inventario según consumo por producto y adiciones del pedido."""
+def _order_consumption_totals(cursor: Any, items: list[OrderItemIn]) -> dict[str, float]:
     totals: dict[str, float] = defaultdict(float)
 
     for item in items:
@@ -261,6 +263,12 @@ def apply_order_deductions(cursor: Any, items: list[OrderItemIn]) -> None:
                 if inv:
                     totals[str(stock_key)] += ad_qty * item_qty
 
+    return totals
+
+
+def apply_order_deductions(cursor: Any, items: list[OrderItemIn]) -> None:
+    """Descuenta inventario según consumo por producto y adiciones del pedido."""
+    totals = _order_consumption_totals(cursor, items)
     for clave, qty in totals.items():
         if qty <= 0:
             continue
@@ -268,6 +276,22 @@ def apply_order_deductions(cursor: Any, items: list[OrderItemIn]) -> None:
             """
             UPDATE inventario
             SET stock = GREATEST(0, stock - %s)
+            WHERE clave = %s
+            """,
+            (qty, clave),
+        )
+
+
+def restore_order_deductions(cursor: Any, items: list[OrderItemIn]) -> None:
+    """Devuelve al inventario el consumo de ítems previos (p. ej. al editar pedido)."""
+    totals = _order_consumption_totals(cursor, items)
+    for clave, qty in totals.items():
+        if qty <= 0:
+            continue
+        cursor.execute(
+            """
+            UPDATE inventario
+            SET stock = stock + %s
             WHERE clave = %s
             """,
             (qty, clave),

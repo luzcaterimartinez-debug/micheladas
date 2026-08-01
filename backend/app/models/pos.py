@@ -75,6 +75,8 @@ class ComandaUpdate(BaseModel):
     mesa: str | None = Field(default=None, max_length=100)
     mesaId: str | None = Field(default=None, max_length=50)
     cliente: str | None = Field(default=None, min_length=1, max_length=100)
+    items: list[OrderItemIn] | None = Field(default=None, min_length=1)
+    total: float | None = Field(default=None, ge=0)
 
 
 class MesaOut(BaseModel):

@@ -23,7 +23,6 @@ def test_consumo_por_producto_michelandia_bases() -> None:
     for pid, bebida in (
         ("tradicional_ginger", "ginger"),
         ("lulo_soda", "soda"),
-        ("maracumazana_cerveza", "cerveza"),
         ("frutos_rojos_cola_pola", "cola_pola"),
         ("blueberry_mango_smirnoff", "smirnoff"),
     ):
@@ -31,7 +30,11 @@ def test_consumo_por_producto_michelandia_bases() -> None:
         keys = {k: q for k, q in lines}
         assert keys[bebida] == 1.0
         assert keys["limon"] == 2.0
-        assert "cerveza" not in keys or bebida == "cerveza"
+        assert "cerveza" not in keys
+
+    cerv = {k: q for k, q in _consumo_por_producto("maracumazana_cerveza")}
+    assert cerv["limon"] == 2.0
+    assert "cerveza" not in cerv  # marca vía fase tipo de cerveza
 
 
 def test_consumo_por_producto_bebidas() -> None:
