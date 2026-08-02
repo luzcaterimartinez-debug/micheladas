@@ -10,15 +10,19 @@ FASE_ID = "cerveza"
 PASO = "fase:cerveza"
 
 OPCIONES = [
-    ("tipo_coronita", "Coronita", "coronita"),
-    ("tipo_corona", "Corona", "corona"),
-    ("tipo_cerveza_latona", "Cerveza latona", "cerveza_latona"),
-    ("tipo_cerveza_personal", "Cerveza personal", "cerveza_personal"),
-    ("tipo_poker", "Poker", "poker"),
     ("tipo_aguila", "Águila", "aguila"),
+    ("tipo_poker", "Poker", "poker"),
     ("tipo_cerveza_light", "Light", "cerveza_light"),
     ("tipo_budweiser", "Budweiser", "budweiser"),
 ]
+
+# Opciones antiguas que ya no deben aparecer en micheladas.
+OPCIONES_RETIRADAS = (
+    "tipo_coronita",
+    "tipo_corona",
+    "tipo_cerveza_latona",
+    "tipo_cerveza_personal",
+)
 
 
 def _ensure_pasos(raw: Any) -> str:
@@ -93,6 +97,19 @@ def ensure_fase_cerveza(cursor: Any) -> int:
             (oid, FASE_ID, nombre, clave),
         )
 
+    # Quitar Coronita/Corona/latona/personal del paso de micheladas.
+    if OPCIONES_RETIRADAS:
+        ph = ", ".join(["%s"] * len(OPCIONES_RETIRADAS))
+        cursor.execute(
+            f"DELETE FROM menu_producto_fase_opcion WHERE opcion_id IN ({ph})",
+            OPCIONES_RETIRADAS,
+        )
+        cursor.execute(
+            f"DELETE FROM menu_fase_opciones WHERE id IN ({ph}) AND fase_id = %s",
+            (*OPCIONES_RETIRADAS, FASE_ID),
+        )
+
+    keep_ids = tuple(o[0] for o in OPCIONES)
     cursor.execute(
         """
         SELECT id, pasos FROM menu_productos
@@ -107,6 +124,20 @@ def ensure_fase_cerveza(cursor: Any) -> int:
             "UPDATE menu_productos SET pasos = %s WHERE id = %s",
             (_ensure_pasos(row["pasos"]), pid),
         )
+        # Solo las opciones vigentes en cada producto *_cerveza.
+        if keep_ids:
+            ph = ", ".join(["%s"] * len(keep_ids))
+            cursor.execute(
+                f"""
+                DELETE FROM menu_producto_fase_opcion
+                WHERE producto_id = %s
+                  AND opcion_id IN (
+                    SELECT id FROM menu_fase_opciones WHERE fase_id = %s
+                  )
+                  AND opcion_id NOT IN ({ph})
+                """,
+                (pid, FASE_ID, *keep_ids),
+            )
         for oid, _n, _c in OPCIONES:
             cursor.execute(
                 """

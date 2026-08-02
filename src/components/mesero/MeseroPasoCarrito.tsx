@@ -134,12 +134,21 @@ export function MeseroPasoCarrito({
       )}
 
       {onParaLlevarChange && (
-        <label
+        <div
+          role="button"
+          tabIndex={0}
           className={cn(
             TOUCH,
             "flex items-center gap-3 rounded-2xl bg-white/95 border-2 px-4 py-3.5 shadow-sm cursor-pointer",
             paraLlevar ? "border-amber-500 ring-2 ring-amber-500/20" : "border-white",
           )}
+          onClick={() => onParaLlevarChange(!paraLlevar)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onParaLlevarChange(!paraLlevar);
+            }
+          }}
         >
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
             <ShoppingBag className="h-5 w-5" />
@@ -155,9 +164,10 @@ export function MeseroPasoCarrito({
           <Switch
             checked={paraLlevar}
             onCheckedChange={onParaLlevarChange}
+            onClick={(e) => e.stopPropagation()}
             aria-label="Cambiar pedido para llevar"
           />
-        </label>
+        </div>
       )}
 
       {count === 0 ? (

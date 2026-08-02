@@ -238,6 +238,11 @@ export function MeseroOrderWizard() {
     }));
   }
 
+  /** Reaplica el cargo de para llevar según la mesa actual (fuente de verdad). */
+  function pricedCartForMesa(items: OrderItem[], mid: string): OrderItem[] {
+    return applyParaLlevarToCart(items, llevarExtraPorUnidad(mid));
+  }
+
   function setParaLlevar(enabled: boolean) {
     if (enabled) {
       if (!isParaLlevar(mesaId)) {
@@ -253,6 +258,28 @@ export function MeseroOrderWizard() {
     setMesaId(restore);
     setCart((c) => applyParaLlevarToCart(c, 0));
   }
+
+  // Si cambia la mesa (p. ej. desde el paso 1), los ítems del carrito deben reflejar el cargo.
+  useEffect(() => {
+    const extra = llevarExtraPorUnidad(mesaId);
+    setCart((c) => {
+      if (c.length === 0) return c;
+      let changed = false;
+      const next = c.map((it) => {
+        const wantExtra = extra > 0 ? extra : undefined;
+        const wantTotal = calcItemLineTotal(
+          it.basePrice,
+          it.additions,
+          orderItemQuantity(it),
+          extra,
+        );
+        if (it.llevarExtra === wantExtra && it.total === wantTotal) return it;
+        changed = true;
+        return { ...it, llevarExtra: wantExtra, total: wantTotal };
+      });
+      return changed ? next : c;
+    });
+  }, [mesaId]);
 
   const previewComanda = useMemo(
     (): Comanda => ({
@@ -583,12 +610,14 @@ export function MeseroOrderWizard() {
       if (cart.length === 0) toast.error("Agrega al menos una michelada");
       return;
     }
+    const items = pricedCartForMesa(cart, mesaId);
+    const total = items.reduce((s, i) => s + i.total, 0);
     const snapshot = {
       cliente: cliente.trim() || "Cliente",
       mesaId: mesaId || undefined,
       mesa: mesaSeleccionada?.nombre,
-      items: cart,
-      total: cartTotal,
+      items,
+      total,
       clientId: crypto.randomUUID(),
     };
     void (async () => {
