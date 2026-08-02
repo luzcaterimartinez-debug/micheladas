@@ -19,7 +19,6 @@ import {
   setCachedMesas,
 } from "@/lib/offline/local-cache";
 import {
-  checkServerReachable,
   isNetworkFailure,
   isRetryableSyncError,
   notifySyncChange,
@@ -295,12 +294,11 @@ export function useComandas() {
       }
 
       if (!shouldSyncWithServer()) {
-        const ok = await checkServerReachable();
-        if (!ok) {
-          applyFromCache();
-          setLoading(false);
-          return;
-        }
+        // No llamar /api/health aquí: el poll de 2s agotaba max_connections_per_hour en Hostinger.
+        // La recuperación la hace useOfflineSync + evento michelada-api-recovered.
+        applyFromCache();
+        setLoading(false);
+        return;
       }
 
       try {
@@ -360,10 +358,10 @@ export function useComandas() {
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    // Polling agresivo para admin/barra en tiempo real entre dispositivos.
+    // Polling en tiempo real; si la API/MySQL está caída, no martillar (cuota Hostinger).
     const interval = window.setInterval(() => {
-      void reload();
-    }, 2000);
+      if (shouldSyncWithServer()) void reload();
+    }, 3000);
 
     return () => {
       window.clearInterval(interval);

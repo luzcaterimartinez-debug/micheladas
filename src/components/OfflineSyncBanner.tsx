@@ -67,7 +67,7 @@ export function OfflineSyncBanner() {
                 <ServerCrash className="h-4 w-4 shrink-0" />
                 <span className="truncate">
                   {import.meta.env.PROD
-                    ? "Servidor / base de datos no disponible — reintentando…"
+                    ? "Base de datos no disponible — reintentando en silencio…"
                     : "Servidor no disponible — inicia el backend (puerto 8000)"}
                 </span>
               </>

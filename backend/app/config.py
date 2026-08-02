@@ -40,8 +40,8 @@ class Settings(BaseSettings):
     mysql_user: str = "root"
     mysql_password: str = ""
     mysql_database: str = "michelada"
-    mysql_pool_size: int = 2
-    mysql_connection_timeout: int = 10
+    mysql_pool_size: int = 1
+    mysql_connection_timeout: int = 8
 
     query_cache_ttl_seconds: int = 30
     query_cache_comandas_ttl_seconds: int = 8

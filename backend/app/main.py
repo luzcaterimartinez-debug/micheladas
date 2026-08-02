@@ -176,11 +176,16 @@ def health(response: Response) -> dict[str, str | list[str]]:
         "status": "ok" if db_ok else "degraded",
         "database": "ok" if db_ok else "error",
         "env": settings.app_env,
+        "mysql_host": settings.mysql_host,
     }
-    if db_error and not settings.is_production:
+    if db_error:
+        # Mensaje operativo (sin secretos): ayuda a diagnosticar cuota Hostinger, firewall, etc.
         payload["database_error"] = db_error
-    elif db_error and settings.is_production:
-        payload["mysql_host"] = settings.mysql_host
+        if "max_connections_per_hour" in db_error.lower() or "1226" in db_error:
+            payload["hint"] = (
+                "Hostinger: se agotó max_connections_per_hour. "
+                "Espera ~1h o reduce polling; en Vercel usa MYSQL_POOL_SIZE=1."
+            )
     if not db_ok:
         response.status_code = 503
     return payload

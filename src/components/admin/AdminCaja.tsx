@@ -48,6 +48,7 @@ import {
   type MetodoPago,
 } from "@/lib/caja-api";
 import type { Comanda } from "@/lib/micheladas-store";
+import { isApiReachable } from "@/lib/offline/network";
 import { cn } from "@/lib/utils";
 import { localDateIso, formatAppMoney } from "@/lib/local-date";
 
@@ -115,8 +116,8 @@ export function AdminCaja() {
     window.addEventListener("michelada-api-recovered", onSync);
     window.addEventListener("focus", onSync);
     const interval = window.setInterval(() => {
-      if (!cobrarId && !editarId) void reload({ silent: true });
-    }, 2000);
+      if (!cobrarId && !editarId && isApiReachable()) void reload({ silent: true });
+    }, 3000);
     return () => {
       window.removeEventListener("michelada-sync-change", onSync);
       window.removeEventListener("michelada-api-recovered", onSync);

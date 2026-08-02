@@ -114,7 +114,7 @@ El build ejecuta `postbuild` que empaqueta la función en `.vercel/output/functi
 
 `VITE_API_URL` puede quedar **vacío** en Vercel (el frontend usa el mismo dominio `/api/...`).
 
-### MySQL desde Vercel (error 2003 / timeout)
+### MySQL desde Vercel (error 2003 / timeout / 1226)
 
 Si en los logs aparece `Can't connect to MySQL server on '...:3306' (110)`:
 
@@ -123,7 +123,14 @@ Si en los logs aparece `Can't connect to MySQL server on '...:3306' (110)`:
 3. Comprueba que el usuario tenga permisos sobre la base `u659323332_micheladas`.
 4. En hosting compartido, MySQL remoto a veces **no está permitido** hacia Vercel. Alternativas: API en el mismo Hostinger, VPS, o BD en la nube (PlanetScale, Railway, etc.).
 
-Diagnóstico: `GET https://micheladas-black.vercel.app/api/status` (muestra si la BD responde).
+Si aparece `max_connections_per_hour` / error **1226**:
+
+- Hostinger corta al usuario tras ~500 conexiones/hora.
+- En Vercel pon `MYSQL_POOL_SIZE=1` y redeploy.
+- El frontend ya limita health (~45–90s) y deja de pollar comandas/caja cuando la API está caída.
+- **Cierra pestañas** del POS y espera ~1 hora a que Hostinger reinicie la cuota, o contacta soporte Hostinger para subir el límite.
+
+Diagnóstico: `GET https://micheladas-black.vercel.app/api/status` (muestra `database_error`).
 
 Tras cambios en `vercel.json`, variables de entorno o `api/`, haz **Redeploy** en Vercel.
 
