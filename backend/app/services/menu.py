@@ -163,8 +163,22 @@ def load_menu(*, include_inactive: bool = False) -> MenuOut:
     return query_cache(key, lambda: _load_menu_db(include_inactive=include_inactive))
 
 
+def _ensure_cerveza_fase_if_needed(cursor: Any) -> bool:
+    """Si faltan opciones de cerveza, las crea. True si hubo cambios."""
+    from app.services.menu_cerveza import ensure_fase_cerveza, productos_cerveza_sin_opciones
+
+    if not productos_cerveza_sin_opciones(cursor):
+        return False
+    ensure_fase_cerveza(cursor)
+    return True
+
+
 def _load_menu_db(*, include_inactive: bool = False) -> MenuOut:
-    with get_db() as (_, cursor):
+    with get_db() as (conn, cursor):
+        if _ensure_cerveza_fase_if_needed(cursor):
+            conn.commit()
+            invalidate_menu_cache()
+
         fases, fase_names = _load_fase_catalog(cursor)
         active_fase_ids = [f.id for f in fases if include_inactive or f.activo]
 

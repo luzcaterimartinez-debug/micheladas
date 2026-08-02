@@ -7,9 +7,11 @@ import {
   ThemedPanel,
   ThemedPanelHeader,
 } from "@/components/michelandia/michelandia-ui";
+import type { FaseOpcion } from "@/lib/fases";
 import { formatMenuPrice, productBaseLabel } from "@/lib/michelandia-theme";
 import type { MenuCategoria } from "@/lib/menu-utils";
 import type { MicheladaType } from "@/lib/micheladas-store";
+import { isCervezaProduct } from "@/lib/product-steps";
 import { cn } from "@/lib/utils";
 
 const TOUCH = "touch-manipulation active:scale-[0.98] transition-all duration-150";
@@ -19,8 +21,12 @@ export type ProductPick = { id: string; quantity: number };
 type Props = {
   categorias: MenuCategoria[];
   picks: ProductPick[];
+  /** productId → id de opción tipo de cerveza */
+  cervezaById: Record<string, string>;
   onToggleProduct: (product: MicheladaType) => void;
   onQuantityChange: (productId: string, quantity: number) => void;
+  onSelectCerveza: (productId: string, opcionId: string) => void;
+  getCervezaOpciones: (product: MicheladaType) => FaseOpcion[];
   onCambiarCategoria: () => void;
   onIrCategorias?: () => void;
 };
@@ -28,8 +34,11 @@ type Props = {
 export function MeseroPasoProducto({
   categorias,
   picks,
+  cervezaById,
   onToggleProduct,
   onQuantityChange,
+  onSelectCerveza,
+  getCervezaOpciones,
   onCambiarCategoria,
   onIrCategorias,
 }: Props) {
@@ -61,7 +70,7 @@ export function MeseroPasoProducto({
         <MeseroStepHeader
           stepLabel="Productos"
           title="Elige productos"
-          description={`Marca uno o varios de: ${names}. Ajusta la cantidad y continúa.`}
+          description={`Marca uno o varios de: ${names}. Si eliges cerveza, escoge la marca.`}
         />
         <button
           type="button"
@@ -98,6 +107,10 @@ export function MeseroPasoProducto({
               {categoria.productos.map((p) => {
                 const qty = pickMap.get(p.id) ?? 0;
                 const selected = qty > 0;
+                const showCerveza = selected && isCervezaProduct(p);
+                const cervezaOps = showCerveza ? getCervezaOpciones(p) : [];
+                const cervezaPick = cervezaById[p.id];
+
                 return (
                   <div
                     key={p.id}
@@ -139,13 +152,47 @@ export function MeseroPasoProducto({
                       </span>
                     </button>
                     {selected && (
-                      <div className="mt-3 pl-8" onClick={(e) => e.stopPropagation()}>
+                      <div className="mt-3 pl-8 space-y-3" onClick={(e) => e.stopPropagation()}>
                         <QuantityStepper
                           size="sm"
                           value={qty}
                           min={1}
                           onChange={(quantity) => onQuantityChange(p.id, quantity)}
                         />
+                        {showCerveza && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                              Tipo de cerveza
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {cervezaOps.map((op) => {
+                                const checked = cervezaPick === op.id;
+                                return (
+                                  <button
+                                    key={op.id}
+                                    type="button"
+                                    onClick={() => onSelectCerveza(p.id, op.id)}
+                                    className={cn(
+                                      TOUCH,
+                                      "px-3 py-2 min-h-10 rounded-full border-2 text-sm font-semibold",
+                                      checked
+                                        ? "bg-[#1e88e5] text-white border-[#1e88e5]"
+                                        : "border-slate-200 bg-white text-slate-800 hover:border-[#1e88e5]/40",
+                                    )}
+                                  >
+                                    {checked ? "✓ " : ""}
+                                    {op.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {!cervezaPick && (
+                              <p className="text-xs font-medium text-amber-700">
+                                Elige Coronita, Corona, latona o personal
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

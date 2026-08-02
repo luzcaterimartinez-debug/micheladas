@@ -49,7 +49,15 @@ import {
   type Comanda,
   type OrderItem,
 } from "@/lib/micheladas-store";
-import { buildBatchMeseroSteps, buildMeseroSteps, getMeseroStepLabel, productHasFaseSteps, type MeseroFlowStep } from "@/lib/product-steps";
+import {
+  buildBatchMeseroSteps,
+  buildMeseroSteps,
+  cervezaOpcionesForProduct,
+  CERVEZA_FASE_ID,
+  getMeseroStepLabel,
+  isCervezaProduct,
+  type MeseroFlowStep,
+} from "@/lib/product-steps";
 import { formatMenuPrice } from "@/lib/michelandia-theme";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +80,8 @@ export function MeseroOrderWizard() {
   const [selectedCategoriaIds, setSelectedCategoriaIds] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [productPicks, setProductPicks] = useState<ProductPick[]>([]);
+  /** Tipo de cerveza elegido en el paso producto (productId → opción). */
+  const [draftCervezaById, setDraftCervezaById] = useState<Record<string, string>>({});
   /** Productos elegidos pendientes de agregar al carrito. */
   const [batchPicks, setBatchPicks] = useState<ProductPick[]>([]);
   /** Toppings/fases ya resueltos por producto dentro del lote. */
@@ -96,6 +106,7 @@ export function MeseroOrderWizard() {
     setSelectedCategoriaIds([]);
     setSelectedId("");
     setProductPicks([]);
+    setDraftCervezaById({});
     setBatchPicks([]);
     setBatchToppingsById({});
     setBatchAdditionsById({});
@@ -333,21 +344,36 @@ export function MeseroOrderWizard() {
     };
   }
 
-  function startFaseCustomize(pick: ProductPick, rest: ProductPick[] = []) {
+  function startFaseCustomize(
+    pick: ProductPick,
+    rest: ProductPick[] = [],
+    topsById?: Record<string, string[]>,
+  ) {
     const p = productos.find((x) => x.id === pick.id);
     if (!p) return;
+    const topsMap = topsById ?? batchToppingsById;
     setSelectedId(pick.id);
     setItemQuantity(pick.quantity);
     setFaseQueue(rest);
-    setToppings(batchToppingsById[pick.id] ?? []);
+    const prefilled = topsMap[pick.id] ?? [];
+    setToppings(prefilled);
     setNotes("");
-    const faseSteps = buildMeseroSteps(p.pasos, p, faseIds).filter(isFasePaso);
+    const faseSteps = buildMeseroSteps(p.pasos, p, faseIds)
+      .filter(isFasePaso)
+      .filter((s) => {
+        if (parseFaseIdFromPaso(s) === CERVEZA_FASE_ID) {
+          return !prefilled.some((id) =>
+            cervezaOpcionesForProduct(p, fases).some((o) => o.id === id),
+          );
+        }
+        return true;
+      });
     if (faseSteps.length > 0) {
       setCurrentStep(faseSteps[0]);
       return;
     }
     if (rest[0]) {
-      startFaseCustomize(rest[0], rest.slice(1));
+      startFaseCustomize(rest[0], rest.slice(1), topsMap);
       return;
     }
     setSelectedId("");
@@ -355,12 +381,15 @@ export function MeseroOrderWizard() {
   }
 
   function finishProductFasesAndContinue(currentToppings: string[]) {
+    const topsMap = selectedId
+      ? { ...batchToppingsById, [selectedId]: currentToppings }
+      : batchToppingsById;
     if (selectedId) {
-      setBatchToppingsById((prev) => ({ ...prev, [selectedId]: currentToppings }));
+      setBatchToppingsById(topsMap);
     }
     const next = faseQueue[0];
     if (next) {
-      startFaseCustomize(next, faseQueue.slice(1));
+      startFaseCustomize(next, faseQueue.slice(1), topsMap);
       return;
     }
     setSelectedId("");
@@ -371,7 +400,14 @@ export function MeseroOrderWizard() {
   function toggleProductPick(product: (typeof productos)[number]) {
     setProductPicks((cur) => {
       const exists = cur.find((p) => p.id === product.id);
-      if (exists) return cur.filter((p) => p.id !== product.id);
+      if (exists) {
+        setDraftCervezaById((d) => {
+          const next = { ...d };
+          delete next[product.id];
+          return next;
+        });
+        return cur.filter((p) => p.id !== product.id);
+      }
       return [...cur, { id: product.id, quantity: 1 }];
     });
   }
@@ -386,20 +422,39 @@ export function MeseroOrderWizard() {
     const picks = productPicks.filter((p) => p.quantity > 0);
     if (picks.length === 0) return;
 
+    const initialTops: Record<string, string[]> = {};
+    for (const pick of picks) {
+      const cerv = draftCervezaById[pick.id];
+      if (cerv) initialTops[pick.id] = [cerv];
+    }
+
     setProductPicks([]);
+    setDraftCervezaById({});
     setBatchPicks(picks);
-    setBatchToppingsById({});
+    setBatchToppingsById(initialTops);
     setBatchAdditionsById({});
     setNotes("");
     setFaseQueue([]);
 
     const needingFases = picks.filter((pick) => {
       const p = productos.find((x) => x.id === pick.id);
-      return !!p && productHasFaseSteps(p, faseIds);
+      if (!p) return false;
+      const prefilled = initialTops[pick.id] ?? [];
+      const pending = buildMeseroSteps(p.pasos, p, faseIds)
+        .filter(isFasePaso)
+        .filter((s) => {
+          if (parseFaseIdFromPaso(s) === CERVEZA_FASE_ID) {
+            return !prefilled.some((id) =>
+              cervezaOpcionesForProduct(p, fases).some((o) => o.id === id),
+            );
+          }
+          return true;
+        });
+      return pending.length > 0;
     });
 
     if (needingFases.length > 0) {
-      startFaseCustomize(needingFases[0], needingFases.slice(1));
+      startFaseCustomize(needingFases[0], needingFases.slice(1), initialTops);
       return;
     }
 
@@ -535,8 +590,14 @@ export function MeseroOrderWizard() {
         return cliente.trim().length > 0;
       case "categoria":
         return selectedCategoriaIds.length > 0;
-      case "producto":
-        return productPicks.some((p) => p.quantity > 0);
+      case "producto": {
+        if (!productPicks.some((p) => p.quantity > 0)) return false;
+        return productPicks.every((pick) => {
+          const p = productos.find((x) => x.id === pick.id);
+          if (!p || !isCervezaProduct(p)) return true;
+          return Boolean(draftCervezaById[pick.id]);
+        });
+      }
       case "adiciones":
         return inBatch ? batchPicks.length > 0 : !!michelada;
       case "notas":
@@ -547,10 +608,9 @@ export function MeseroOrderWizard() {
         return cart.length > 0;
       default:
         if (!isFasePaso(step)) return false;
-        if (parseFaseIdFromPaso(step) === "cerveza") {
-          return toppings.some((id) =>
-            opcionesForFase(michelada!, "cerveza").some((o) => o.id === id),
-          );
+        if (parseFaseIdFromPaso(step) === CERVEZA_FASE_ID) {
+          const ops = cervezaOpcionesForProduct(michelada, fases);
+          return toppings.some((id) => ops.some((o) => o.id === id));
         }
         return true;
     }
@@ -649,11 +709,17 @@ export function MeseroOrderWizard() {
         <MeseroPasoProducto
           categorias={categoriasSeleccionadas}
           picks={productPicks}
+          cervezaById={draftCervezaById}
           onToggleProduct={toggleProductPick}
           onQuantityChange={setProductPickQty}
+          onSelectCerveza={(productId, opcionId) =>
+            setDraftCervezaById((cur) => ({ ...cur, [productId]: opcionId }))
+          }
+          getCervezaOpciones={(p) => cervezaOpcionesForProduct(p, fases)}
           onCambiarCategoria={() => {
             setSelectedId("");
             setProductPicks([]);
+            setDraftCervezaById({});
             setCurrentStep("categoria");
           }}
           onIrCategorias={() => setCurrentStep("categoria")}
@@ -662,9 +728,15 @@ export function MeseroOrderWizard() {
 
       {isFasePaso(step) && michelada && (() => {
         const faseId = parseFaseIdFromPaso(step)!;
-        const faseName = fases.find((f) => f.id === faseId)?.name ?? faseId;
-        const opciones = opcionesForFase(michelada, faseId);
-        const isCerveza = faseId === "cerveza";
+        const faseName =
+          faseId === CERVEZA_FASE_ID
+            ? "Tipo de cerveza"
+            : (fases.find((f) => f.id === faseId)?.name ?? faseId);
+        const opciones =
+          faseId === CERVEZA_FASE_ID
+            ? cervezaOpcionesForProduct(michelada, fases)
+            : opcionesForFase(michelada, faseId);
+        const isCerveza = faseId === CERVEZA_FASE_ID;
         return (
           <MeseroPasoFase
             faseName={faseName}

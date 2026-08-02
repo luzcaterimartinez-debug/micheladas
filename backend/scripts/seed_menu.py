@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import get_db
 from app.services.inventario import ensure_inventario_seeded, sync_consumo_producto
-from scripts.migrate_fase_cerveza import ensure_fase_cerveza
+from app.services.menu_cerveza import ensure_fase_cerveza
 
 PASOS = json.dumps(["notas"])
 PASOS_CERVEZA = json.dumps(["fase:cerveza", "notas"])

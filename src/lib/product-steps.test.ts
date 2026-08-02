@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBatchMeseroSteps, buildMeseroSteps, getMeseroStepLabel } from "@/lib/product-steps";
+import { buildBatchMeseroSteps, buildMeseroSteps, getMeseroStepLabel, isCervezaProduct } from "@/lib/product-steps";
 import type { Fase } from "@/lib/fases";
 import type { MicheladaType } from "@/lib/micheladas-store";
 
@@ -22,6 +22,15 @@ const producto: MicheladaType = {
   pasos: ["fase:topping", "notas"],
 };
 
+const cerveza: MicheladaType = {
+  id: "tradicional_cerveza",
+  name: "Tradicional · Cerveza",
+  price: 11000,
+  description: "",
+  faseOpciones: [],
+  pasos: ["notas"],
+};
+
 describe("product-steps", () => {
   it("buildMeseroSteps incluye pasos fijos y fases con opciones", () => {
     const steps = buildMeseroSteps(producto.pasos, producto, ["topping", "nectar"]);
@@ -39,8 +48,17 @@ describe("product-steps", () => {
     expect(steps.indexOf("notas")).toBeLessThan(steps.indexOf("carrito"));
   });
 
+  it("productos *_cerveza fuerzan paso tipo de cerveza", () => {
+    expect(isCervezaProduct(cerveza)).toBe(true);
+    const steps = buildMeseroSteps(cerveza.pasos, cerveza, []);
+    expect(steps).toContain("fase:cerveza");
+    const batch = buildBatchMeseroSteps(cerveza, []);
+    expect(batch).toContain("fase:cerveza");
+  });
+
   it("getMeseroStepLabel usa nombre de fase", () => {
     expect(getMeseroStepLabel("fase:topping", fases)).toBe("Topping");
+    expect(getMeseroStepLabel("fase:cerveza", fases)).toBe("Tipo de cerveza");
     expect(getMeseroStepLabel("carrito", fases)).toBe("Enviar pedido");
   });
 });
