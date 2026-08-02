@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
 import { ThemedPanel } from "@/components/michelandia/michelandia-ui";
 import type { Comanda } from "@/lib/micheladas-store";
+import { formatAppMoney } from "@/lib/local-date";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -42,7 +43,7 @@ export function MeseroListasBanner({ listas, onMarcarEntregada, className }: Pro
                 <p className="font-bold truncate text-slate-900">
                   #{c.folio} · {c.mesa ?? "—"} · {c.cliente}
                 </p>
-                <p className="text-xs text-slate-500">${c.total}</p>
+                <p className="text-xs text-slate-500">{formatAppMoney(c.total)}</p>
               </div>
               <div className="flex shrink-0 gap-1">
                 <ComandaViewDialog comanda={c} size="sm" variant="ghost" label="Detalle" />

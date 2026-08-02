@@ -36,6 +36,7 @@ import {
   type Comanda,
   type OrderItem,
 } from "@/lib/micheladas-store";
+import { formatAppMoney } from "@/lib/local-date";
 
 export function OrderBuilder() {
   const { productos, adiciones, faseOpciones } = useMenu();
@@ -232,7 +233,7 @@ export function OrderBuilder() {
                       <p className="font-semibold">{m.name}</p>
                       <p className="text-xs text-muted-foreground mt-1">{m.description}</p>
                     </div>
-                    <Badge variant="secondary">${m.price}</Badge>
+                    <Badge variant="secondary">{formatAppMoney(m.price)}</Badge>
                   </div>
                 </button>
               );
@@ -324,7 +325,7 @@ export function OrderBuilder() {
                       />
                       <span className="text-sm font-medium">{a.name}</span>
                     </span>
-                    <Badge variant="outline">+${a.price}</Badge>
+                    <Badge variant="outline">+{formatAppMoney(a.price)}</Badge>
                   </label>
                   {selected && (
                     <div className="mt-2 pl-7">
@@ -365,12 +366,12 @@ export function OrderBuilder() {
             <p className="text-sm text-muted-foreground">Cantidad</p>
             <QuantityStepper value={itemQuantity} onChange={setItemQuantity} size="sm" />
             <p className="text-xs text-muted-foreground">
-              ${currentUnitTotal} c/u
+              {formatAppMoney(currentUnitTotal)} c/u
             </p>
           </div>
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Total de esta michelada</p>
-            <p className="text-2xl font-bold">${currentTotal}</p>
+            <p className="text-2xl font-bold">{formatAppMoney(currentTotal)}</p>
           </div>
           <Button size="lg" onClick={addToCart} className="sm:self-end">
             <Plus className="h-4 w-4 mr-1" /> Agregar al pedido
@@ -456,7 +457,7 @@ export function OrderBuilder() {
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">${it.total}</p>
+                        <p className="font-semibold">{formatAppMoney(it.total)}</p>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -475,7 +476,7 @@ export function OrderBuilder() {
           <Separator />
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Total</span>
-            <span className="text-2xl font-bold">${cartTotal}</span>
+            <span className="text-2xl font-bold">{formatAppMoney(cartTotal)}</span>
           </div>
           <Button
             className="w-full"

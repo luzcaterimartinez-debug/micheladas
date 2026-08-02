@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { queueLabel } from "@/lib/comanda-queue";
-import { faseOpcionNames, orderItemLabel, orderItemSubtitle, timeAgo } from "@/lib/comanda-display";
+import { faseOpcionNames, openComandaTicketView, orderItemLabel, orderItemSubtitle, timeAgo } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,17 @@ export function BarraComandaCard({ comanda: c, onMarkLista, onMarkEntregada, com
     setBusy(action);
     try {
       await fn();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handlePrintAndAtender() {
+    if (busy) return;
+    setBusy("atendido");
+    try {
+      openComandaTicketView(c, productos, false);
+      if (canComplete) await onMarkEntregada(c.id);
     } finally {
       setBusy(null);
     }
@@ -162,7 +173,16 @@ export function BarraComandaCard({ comanda: c, onMarkLista, onMarkEntregada, com
                 {busy === "lista" ? "…" : "Lista (mesero)"}
               </Button>
             )}
-            <ComandaViewDialog comanda={c} trigger="print" iconOnly size="sm" variant="outline" />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5 min-h-9"
+              disabled={busy !== null}
+              onClick={() => void handlePrintAndAtender()}
+            >
+              Imprimir
+            </Button>
           </div>
         </div>
       </CardContent>

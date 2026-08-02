@@ -52,6 +52,22 @@ export const FALLBACK_CERVEZA_OPCIONES: FaseOpcion[] = [
     stockKey: "cerveza_personal",
     cantidad: 1,
   },
+  { id: "tipo_poker", name: "Poker", faseId: CERVEZA_FASE_ID, stockKey: "poker", cantidad: 1 },
+  { id: "tipo_aguila", name: "Águila", faseId: CERVEZA_FASE_ID, stockKey: "aguila", cantidad: 1 },
+  {
+    id: "tipo_cerveza_light",
+    name: "Light",
+    faseId: CERVEZA_FASE_ID,
+    stockKey: "cerveza_light",
+    cantidad: 1,
+  },
+  {
+    id: "tipo_budweiser",
+    name: "Budweiser",
+    faseId: CERVEZA_FASE_ID,
+    stockKey: "budweiser",
+    cantidad: 1,
+  },
 ];
 
 export function isCervezaProduct(producto: Pick<MicheladaType, "id"> | undefined): boolean {

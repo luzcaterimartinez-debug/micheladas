@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { Users, Plus, Trash2, Move, Clock, Package, Check } from "lucide-react";
 import { useComandas, useMesas, type Mesa, type Comanda } from "@/lib/micheladas-store";
+import { formatAppMoney } from "@/lib/local-date";
 import { isMesaVirtual } from "@/lib/pos-utils";
 
 const ESTADO_META: Record<Mesa["estado"], { label: string; cls: string }> = {
@@ -211,7 +212,7 @@ export function MesasPanel() {
                                 <span className="font-medium flex items-center gap-1">
                                   <Icon className="h-3 w-3" /> #{c.folio}
                                 </span>
-                                <span className="font-semibold">${c.total}</span>
+                                <span className="font-semibold">{formatAppMoney(c.total)}</span>
                               </div>
                               <p className="text-xs text-muted-foreground">
                                 {c.items.length} bebida(s) · {c.cliente}
@@ -252,7 +253,7 @@ export function MesasPanel() {
                       </ul>
                       <div className="flex justify-between text-sm font-semibold">
                         <span>Total mesa</span>
-                        <span>${totalMesa}</span>
+                        <span>{formatAppMoney(totalMesa)}</span>
                       </div>
                     </>
                   ) : (
@@ -297,7 +298,7 @@ export function MesasPanel() {
                     #{c.folio} · {c.cliente}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {c.items.length} bebida(s) · ${c.total}
+                    {c.items.length} bebida(s) · {formatAppMoney(c.total)}
                   </p>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => openReassign(c)}>

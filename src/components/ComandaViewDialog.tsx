@@ -13,9 +13,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { queueLabel } from "@/lib/comanda-queue";
 import { faseOpcionNames, openComandaTicketView, orderItemLabel, orderItemSubtitle } from "@/lib/comanda-display";
-import { formatAppDateTime } from "@/lib/local-date";
+import { formatAppDateTime, formatAppMoney } from "@/lib/local-date";
 import { useMenu } from "@/lib/menu-context";
 import type { Comanda, MicheladaType } from "@/lib/micheladas-store";
+import { formatAdditionLine } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<Comanda["status"], string> = {
@@ -61,11 +62,7 @@ function OrderItemRow({
   const subtitle = orderItemSubtitle(item);
   const extras: string[] = [
     ...tops,
-    ...item.additions.map((a) => {
-      const q = Math.max(1, a.quantity ?? 1);
-      const name = q > 1 ? `${q}× ${a.name}` : a.name;
-      return a.price > 0 ? `${name} +$${a.price * q}` : name;
-    }),
+    ...item.additions.map((a) => formatAdditionLine(a, formatAppMoney)),
   ];
 
   return (
@@ -77,7 +74,7 @@ function OrderItemRow({
             <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
           )}
         </div>
-        <span className="text-[15px] font-medium tabular-nums shrink-0">${item.total}</span>
+        <span className="text-[15px] font-medium tabular-nums shrink-0">{formatAppMoney(item.total)}</span>
       </div>
       {extras.length > 0 && (
         <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{extras.join(" · ")}</p>
@@ -216,7 +213,7 @@ export function ComandaViewDialog({
           <div className="shrink-0 border-t px-5 py-4 space-y-4 bg-muted/20">
             <div className="flex justify-between items-baseline">
               <span className="text-sm text-muted-foreground">Total</span>
-              <span className="text-xl font-semibold tabular-nums">${comanda.total}</span>
+              <span className="text-xl font-semibold tabular-nums">{formatAppMoney(comanda.total)}</span>
             </div>
 
             <Separator />

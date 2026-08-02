@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
 import type { Comanda } from "@/lib/micheladas-store";
 import { getMesaActivity, type MesaActivity } from "@/lib/pos-utils";
+import { formatAppMoney } from "@/lib/local-date";
 import { cn } from "@/lib/utils";
 
 const STATUS_BADGE: Record<Comanda["status"], { label: string; cls: string }> = {
@@ -51,7 +52,7 @@ export function MeseroMesaActividad({
             {activity.activas.length} pedido{activity.activas.length === 1 ? "" : "s"} activo
             {activity.activas.length === 1 ? "" : "s"}
             {activity.totalCuenta > 0 && (
-              <span className="font-semibold text-foreground"> · ${activity.totalCuenta}</span>
+              <span className="font-semibold text-foreground"> · {formatAppMoney(activity.totalCuenta)}</span>
             )}
           </p>
         </div>
@@ -93,7 +94,7 @@ export function MeseroMesaActividad({
                     {c.cliente}
                   </p>
                   <p className="text-xs text-muted-foreground tabular-nums">
-                    {c.items.length} ítem{c.items.length === 1 ? "" : "s"} · ${c.total}
+                    {c.items.length} ítem{c.items.length === 1 ? "" : "s"} · {formatAppMoney(c.total)}
                   </p>
                 </div>
                 <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-md", st.cls)}>

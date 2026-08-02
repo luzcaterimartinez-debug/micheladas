@@ -56,7 +56,7 @@ function ImpresionRoute() {
 }
 
 function ImpresionPanel({ userName, onLogout }: { userName: string; onLogout: () => void }) {
-  const { comandas, loading, reload } = useComandas();
+  const { comandas, loading, reload, updateStatus } = useComandas();
   const { productos } = useMenu();
   const [autoPrint, setAutoPrint] = useState(isAutoPrintEnabled);
 
@@ -70,7 +70,14 @@ function ImpresionPanel({ userName, onLogout }: { userName: string; onLogout: ()
 
   usePrintStationPoll(reload, autoPrint);
 
-  const { lastPrinted, printedCount } = useAutoPrintComandas(comandas, productos, autoPrint);
+  const { lastPrinted, printedCount } = useAutoPrintComandas(
+    comandas,
+    productos,
+    autoPrint,
+    (c) => {
+      void updateStatus(c.id, "entregada");
+    },
+  );
 
   function toggleAutoPrint(v: boolean) {
     setAutoPrintEnabled(v);

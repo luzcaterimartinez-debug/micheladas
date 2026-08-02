@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
 import type { Comanda, Mesa } from "@/lib/micheladas-store";
+import { formatAppMoney } from "@/lib/local-date";
 import { getMesaActivity, getMesasPorAtender } from "@/lib/pos-utils";
 import { cn } from "@/lib/utils";
 
@@ -84,7 +85,7 @@ export function MeseroMesasPorAtender({
                   <p className="text-xs text-muted-foreground truncate">
                     {mesa.cliente ?? ultima?.cliente ?? "Sin nombre"}
                     {activity.totalCuenta > 0 && (
-                      <span className="tabular-nums"> · ${activity.totalCuenta}</span>
+                      <span className="tabular-nums"> · {formatAppMoney(activity.totalCuenta)}</span>
                     )}
                   </p>
                   {activity.listas > 0 && (

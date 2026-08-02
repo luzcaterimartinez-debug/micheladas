@@ -47,6 +47,7 @@ import {
 import type { InventoryItem } from "@/lib/micheladas-store";
 import type { MenuCategoria } from "@/lib/menu-utils";
 import type { MicheladaType } from "@/lib/micheladas-store";
+import { formatAppMoney } from "@/lib/local-date";
 import { cn } from "@/lib/utils";
 
 type ProductoAdmin = MicheladaType & { activo?: boolean };
@@ -356,7 +357,7 @@ export function AdminMenu() {
                         </p>
                       </div>
                       <Badge variant="secondary" className="shrink-0">
-                        ${p.price}
+                        {formatAppMoney(p.price)}
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">

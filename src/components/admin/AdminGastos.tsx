@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { localDateIso } from "@/lib/local-date";
+import { localDateIso, formatAppMoney } from "@/lib/local-date";
 import {
   CATEGORIA_GASTO_LABEL,
   CATEGORIAS_GASTO,
@@ -37,7 +37,7 @@ import {
 } from "@/lib/gastos-api";
 
 function money(n: number) {
-  return `$${n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatAppMoney(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function monthStartIso() {

@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { queueLabel, sortComandasByQueue } from "@/lib/comanda-queue";
 import { faseOpcionNames, orderItemLabel } from "@/lib/comanda-display";
 import { useMenu } from "@/lib/menu-context";
-import { formatAppTime } from "@/lib/local-date";
+import { formatAppTime, formatAppMoney } from "@/lib/local-date";
 import { useComandas, type Comanda } from "@/lib/micheladas-store";
 import { ComandaViewDialog } from "@/components/ComandaViewDialog";
 import { Check, Clock, Trash2, Package } from "lucide-react";
@@ -64,7 +64,7 @@ export function ComandasList() {
                   <li key={it.id} className="border-l-2 border-primary/40 pl-3">
                     <div className="flex justify-between font-medium">
                       <span>{orderItemLabel(it)}</span>
-                      <span>${it.total}</span>
+                      <span>{formatAppMoney(it.total)}</span>
                     </div>
                     {it.selectedToppings.length > 0 && (
                       <p className="text-xs text-muted-foreground">
@@ -92,7 +92,7 @@ export function ComandasList() {
               <Separator />
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total</span>
-                <span className="font-bold text-lg">${c.total}</span>
+                <span className="font-bold text-lg">{formatAppMoney(c.total)}</span>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 <ComandaViewDialog comanda={c} />

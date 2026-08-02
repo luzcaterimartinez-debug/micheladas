@@ -37,6 +37,7 @@ SABORES = [
     ("lulo", "Lulo", "", PRECIOS_ESTANDAR),
     ("maracumazana", "Maracumanzana", "Maracuyá + manzana", PRECIOS_ESTANDAR),
     ("maragumango", "Maragumango", "Mango + maracuyá", PRECIOS_ESTANDAR),
+    ("maracuya_sola", "Maracuyá Sola", "Solo maracuyá", PRECIOS_ESTANDAR),
     ("manzana_verde", "Manzana Verde", "", PRECIOS_ESTANDAR),
     ("frutos_rojos", "Frutos Rojos", "Cereza + sandía + fresa", PRECIOS_ESTANDAR),
     ("mango_biche", "Mango Biche", "", PRECIOS_ESTANDAR),
@@ -53,6 +54,8 @@ ADICIONES = [
     ("sandia", "Sandía", 3_000, "sandia", 3, 1),
     ("maracuya", "Maracuyá", 3_000, "maracuya", 4, 1),
     ("mango", "Mango", 3_000, "mango", 5, 1),
+    ("sal", "Sal", 3_000, "sal", 6, 1),
+    ("trululu", "Trululu", 3_000, "trululu", 7, 1),
 ]
 
 ESPECIALES = [
@@ -76,14 +79,18 @@ BEBIDAS = [
     ("corona", "Corona", 8_000, "Cerveza Corona", 2, [("corona", 1.0)]),
     ("cerveza_latona", "Cerveza latona", 6_000, "Cerveza latona", 3, [("cerveza_latona", 1.0)]),
     ("cerveza_personal", "Cerveza personal", 5_000, "Cerveza personal", 4, [("cerveza_personal", 1.0)]),
-    ("la_soda", "La soda", 5_000, "Soda", 5, [("soda", 1.0)]),
-    ("ginger_personal", "Ginger personal", 5_000, "Ginger ale personal", 6, [("ginger", 1.0)]),
+    ("poker", "Poker", 5_000, "Cerveza Poker", 5, [("poker", 1.0)]),
+    ("aguila", "Águila", 5_000, "Cerveza Águila", 6, [("aguila", 1.0)]),
+    ("cerveza_light", "Light", 5_000, "Cerveza Light", 7, [("cerveza_light", 1.0)]),
+    ("budweiser", "Budweiser", 5_000, "Cerveza Budweiser", 8, [("budweiser", 1.0)]),
+    ("la_soda", "La soda", 5_000, "Soda", 9, [("soda", 1.0)]),
+    ("ginger_personal", "Ginger personal", 5_000, "Ginger ale personal", 10, [("ginger", 1.0)]),
     (
         "ginger_litro_medio",
         "Ginger litro y medio",
         8_000,
         "Ginger ale 1.5 L",
-        7,
+        11,
         [("ginger_litro_medio", 1.0)],
     ),
 ]
@@ -93,6 +100,10 @@ BEBIDAS_INVENTARIO = [
     ("corona", "Corona", 48, "pz", 12),
     ("cerveza_latona", "Cerveza latona", 48, "pz", 12),
     ("cerveza_personal", "Cerveza personal", 48, "pz", 12),
+    ("poker", "Poker", 48, "pz", 12),
+    ("aguila", "Águila", 48, "pz", 12),
+    ("cerveza_light", "Light", 48, "pz", 12),
+    ("budweiser", "Budweiser", 48, "pz", 12),
     ("ginger_litro_medio", "Ginger 1.5 L", 24, "pz", 6),
 ]
 

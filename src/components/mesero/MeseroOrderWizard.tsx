@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -41,8 +41,11 @@ import { useMenu } from "@/lib/menu-context";
 import {
   calcItemLineTotal,
   formatAdditionLine,
+  isParaLlevar,
+  LLEVAR_EXTRA,
   llevarExtraPorUnidad,
   MESA_LLEVAR_ID,
+  orderItemQuantity,
   useComandas,
   useInventory,
   useMesas,
@@ -77,6 +80,8 @@ export function MeseroOrderWizard() {
   const [mesaDetalleId, setMesaDetalleId] = useState<string | null>(null);
   const [cliente, setCliente] = useState("");
   const [mesaId, setMesaId] = useState("");
+  /** Mesa previa al activar "para llevar" desde el carrito (para poder revertir). */
+  const mesaAntesDeLlevarRef = useRef("");
   const [selectedCategoriaIds, setSelectedCategoriaIds] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [productPicks, setProductPicks] = useState<ProductPick[]>([]);
@@ -212,12 +217,43 @@ export function MeseroOrderWizard() {
   const batchPreviewTotal = batchCards.reduce((s, c) => s + c.lineTotal, 0);
 
   const llevarExtra = llevarExtraPorUnidad(mesaId);
+  const paraLlevar = isParaLlevar(mesaId);
   const cartTotal = cart.reduce((s, i) => s + i.total, 0);
   const mesaSeleccionada =
     mesas.find((m) => m.id === mesaId) ??
     (mesaId === MESA_LLEVAR_ID
       ? { id: MESA_LLEVAR_ID, nombre: "Para llevar", capacidad: 0, estado: "libre" as const }
       : undefined);
+
+  function applyParaLlevarToCart(items: OrderItem[], extra: number): OrderItem[] {
+    return items.map((it) => ({
+      ...it,
+      llevarExtra: extra > 0 ? extra : undefined,
+      total: calcItemLineTotal(
+        it.basePrice,
+        it.additions,
+        orderItemQuantity(it),
+        extra,
+      ),
+    }));
+  }
+
+  function setParaLlevar(enabled: boolean) {
+    if (enabled) {
+      if (!isParaLlevar(mesaId)) {
+        mesaAntesDeLlevarRef.current = mesaId;
+      }
+      setMesaId(MESA_LLEVAR_ID);
+      setCart((c) => applyParaLlevarToCart(c, LLEVAR_EXTRA));
+      setCliente((c) => c.trim() || "Para llevar");
+      return;
+    }
+    const restore = mesaAntesDeLlevarRef.current || "barra";
+    mesaAntesDeLlevarRef.current = "";
+    setMesaId(restore);
+    setCart((c) => applyParaLlevarToCart(c, 0));
+  }
+
   const previewComanda = useMemo(
     (): Comanda => ({
       id: "preview",
@@ -895,6 +931,8 @@ export function MeseroOrderWizard() {
           productos={productos}
           mesa={mesaSeleccionada}
           cliente={cliente}
+          paraLlevar={paraLlevar}
+          onParaLlevarChange={setParaLlevar}
           onRemoveItem={(id) => setCart((c) => c.filter((x) => x.id !== id))}
           onUpdateQuantity={(id, quantity) =>
             setCart((c) =>

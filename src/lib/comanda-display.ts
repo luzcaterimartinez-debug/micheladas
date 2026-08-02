@@ -1,5 +1,5 @@
 import { queueLabel } from "@/lib/comanda-queue";
-import { formatAppDateTime } from "@/lib/local-date";
+import { formatAppDateTime, formatAppMoney } from "@/lib/local-date";
 import { enqueuePrint } from "@/lib/print-queue";
 import { DEFAULT_PRINTER, isRawBtPreferred } from "@/lib/printer-config";
 import { tryPrintRawBt, tryPrintRawBtFromUserGesture } from "@/lib/rawbt-print";
@@ -222,13 +222,13 @@ export function renderComandaTicket(
       const extras: string[] = [];
       if (tops.length) extras.push(`+ ${tops.join(", ")}`);
       if (adds.length) extras.push(`Adic: ${adds.join(", ")}`);
-      if ((it.llevarExtra ?? 0) > 0) extras.push(`Para llevar +$${it.llevarExtra}`);
+      if ((it.llevarExtra ?? 0) > 0) extras.push(`Para llevar +${formatAppMoney(it.llevarExtra!)}`);
 
       return `
         <div class="item">
           <div class="item-head">
             <span class="item-name">${esc(label)}</span>
-            <span class="item-price">$${it.total}</span>
+            <span class="item-price">${formatAppMoney(it.total)}</span>
           </div>
           ${extras.length ? `<div class="item-extra">${esc(extras.join(" · "))}</div>` : ""}
           ${it.notes ? `<div class="item-note">* ${esc(it.notes)}</div>` : ""}
@@ -266,7 +266,7 @@ export function renderComandaTicket(
   ${rows}
   <hr class="rule-double"/>
   <div class="total-box">
-    <div class="total"><span>TOTAL</span><span>$${c.total}</span></div>
+    <div class="total"><span>TOTAL</span><span>${formatAppMoney(c.total)}</span></div>
   </div>
   <div class="thanks">¡Gracias!</div>
   <div class="foot">${DEFAULT_PRINTER.model} · ${DEFAULT_PRINTER.paperMm}mm</div>
@@ -325,7 +325,7 @@ export function renderComandaTicketPlainText(
 
   for (const it of c.items) {
     const label = orderItemLabel(it);
-    lines.push(`${label}  $${it.total}`);
+    lines.push(`${label}  ${formatAppMoney(it.total)}`);
     const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos);
     if (tops.length) lines.push(`  + ${tops.join(", ")}`);
     const adds = it.additions.map((a) => {
@@ -333,11 +333,11 @@ export function renderComandaTicketPlainText(
       return q > 1 ? `${q}× ${a.name}` : a.name;
     });
     if (adds.length) lines.push(`  Adic: ${adds.join(", ")}`);
-    if ((it.llevarExtra ?? 0) > 0) lines.push(`  Para llevar +$${it.llevarExtra}`);
+    if ((it.llevarExtra ?? 0) > 0) lines.push(`  Para llevar +${formatAppMoney(it.llevarExtra!)}`);
     if (it.notes) lines.push(`  * ${it.notes}`);
   }
 
-  lines.push(LINE, `TOTAL  $${c.total}`, "", DEFAULT_PRINTER.model);
+  lines.push(LINE, `TOTAL  ${formatAppMoney(c.total)}`, "", DEFAULT_PRINTER.model);
   return lines.join("\n");
 }
 

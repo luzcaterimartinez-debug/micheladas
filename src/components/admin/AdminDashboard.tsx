@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useComandas, useInventory, useMesas } from "@/lib/micheladas-store";
 import { isMesaVirtual } from "@/lib/pos-utils";
 import { fetchCajaResumen, type CajaResumen } from "@/lib/caja-api";
-import { localDateIso } from "@/lib/local-date";
+import { localDateIso, formatAppMoney } from "@/lib/local-date";
 import { AlertTriangle, ClipboardList, DollarSign, Loader2, Package, RefreshCw, Users } from "lucide-react";
 
 export function AdminDashboard() {
@@ -35,7 +35,7 @@ export function AdminDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [comandas.length]);
+  }, [comandas]);
 
   async function handleRefresh() {
     if (refreshing) return;
@@ -58,9 +58,9 @@ export function AdminDashboard() {
   const stats = [
     {
       title: "Ventas hoy",
-      value: `$${ventasHoy.toLocaleString("es-CO")}`,
+      value: formatAppMoney(ventasHoy),
       sub: cajaHoy
-        ? `${comandasHoy} comandas · ${moneyShort(cajaHoy.ventasPagadas)} cobrado`
+        ? `${comandasHoy} comandas · ${formatAppMoney(cajaHoy.ventasPagadas)} cobrado`
         : "Cargando…",
       icon: DollarSign,
     },
@@ -159,7 +159,7 @@ export function AdminDashboard() {
                         {c.pagado ? " · Cobrado" : ""}
                       </p>
                     </div>
-                    <p className="font-bold text-sm tabular-nums shrink-0">${c.total}</p>
+                    <p className="font-bold text-sm tabular-nums shrink-0">{formatAppMoney(c.total)}</p>
                   </div>
                 ))}
               </div>
@@ -184,7 +184,7 @@ export function AdminDashboard() {
                           {c.status}
                           {c.pagado ? " · cobrado" : ""}
                         </td>
-                        <td className="py-2 text-right font-medium">${c.total}</td>
+                        <td className="py-2 text-right font-medium">{formatAppMoney(c.total)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -196,8 +196,4 @@ export function AdminDashboard() {
       </Card>
     </div>
   );
-}
-
-function moneyShort(n: number) {
-  return `$${n.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`;
 }

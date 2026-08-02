@@ -47,10 +47,10 @@ import {
 } from "@/lib/caja-api";
 import type { Comanda } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
-import { localDateIso } from "@/lib/local-date";
+import { localDateIso, formatAppMoney } from "@/lib/local-date";
 
 function money(n: number) {
-  return `$${n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatAppMoney(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function AdminCaja() {
@@ -102,6 +102,16 @@ export function AdminCaja() {
     setEfectivoContado("");
     void reload();
   }, [fecha, reload]);
+
+  useEffect(() => {
+    const onSync = () => void reload();
+    window.addEventListener("michelada-sync-change", onSync);
+    const interval = window.setInterval(() => void reload(), 4000);
+    return () => {
+      window.removeEventListener("michelada-sync-change", onSync);
+      window.clearInterval(interval);
+    };
+  }, [reload]);
 
   function openCobrar(c: Comanda) {
     setCobrarId(c.id);

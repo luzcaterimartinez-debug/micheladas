@@ -22,6 +22,10 @@ DEFAULT_ITEMS: list[dict[str, Any]] = [
     {"clave": "corona", "nombre": "Corona", "stock": 48, "unidad": "pz", "minimo": 12},
     {"clave": "cerveza_latona", "nombre": "Cerveza latona", "stock": 48, "unidad": "pz", "minimo": 12},
     {"clave": "cerveza_personal", "nombre": "Cerveza personal", "stock": 48, "unidad": "pz", "minimo": 12},
+    {"clave": "poker", "nombre": "Poker", "stock": 48, "unidad": "pz", "minimo": 12},
+    {"clave": "aguila", "nombre": "Águila", "stock": 48, "unidad": "pz", "minimo": 12},
+    {"clave": "cerveza_light", "nombre": "Light", "stock": 48, "unidad": "pz", "minimo": 12},
+    {"clave": "budweiser", "nombre": "Budweiser", "stock": 48, "unidad": "pz", "minimo": 12},
     {"clave": "ginger_litro_medio", "nombre": "Ginger 1.5 L", "stock": 24, "unidad": "pz", "minimo": 6},
     {"clave": "clamato", "nombre": "Clamato", "stock": 8, "unidad": "L", "minimo": 2},
     {"clave": "limon", "nombre": "Limón", "stock": 100, "unidad": "pz", "minimo": 15},
@@ -32,6 +36,8 @@ DEFAULT_ITEMS: list[dict[str, Any]] = [
     {"clave": "sandia", "nombre": "Sandía", "stock": 50, "unidad": "pz", "minimo": 10},
     {"clave": "maracuya", "nombre": "Maracuyá", "stock": 50, "unidad": "pz", "minimo": 10},
     {"clave": "mango", "nombre": "Mango", "stock": 50, "unidad": "pz", "minimo": 10},
+    {"clave": "sal", "nombre": "Sal", "stock": 50, "unidad": "pz", "minimo": 10},
+    {"clave": "trululu", "nombre": "Trululu", "stock": 50, "unidad": "pz", "minimo": 10},
 ]
 
 # Productos de categoría Bebidas: 1 unidad del ítem, sin limón.
@@ -40,6 +46,10 @@ BEBIDAS_CONSUMO: dict[str, list[tuple[str, float]]] = {
     "corona": [("corona", 1.0)],
     "cerveza_latona": [("cerveza_latona", 1.0)],
     "cerveza_personal": [("cerveza_personal", 1.0)],
+    "poker": [("poker", 1.0)],
+    "aguila": [("aguila", 1.0)],
+    "cerveza_light": [("cerveza_light", 1.0)],
+    "budweiser": [("budweiser", 1.0)],
     "la_soda": [("soda", 1.0)],
     "ginger_personal": [("ginger", 1.0)],
     "ginger_litro_medio": [("ginger_litro_medio", 1.0)],

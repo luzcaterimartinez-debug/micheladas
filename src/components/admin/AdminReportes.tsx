@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { localDateIso } from "@/lib/local-date";
+import { localDateIso, formatAppMoney } from "@/lib/local-date";
 import { fetchReporte, type PeriodoReporte, type ReporteData } from "@/lib/reportes-api";
 
 const MESES = [
@@ -39,7 +39,7 @@ const ESTADO_LABEL: Record<string, string> = {
 };
 
 function money(n: number) {
-  return `$${n.toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  return formatAppMoney(n, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
 function SerieChart({ serie }: { serie: ReporteData["serie"] }) {

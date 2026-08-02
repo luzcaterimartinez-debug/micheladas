@@ -1,3 +1,5 @@
+import { formatAppMoney } from "@/lib/local-date";
+
 export type FlavorTheme = {
   border: string;
   title: string;
@@ -35,6 +37,12 @@ const THEMES: Record<string, FlavorTheme> = {
     title: "#e65100",
     subtitle: "#ff9800",
     ring: "rgba(245, 124, 0, 0.35)",
+  },
+  maracuya_sola: {
+    border: "#c0ca33",
+    title: "#9e9d24",
+    subtitle: "#d4e157",
+    ring: "rgba(192, 202, 51, 0.4)",
   },
   manzana_verde: {
     border: "#7cb342",
@@ -103,8 +111,9 @@ export function flavorTheme(categoriaId: string): FlavorTheme {
   return THEMES[categoriaId] ?? DEFAULT_THEME;
 }
 
+/** Precio en COP con separador de miles (ej. $14.000). */
 export function formatMenuPrice(value: number): string {
-  return `$${value.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`;
+  return formatAppMoney(value);
 }
 
 export function productBaseLabel(productName: string, categoriaName: string): string {

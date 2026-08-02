@@ -1,12 +1,13 @@
-import { MapPin, ShoppingCart, Trash2, User } from "lucide-react";
+import { MapPin, ShoppingBag, ShoppingCart, Trash2, User } from "lucide-react";
 
 import { QuantityStepper } from "@/components/QuantityStepper";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { MeseroStepHeader, ThemedPanel, ThemedPanelHeader } from "@/components/michelandia/michelandia-ui";
 import { formatMenuPrice } from "@/lib/michelandia-theme";
 import { faseOpcionNames, orderItemLabel, orderItemSubtitle } from "@/lib/comanda-display";
 import type { Mesa, MicheladaType, OrderItem } from "@/lib/micheladas-store";
-import { formatAdditionLine, orderItemQuantity } from "@/lib/micheladas-store";
+import { formatAdditionLine, LLEVAR_EXTRA, orderItemQuantity } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
 
 const TOUCH = "touch-manipulation active:scale-[0.98] transition-all duration-150";
@@ -17,6 +18,8 @@ type Props = {
   productos: MicheladaType[];
   mesa?: Mesa;
   cliente?: string;
+  paraLlevar?: boolean;
+  onParaLlevarChange?: (enabled: boolean) => void;
   onRemoveItem: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
 };
@@ -97,6 +100,8 @@ export function MeseroPasoCarrito({
   productos,
   mesa,
   cliente,
+  paraLlevar = false,
+  onParaLlevarChange,
   onRemoveItem,
   onUpdateQuantity,
 }: Props) {
@@ -126,6 +131,33 @@ export function MeseroPasoCarrito({
             </span>
           )}
         </div>
+      )}
+
+      {onParaLlevarChange && (
+        <label
+          className={cn(
+            TOUCH,
+            "flex items-center gap-3 rounded-2xl bg-white/95 border-2 px-4 py-3.5 shadow-sm cursor-pointer",
+            paraLlevar ? "border-amber-500 ring-2 ring-amber-500/20" : "border-white",
+          )}
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+            <ShoppingBag className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-extrabold text-sm text-slate-900 leading-tight">
+              Pedido para llevar
+            </span>
+            <span className="block text-xs text-slate-600 mt-0.5 font-medium">
+              +{formatMenuPrice(LLEVAR_EXTRA)} por cada producto
+            </span>
+          </span>
+          <Switch
+            checked={paraLlevar}
+            onCheckedChange={onParaLlevarChange}
+            aria-label="Cambiar pedido para llevar"
+          />
+        </label>
       )}
 
       {count === 0 ? (

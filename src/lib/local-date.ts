@@ -51,7 +51,9 @@ export function formatAppMoney(
   options: Intl.NumberFormatOptions = {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
+    useGrouping: true,
   },
 ): string {
-  return `$${n.toLocaleString(APP_LOCALE, options)}`;
+  const value = Number.isFinite(n) ? n : 0;
+  return `$${value.toLocaleString(APP_LOCALE, { useGrouping: true, ...options })}`;
 }

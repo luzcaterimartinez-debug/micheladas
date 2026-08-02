@@ -48,6 +48,7 @@ import {
   updateAdicion,
 } from "@/lib/menu-api";
 import type { Addition } from "@/lib/micheladas-store";
+import { formatAppMoney } from "@/lib/local-date";
 
 type AdicionAdmin = Addition & { activo?: boolean };
 
@@ -226,7 +227,7 @@ export function AdminAdiciones() {
                       )}
                     </div>
                     <Badge variant="secondary" className="shrink-0 tabular-nums">
-                      +${a.price}
+                      +{formatAppMoney(a.price)}
                     </Badge>
                   </div>
                   <div className="flex gap-2">

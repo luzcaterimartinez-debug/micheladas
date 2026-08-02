@@ -17,7 +17,7 @@ import {
   setCachedInventario,
   setCachedMesas,
 } from "@/lib/offline/local-cache";
-import { isNetworkFailure, isRetryableSyncError, shouldSyncWithServer } from "@/lib/offline/network";
+import { isNetworkFailure, isRetryableSyncError, notifySyncChange, shouldSyncWithServer } from "@/lib/offline/network";
 import {
   buildOptimisticComanda,
   discardLocalComanda,
@@ -219,6 +219,8 @@ export const ADDITIONS: Addition[] = [
   { id: "sandia", name: "Sandía", price: 3000, stockKey: "sandia" },
   { id: "maracuya", name: "Maracuyá", price: 3000, stockKey: "maracuya" },
   { id: "mango", name: "Mango", price: 3000, stockKey: "mango" },
+  { id: "sal", name: "Sal", price: 3000, stockKey: "sal" },
+  { id: "trululu", name: "Trululu", price: 3000, stockKey: "trululu" },
 ];
 
 const DEFAULT_INVENTORY: InventoryItem[] = [
@@ -231,6 +233,10 @@ const DEFAULT_INVENTORY: InventoryItem[] = [
   { key: "corona", name: "Corona", stock: 48, unit: "pz", minStock: 12 },
   { key: "cerveza_latona", name: "Cerveza latona", stock: 48, unit: "pz", minStock: 12 },
   { key: "cerveza_personal", name: "Cerveza personal", stock: 48, unit: "pz", minStock: 12 },
+  { key: "poker", name: "Poker", stock: 48, unit: "pz", minStock: 12 },
+  { key: "aguila", name: "Águila", stock: 48, unit: "pz", minStock: 12 },
+  { key: "cerveza_light", name: "Light", stock: 48, unit: "pz", minStock: 12 },
+  { key: "budweiser", name: "Budweiser", stock: 48, unit: "pz", minStock: 12 },
   { key: "ginger_litro_medio", name: "Ginger 1.5 L", stock: 24, unit: "pz", minStock: 6 },
   { key: "clamato", name: "Clamato", stock: 8, unit: "L", minStock: 2 },
   { key: "limon", name: "Limón", stock: 100, unit: "pz", minStock: 15 },
@@ -241,6 +247,8 @@ const DEFAULT_INVENTORY: InventoryItem[] = [
   { key: "sandia", name: "Sandía", stock: 50, unit: "pz", minStock: 10 },
   { key: "maracuya", name: "Maracuyá", stock: 50, unit: "pz", minStock: 10 },
   { key: "mango", name: "Mango", stock: 50, unit: "pz", minStock: 10 },
+  { key: "sal", name: "Sal", stock: 50, unit: "pz", minStock: 10 },
+  { key: "trululu", name: "Trululu", stock: 50, unit: "pz", minStock: 10 },
 ];
 
 const DEFAULT_MESAS: Mesa[] = [
@@ -303,9 +311,10 @@ export function useComandas() {
     };
     window.addEventListener("michelada-sync-change", onSync);
 
+    // Polling corto para que barra ↔ admin se vean al instante.
     const interval = window.setInterval(() => {
       if (shouldSyncWithServer()) void reload();
-    }, 10000);
+    }, 4000);
 
     return () => {
       window.clearInterval(interval);
@@ -393,9 +402,11 @@ export function useComandas() {
         setComandas((prev) =>
           prev.map((c) => (c.id === id ? updated : c)).sort(sortComandasByQueue),
         );
+        notifySyncChange();
       } catch (err) {
         if (isNetworkFailure(err)) {
           enqueueOp({ type: "comanda:patch", comandaId: id, patch: { status } });
+          notifySyncChange();
           return;
         }
         const msg = err instanceof Error ? err.message.toLowerCase() : "";
@@ -403,6 +414,7 @@ export function useComandas() {
         if (msg.includes("no encontrada") || msg.includes("404")) {
           discardLocalComanda(id);
           setComandas((prev) => prev.filter((c) => c.id !== id));
+          notifySyncChange();
           return;
         }
         // Revertir si el servidor rechazó el cambio.
@@ -868,7 +880,8 @@ export function additionQuantity(a: { quantity?: number }): number {
 /** Etiqueta de adición con cantidad (ej. "2× Cereza +$6.000"). */
 export function formatAdditionLine(
   a: { name: string; price: number; quantity?: number },
-  formatPrice: (n: number) => string = (n) => `$${n}`,
+  formatPrice: (n: number) => string = (n) =>
+    `$${n.toLocaleString("es-CO", { maximumFractionDigits: 0, useGrouping: true })}`,
 ): string {
   const qty = additionQuantity(a);
   const line = a.price * qty;

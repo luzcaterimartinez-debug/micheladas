@@ -132,7 +132,7 @@ function MesaTile({
         </div>
         {hasActivas && (
           <span className="text-xs font-bold tabular-nums text-slate-700 shrink-0">
-            ${activity.totalCuenta}
+            {formatMenuPrice(activity.totalCuenta)}
           </span>
         )}
       </div>

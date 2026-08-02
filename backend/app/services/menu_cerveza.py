@@ -14,6 +14,10 @@ OPCIONES = [
     ("tipo_corona", "Corona", "corona"),
     ("tipo_cerveza_latona", "Cerveza latona", "cerveza_latona"),
     ("tipo_cerveza_personal", "Cerveza personal", "cerveza_personal"),
+    ("tipo_poker", "Poker", "poker"),
+    ("tipo_aguila", "Águila", "aguila"),
+    ("tipo_cerveza_light", "Light", "cerveza_light"),
+    ("tipo_budweiser", "Budweiser", "budweiser"),
 ]
 
 

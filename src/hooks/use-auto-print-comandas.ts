@@ -41,8 +41,12 @@ export function useAutoPrintComandas(
   comandas: Comanda[],
   productos: MicheladaType[],
   enabled: boolean,
+  /** Tras imprimir (p. ej. marcar atendido). */
+  onPrinted?: (comanda: Comanda) => void,
 ) {
   const printedIds = useRef(loadPrintedIds());
+  const onPrintedRef = useRef(onPrinted);
+  onPrintedRef.current = onPrinted;
   const [lastPrinted, setLastPrinted] = useState<LastPrinted | null>(null);
   const [printedCount, setPrintedCount] = useState(0);
 
@@ -50,6 +54,7 @@ export function useAutoPrintComandas(
     if (!enabled || !isPrintStation()) return;
     if (printComandaIfNew(c, productos, printedIds.current)) {
       recordPrint(c, setLastPrinted, setPrintedCount);
+      onPrintedRef.current?.(c);
     }
   };
 

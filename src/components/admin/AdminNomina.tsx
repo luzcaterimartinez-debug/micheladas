@@ -50,6 +50,7 @@ import {
   type NominaPrestamo,
   type TipoPago,
 } from "@/lib/nomina-api";
+import { formatAppMoney } from "@/lib/local-date";
 
 const MESES = [
   "Enero",
@@ -67,7 +68,7 @@ const MESES = [
 ];
 
 function money(n: number) {
-  return `$${n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatAppMoney(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 type ConfigForm = {
