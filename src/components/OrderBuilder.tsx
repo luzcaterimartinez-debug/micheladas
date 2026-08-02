@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,7 @@ export function OrderBuilder() {
   const [mesaId, setMesaId] = useState<string>("__none__");
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [sending, setSending] = useState(false);
+  const sendClientIdRef = useRef<string | null>(null);
 
   function resetCompletedOrder() {
     setCart([]);
@@ -62,6 +63,7 @@ export function OrderBuilder() {
     setNotes("");
     setItemQuantity(1);
     setSending(false);
+    sendClientIdRef.current = null;
   }
 
   useEffect(() => {
@@ -166,13 +168,14 @@ export function OrderBuilder() {
       if (cart.length === 0) toast.error("Agrega al menos una michelada");
       return;
     }
+    if (!sendClientIdRef.current) sendClientIdRef.current = crypto.randomUUID();
     const snapshot = {
       cliente: cliente.trim() || "Cliente",
       mesaId: mesaId !== "__none__" ? mesaId : undefined,
       mesa: mesaNombre,
       items: cart,
       total: cartTotal,
-      clientId: crypto.randomUUID(),
+      clientId: sendClientIdRef.current,
     };
     void (async () => {
       setSending(true);
@@ -192,6 +195,7 @@ export function OrderBuilder() {
         toast.error(result.error);
         return;
       }
+      sendClientIdRef.current = null;
       toast.success(
         result.queued
           ? `Comanda #${result.comanda.folio} guardada para sincronizar.`

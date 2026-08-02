@@ -154,7 +154,10 @@ export async function fetchComandas(opts?: {
   if (opts?.mesaId) params.set("mesa_id", opts.mesaId);
   if (opts?.limit != null) params.set("limit", String(opts.limit));
   const q = params.toString() ? `?${params.toString()}` : "";
-  const res = await fetch(`${getApiUrl()}/api/comandas${q}`, { headers: authHeaders() });
+  const res = await fetchWithTimeout(`${getApiUrl()}/api/comandas${q}`, {
+    headers: authHeaders(),
+    cache: "no-store",
+  });
   const data = await res.json().catch(() => ({}));
   assertOk(res, data);
   return (data as Record<string, unknown>[]).map(mapComanda);
@@ -185,14 +188,14 @@ export async function patchComandaApi(
   id: string,
   patch: {
     status?: Comanda["status"];
-    mesa?: string;
-    mesaId?: string;
+    mesa?: string | null;
+    mesaId?: string | null;
     cliente?: string;
     items?: Comanda["items"];
     total?: number;
   },
 ): Promise<Comanda> {
-  const res = await fetch(`${getApiUrl()}/api/comandas/${id}`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}/api/comandas/${id}`, {
     method: "PATCH",
     headers: authHeaders(),
     body: JSON.stringify(patch),

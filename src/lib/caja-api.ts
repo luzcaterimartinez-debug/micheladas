@@ -1,4 +1,6 @@
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
+import { fetchWithTimeout } from "@/lib/api-fetch";
+import { markApiFailureFromStatus } from "@/lib/offline/network";
 import type { Comanda } from "@/lib/micheladas-store";
 import { mapComanda } from "@/lib/pos-api";
 
@@ -106,11 +108,18 @@ function mapCorte(raw: Record<string, unknown>): CorteCaja {
   };
 }
 
+function assertCajaOk(res: Response, data: unknown): asserts res is Response & { ok: true } {
+  if (!res.ok) {
+    markApiFailureFromStatus(res.status);
+    throw new Error(parseApiError(data, res.status));
+  }
+}
+
 export async function fetchCajaResumen(fecha?: string): Promise<CajaResumen> {
   const q = fecha ? `?fecha=${encodeURIComponent(fecha)}` : "";
-  const res = await fetch(`${getApiUrl()}/api/caja/resumen${q}`, { headers: authHeaders() });
+  const res = await fetchWithTimeout(`${getApiUrl()}/api/caja/resumen${q}`, { headers: authHeaders() });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertCajaOk(res, data);
   return mapResumen(data as Record<string, unknown>);
 }
 
@@ -122,30 +131,30 @@ export async function fetchCajaComandas(opts?: {
   if (opts?.fecha) params.set("fecha", opts.fecha);
   if (opts?.pagado != null) params.set("pagado", String(opts.pagado));
   const q = params.toString() ? `?${params.toString()}` : "";
-  const res = await fetch(`${getApiUrl()}/api/caja/comandas${q}`, { headers: authHeaders() });
+  const res = await fetchWithTimeout(`${getApiUrl()}/api/caja/comandas${q}`, { headers: authHeaders() });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertCajaOk(res, data);
   return (data as Record<string, unknown>[]).map(mapComanda);
 }
 
 export async function registrarPagoApi(comandaId: string, input: PagoInput): Promise<Comanda> {
-  const res = await fetch(`${getApiUrl()}/api/caja/pagos/${comandaId}`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}/api/caja/pagos/${comandaId}`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(input),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertCajaOk(res, data);
   return mapComanda(data as Record<string, unknown>);
 }
 
 export async function anularPagoApi(comandaId: string): Promise<Comanda> {
-  const res = await fetch(`${getApiUrl()}/api/caja/pagos/${comandaId}`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}/api/caja/pagos/${comandaId}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertCajaOk(res, data);
   return mapComanda(data as Record<string, unknown>);
 }
 
@@ -154,19 +163,21 @@ export async function crearCorteApi(input: {
   efectivoContado: number;
   notas?: string;
 }): Promise<CorteCaja> {
-  const res = await fetch(`${getApiUrl()}/api/caja/corte`, {
+  const res = await fetchWithTimeout(`${getApiUrl()}/api/caja/corte`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(input),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertCajaOk(res, data);
   return mapCorte(data as Record<string, unknown>);
 }
 
 export async function fetchCortes(limit = 30): Promise<CorteCaja[]> {
-  const res = await fetch(`${getApiUrl()}/api/caja/cortes?limit=${limit}`, { headers: authHeaders() });
+  const res = await fetchWithTimeout(`${getApiUrl()}/api/caja/cortes?limit=${limit}`, {
+    headers: authHeaders(),
+  });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(parseApiError(data, res.status));
+  assertCajaOk(res, data);
   return (data as Record<string, unknown>[]).map(mapCorte);
 }

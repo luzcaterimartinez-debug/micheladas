@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
+import { OfflineSyncBanner } from "@/components/OfflineSyncBanner";
 import appCss from "../styles.css?url";
 import { PwaRegistrar } from "../components/PwaRegistrar";
 import { PWA_THEME_COLOR } from "../pwa/manifest";
@@ -129,6 +130,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <PwaRegistrar />
+      <OfflineSyncBanner />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>

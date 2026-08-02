@@ -56,7 +56,8 @@ export function useOfflineSync() {
     window.addEventListener("michelada-sync-change", onChange);
     refresh();
     void pingServer();
-    const interval = window.setInterval(() => void pingServer(), 15000);
+    // Health frecuente: si MySQL/API cae, el banner aparece y se recupera solo.
+    const interval = window.setInterval(() => void pingServer(), 5_000);
     return () => {
       teardown();
       window.clearInterval(interval);

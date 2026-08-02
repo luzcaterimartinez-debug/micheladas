@@ -1,4 +1,4 @@
-import { MapPin, ShoppingBag, ShoppingCart, Trash2, User } from "lucide-react";
+import { MapPin, ShoppingBag, ShoppingCart, Trash2, User, Zap } from "lucide-react";
 
 import { QuantityStepper } from "@/components/QuantityStepper";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { MeseroStepHeader, ThemedPanel, ThemedPanelHeader } from "@/components/michelandia/michelandia-ui";
 import { formatMenuPrice } from "@/lib/michelandia-theme";
 import { faseOpcionNames, orderItemLabel, orderItemSubtitle } from "@/lib/comanda-display";
+import type { PedidoAtajo } from "@/lib/mesero-atajos";
 import type { Mesa, MicheladaType, OrderItem } from "@/lib/micheladas-store";
 import { formatAdditionLine, LLEVAR_EXTRA, orderItemQuantity } from "@/lib/micheladas-store";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,8 @@ type Props = {
   onParaLlevarChange?: (enabled: boolean) => void;
   onRemoveItem: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
+  atajos?: PedidoAtajo[];
+  onAtajo?: (atajo: PedidoAtajo) => void;
 };
 
 function CartItemRow({
@@ -104,6 +107,8 @@ export function MeseroPasoCarrito({
   onParaLlevarChange,
   onRemoveItem,
   onUpdateQuantity,
+  atajos,
+  onAtajo,
 }: Props) {
   const clienteLabel = cliente?.trim();
   const count = cart.reduce((sum, it) => sum + orderItemQuantity(it), 0);
@@ -130,6 +135,31 @@ export function MeseroPasoCarrito({
               <span className="font-semibold truncate max-w-[10rem]">{clienteLabel}</span>
             </span>
           )}
+        </div>
+      )}
+
+      {atajos && atajos.length > 0 && onAtajo && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-white/90 flex items-center gap-1.5">
+            <Zap className="h-3.5 w-3.5" />
+            Pedidos frecuentes
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {atajos.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className={cn(
+                  TOUCH,
+                  "rounded-xl bg-white/95 border border-white px-3 py-2.5 text-left text-sm font-bold text-slate-900 shadow-sm",
+                  "hover:bg-amber-50 active:bg-amber-100",
+                )}
+                onClick={() => onAtajo(a)}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

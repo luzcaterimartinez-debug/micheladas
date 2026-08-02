@@ -29,6 +29,7 @@ import { MeseroPasoFase } from "@/components/mesero/MeseroPasoFase";
 import { MeseroPasoMesa } from "@/components/mesero/MeseroPasoMesa";
 import { useMeseroComandaAlerts } from "@/hooks/use-mesero-comanda-alerts";
 import { sendToBarraAndOpenTicket } from "@/lib/send-to-barra";
+import { PEDIDOS_ATAJO, type PedidoAtajo } from "@/lib/mesero-atajos";
 import {
   clearMeseroFreshStart,
   consumeMeseroCartRestore,
@@ -102,6 +103,8 @@ export function MeseroOrderWizard() {
   const [itemQuantity, setItemQuantity] = useState(1);
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [sending, setSending] = useState(false);
+  /** clientId estable mientras el envío no termine (evita doble comanda). */
+  const sendClientIdRef = useRef<string | null>(null);
 
   function resetCompletedOrder() {
     setCart([]);
@@ -120,6 +123,7 @@ export function MeseroOrderWizard() {
     setNotes("");
     setItemQuantity(1);
     setSending(false);
+    sendClientIdRef.current = null;
     setCurrentStep("mesa");
   }
 
@@ -612,13 +616,14 @@ export function MeseroOrderWizard() {
     }
     const items = pricedCartForMesa(cart, mesaId);
     const total = items.reduce((s, i) => s + i.total, 0);
+    if (!sendClientIdRef.current) sendClientIdRef.current = crypto.randomUUID();
     const snapshot = {
       cliente: cliente.trim() || "Cliente",
       mesaId: mesaId || undefined,
       mesa: mesaSeleccionada?.nombre,
       items,
       total,
-      clientId: crypto.randomUUID(),
+      clientId: sendClientIdRef.current,
     };
     void (async () => {
       setSending(true);
@@ -638,6 +643,7 @@ export function MeseroOrderWizard() {
         toast.error(result.error);
         return;
       }
+      sendClientIdRef.current = null;
       toast.success(
         result.queued
           ? `Turno ${result.comanda.queueOrder} · Comanda #${result.comanda.folio} guardada.`
@@ -646,6 +652,19 @@ export function MeseroOrderWizard() {
       void reloadMesas();
       void reloadComandas();
     })();
+  }
+
+  function addAtajoToCart(atajo: PedidoAtajo) {
+    const p = productos.find((x) => x.id === atajo.productId);
+    if (!p) {
+      toast.error(`No está en el menú: ${atajo.label}`);
+      return;
+    }
+    const qty = Math.max(1, atajo.quantity ?? 1);
+    const toppings = atajo.cervezaOpcionId ? [atajo.cervezaOpcionId] : [];
+    const item = buildCartItem(p, qty, { toppings });
+    setCart((c) => [...c, item]);
+    toast.success(`${atajo.label} agregada`);
   }
 
   function canContinue(): boolean {
@@ -963,6 +982,8 @@ export function MeseroOrderWizard() {
           cliente={cliente}
           paraLlevar={paraLlevar}
           onParaLlevarChange={setParaLlevar}
+          atajos={PEDIDOS_ATAJO}
+          onAtajo={addAtajoToCart}
           onRemoveItem={(id) => setCart((c) => c.filter((x) => x.id !== id))}
           onUpdateQuantity={(id, quantity) =>
             setCart((c) =>

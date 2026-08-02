@@ -35,8 +35,28 @@ export type SendToBarraResult =
   | { ok: true; comanda: Comanda; queued: boolean }
   | { ok: false; error: string };
 
+/** Evita doble envío concurrente con el mismo clientId. */
+const inFlightByClientId = new Map<string, Promise<SendToBarraResult>>();
+
 /** Envía la comanda a barra, la marca atendida y abre /ticket para imprimir. */
 export async function sendToBarraAndOpenTicket(
+  order: BarraOrderPayload,
+  productos: MicheladaType[],
+  deps: SendDeps,
+): Promise<SendToBarraResult> {
+  const existing = inFlightByClientId.get(order.clientId);
+  if (existing) return existing;
+
+  const run = doSend(order, productos, deps);
+  inFlightByClientId.set(order.clientId, run);
+  try {
+    return await run;
+  } finally {
+    inFlightByClientId.delete(order.clientId);
+  }
+}
+
+async function doSend(
   order: BarraOrderPayload,
   productos: MicheladaType[],
   deps: SendDeps,
@@ -52,7 +72,6 @@ export async function sendToBarraAndOpenTicket(
     try {
       await deps.markEntregada(comanda.id);
     } catch {
-      // Si falla el patch, igual devolvemos la comanda; el envío ya ocurrió.
       finalComanda = comanda;
     }
 

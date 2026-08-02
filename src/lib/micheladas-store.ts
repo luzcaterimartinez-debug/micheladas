@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getStoredSession } from "@/lib/auth";
 import {
@@ -12,12 +12,19 @@ import {
   getCachedComandas,
   getCachedInventario,
   getCachedMesas,
+  LS_COMANDAS,
   nextLocalFolio,
   setCachedComandas,
   setCachedInventario,
   setCachedMesas,
 } from "@/lib/offline/local-cache";
-import { isNetworkFailure, isRetryableSyncError, notifySyncChange, shouldSyncWithServer } from "@/lib/offline/network";
+import {
+  checkServerReachable,
+  isNetworkFailure,
+  isRetryableSyncError,
+  notifySyncChange,
+  shouldSyncWithServer,
+} from "@/lib/offline/network";
 import {
   buildOptimisticComanda,
   discardLocalComanda,
@@ -265,62 +272,110 @@ export function useComandas() {
   const [comandas, setComandas] = useState<Comanda[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const reloadingRef = useRef(false);
+
+  const applyFromCache = useCallback(() => {
+    setComandas(foldOutboxIntoComandas(getCachedComandas()).sort(sortComandasByQueue));
+  }, []);
 
   const reload = useCallback(async () => {
-    if (!getStoredSession()) {
-      setComandas(getCachedComandas());
-      setLoading(false);
-      return;
-    }
-
-    const cached = getCachedComandas();
-    if (!shouldSyncWithServer()) {
-      setComandas([...cached].sort(sortComandasByQueue));
-      setLoading(false);
-      return;
-    }
-
+    if (reloadingRef.current) return;
+    reloadingRef.current = true;
     try {
+      if (!getStoredSession()) {
+        applyFromCache();
+        setLoading(false);
+        return;
+      }
+
+      const cached = getCachedComandas();
+      // Mostrar caché al instante mientras se pide al servidor.
       if (cached.length > 0) {
         setComandas(foldOutboxIntoComandas([...cached]).sort(sortComandasByQueue));
       }
-      await flushOutbox();
-      const data = await fetchComandas({ status: "pendiente,lista,entregada", limit: 500 });
-      const merged = foldOutboxIntoComandas(data);
-      setCachedComandas(merged);
-      setComandas(merged);
-      setError(null);
-    } catch (err) {
-      setComandas(foldOutboxIntoComandas([...cached]).sort(sortComandasByQueue));
-      if (isNetworkFailure(err) || !shouldSyncWithServer()) {
+
+      if (!shouldSyncWithServer()) {
+        const ok = await checkServerReachable();
+        if (!ok) {
+          applyFromCache();
+          setLoading(false);
+          return;
+        }
+      }
+
+      try {
+        await flushOutbox();
+        const data = await fetchComandas({ status: "pendiente,lista,entregada", limit: 500 });
+        const merged = foldOutboxIntoComandas(data);
+        setCachedComandas(merged);
+        setComandas(merged);
         setError(null);
-      } else {
-        setError(err instanceof Error ? err.message : "Error al cargar comandas");
+      } catch (err) {
+        applyFromCache();
+        if (isNetworkFailure(err) || !shouldSyncWithServer()) {
+          setError(null);
+        } else {
+          setError(err instanceof Error ? err.message : "Error al cargar comandas");
+        }
+      } finally {
+        setLoading(false);
       }
     } finally {
-      setLoading(false);
+      reloadingRef.current = false;
     }
-  }, []);
+  }, [applyFromCache]);
 
   useEffect(() => {
     void reload();
     if (!getStoredSession()) return;
 
     const onSync = () => {
-      if (shouldSyncWithServer()) void reload();
+      void reload();
     };
-    window.addEventListener("michelada-sync-change", onSync);
 
-    // Polling corto para que barra ↔ admin se vean al instante.
+    const onStore = (e: Event) => {
+      const key = (e as CustomEvent<{ key?: string }>).detail?.key;
+      if (key === LS_COMANDAS) applyFromCache();
+    };
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LS_COMANDAS) applyFromCache();
+    };
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("michelada-sync");
+      bc.onmessage = () => void reload();
+    } catch {
+      bc = null;
+    }
+
+    window.addEventListener("michelada-sync-change", onSync);
+    window.addEventListener("michelada-api-recovered", onSync);
+    window.addEventListener("michelada-store-change", onStore);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", onSync);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") onSync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    // Polling agresivo para admin/barra en tiempo real entre dispositivos.
     const interval = window.setInterval(() => {
-      if (shouldSyncWithServer()) void reload();
-    }, 4000);
+      void reload();
+    }, 2000);
 
     return () => {
       window.clearInterval(interval);
       window.removeEventListener("michelada-sync-change", onSync);
+      window.removeEventListener("michelada-api-recovered", onSync);
+      window.removeEventListener("michelada-store-change", onStore);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", onSync);
+      document.removeEventListener("visibilitychange", onVisible);
+      bc?.close();
     };
-  }, [reload]);
+  }, [reload, applyFromCache]);
 
   return {
     comandas,
@@ -347,6 +402,7 @@ export function useComandas() {
         setComandas(all);
         markMesaOcupadaLocally(c.mesaId, c.cliente, DEFAULT_MESAS);
         notifyComandaNueva(nueva);
+        notifySyncChange();
         return nueva;
       }
 
@@ -359,6 +415,7 @@ export function useComandas() {
         setComandas((prev) => [...prev, nueva].sort(sortComandasByQueue));
         markMesaOcupadaLocally(c.mesaId, c.cliente, DEFAULT_MESAS);
         notifyComandaNueva(nueva);
+        notifySyncChange();
         return nueva;
       };
 
@@ -372,6 +429,7 @@ export function useComandas() {
         );
         markMesaOcupadaLocally(nueva.mesaId ?? c.mesaId, nueva.cliente, DEFAULT_MESAS);
         notifyComandaNueva(nueva);
+        notifySyncChange();
         return nueva;
       } catch (err) {
         if (isNetworkFailure(err) || isRetryableSyncError(err)) return queueOffline();
@@ -393,6 +451,7 @@ export function useComandas() {
 
       if (!shouldSyncWithServer()) {
         enqueueOp({ type: "comanda:patch", comandaId: id, patch: { status } });
+        notifySyncChange();
         return;
       }
 
@@ -490,13 +549,21 @@ export function useComandas() {
     },
     updatePedido: async (
       id: string,
-      patch: { cliente?: string; items: OrderItem[]; total: number },
+      patch: {
+        cliente?: string;
+        items: OrderItem[];
+        total: number;
+        mesaId?: string | null;
+        mesa?: string | null;
+      },
     ) => {
       const before = getCachedComandas().find((x) => x.id === id);
       const localPatch = {
         cliente: patch.cliente,
         items: patch.items,
         total: patch.total,
+        ...(patch.mesaId !== undefined ? { mesaId: patch.mesaId || undefined } : {}),
+        ...(patch.mesa !== undefined ? { mesa: patch.mesa || undefined } : {}),
       };
 
       const applyLocal = () => {
@@ -511,6 +578,8 @@ export function useComandas() {
                     cliente: patch.cliente?.trim() || c.cliente,
                     items: patch.items,
                     total: patch.total,
+                    ...(patch.mesaId !== undefined ? { mesaId: patch.mesaId || undefined } : {}),
+                    ...(patch.mesa !== undefined ? { mesa: patch.mesa || undefined } : {}),
                   }
                 : c,
             )
@@ -520,10 +589,11 @@ export function useComandas() {
 
       if (!getStoredSession()) {
         applyLocal();
+        notifySyncChange();
         return getCachedComandas().find((x) => x.id === id)!;
       }
 
-      // Optimista para que barra vea el cambio al instante.
+      // Optimista para que barra/caja vean el cambio al instante.
       patchComandaInCache(id, localPatch);
       setComandas((prev) =>
         prev
@@ -534,6 +604,8 @@ export function useComandas() {
                   cliente: patch.cliente?.trim() || c.cliente,
                   items: patch.items,
                   total: patch.total,
+                  ...(patch.mesaId !== undefined ? { mesaId: patch.mesaId || undefined } : {}),
+                  ...(patch.mesa !== undefined ? { mesa: patch.mesa || undefined } : {}),
                 }
               : c,
           )
@@ -542,6 +614,7 @@ export function useComandas() {
 
       if (!shouldSyncWithServer()) {
         enqueueOp({ type: "comanda:patch", comandaId: id, patch: localPatch });
+        notifySyncChange();
         return getCachedComandas().find((x) => x.id === id)!;
       }
 
@@ -551,10 +624,12 @@ export function useComandas() {
         setComandas((prev) =>
           prev.map((c) => (c.id === id ? updated : c)).sort(sortComandasByQueue),
         );
+        notifySyncChange();
         return updated;
       } catch (err) {
         if (isNetworkFailure(err)) {
           enqueueOp({ type: "comanda:patch", comandaId: id, patch: localPatch });
+          notifySyncChange();
           return getCachedComandas().find((x) => x.id === id)!;
         }
         if (before) {

@@ -24,10 +24,10 @@ export function shouldSyncWithServer(): boolean {
 }
 
 export function markApiUnreachable(): void {
-  if (!apiReachable) return;
+  const wasReachable = apiReachable;
   apiReachable = false;
   lastUnreachableAt = Date.now();
-  notifySyncChange();
+  if (wasReachable) notifySyncChange();
 }
 
 export function markApiReachable(): void {
@@ -44,16 +44,10 @@ export function markApiFailureFromStatus(status: number): void {
   if (status >= 500 || status === 429) markApiUnreachable();
 }
 
-export async function checkServerReachable(): Promise<boolean> {
+export async function checkServerReachable(opts?: { force?: boolean }): Promise<boolean> {
+  void opts; // force reservado; el health siempre puede sondear
   if (!isAppOnline()) {
     markApiUnreachable();
-    return false;
-  }
-  if (
-    !apiReachable &&
-    lastUnreachableAt > 0 &&
-    Date.now() - lastUnreachableAt < API_RECOVERY_COOLDOWN_MS
-  ) {
     return false;
   }
   const base = getApiUrl();
@@ -76,6 +70,15 @@ export async function checkServerReachable(): Promise<boolean> {
     markApiUnreachable();
     return false;
   }
+}
+
+/** True si acabamos de marcar la API caída (evita martillar MySQL con sync/outbox). */
+export function isApiRecoveryCooldown(): boolean {
+  return (
+    !apiReachable &&
+    lastUnreachableAt > 0 &&
+    Date.now() - lastUnreachableAt < API_RECOVERY_COOLDOWN_MS
+  );
 }
 
 export function isNetworkFailure(err: unknown): boolean {
@@ -137,4 +140,12 @@ export function writeLocal<T>(key: string, value: T): void {
 export function notifySyncChange(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent("michelada-sync-change"));
+  try {
+    const bc = new BroadcastChannel("michelada-sync");
+    bc.postMessage({ type: "sync", at: Date.now() });
+    bc.close();
+  } catch {
+    /* BroadcastChannel no disponible */
+  }
 }
+

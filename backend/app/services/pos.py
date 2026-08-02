@@ -633,11 +633,7 @@ def update_comanda(comanda_id: str, patch: ComandaUpdate) -> ComandaOut:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="No se puede editar un pedido ya cobrado",
                 )
-            if existing.get("status") == "entregada":
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No se puede editar un pedido ya entregado",
-                )
+            # Permitir editar ítems/mesa mientras no esté cobrado (aunque esté "entregada"/atendida).
 
         fields: list[str] = []
         params: list[Any] = []
@@ -647,7 +643,8 @@ def update_comanda(comanda_id: str, patch: ComandaUpdate) -> ComandaOut:
         if patch.cliente is not None:
             fields.append("cliente = %s")
             params.append(patch.cliente.strip())
-        if patch.mesaId is not None or patch.mesa is not None:
+        # Incluye mesaId/mesa = null explícito (quitar mesa / pasar a sin mesa).
+        if "mesaId" in patch.model_fields_set or "mesa" in patch.model_fields_set:
             mesa_id, mesa_nombre = _resolve_mesa(cursor, patch.mesaId, patch.mesa)
             fields.append("mesa_id = %s")
             params.append(mesa_id)

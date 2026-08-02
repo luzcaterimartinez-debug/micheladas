@@ -5,12 +5,14 @@ import {
   CheckCircle2,
   CreditCard,
   Loader2,
+  Pencil,
   RefreshCw,
   Undo2,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AdminEditarPedidoDialog } from "@/components/admin/AdminEditarPedidoDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +63,7 @@ export function AdminCaja() {
   const [cortes, setCortes] = useState<CorteCaja[]>([]);
   const [loading, setLoading] = useState(true);
   const [cobrarId, setCobrarId] = useState<string | null>(null);
+  const [editarId, setEditarId] = useState<string | null>(null);
   const [metodo, setMetodo] = useState<MetodoPago>("efectivo");
   const [propina, setPropina] = useState("0");
   const [montoEfectivo, setMontoEfectivo] = useState("");
@@ -71,14 +74,15 @@ export function AdminCaja() {
   const [saving, setSaving] = useState(false);
 
   const comandaCobrar = pendientes.find((c) => c.id === cobrarId);
+  const comandaEditar = pendientes.find((c) => c.id === editarId) ?? null;
 
   const totalCobrar = useMemo(() => {
     if (!comandaCobrar) return 0;
     return comandaCobrar.total + (Number(propina) || 0);
   }, [comandaCobrar, propina]);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const [r, p, g, h] = await Promise.all([
         fetchCajaResumen(fecha),
@@ -92,9 +96,9 @@ export function AdminCaja() {
       setCortes(h);
       setEfectivoContado((prev) => (prev === "" ? String(r.efectivoEsperado) : prev));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al cargar caja");
+      if (!opts?.silent) toast.error(err instanceof Error ? err.message : "Error al cargar caja");
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [fecha]);
 
@@ -104,14 +108,22 @@ export function AdminCaja() {
   }, [fecha, reload]);
 
   useEffect(() => {
-    const onSync = () => void reload();
+    const onSync = () => {
+      if (!cobrarId && !editarId) void reload({ silent: true });
+    };
     window.addEventListener("michelada-sync-change", onSync);
-    const interval = window.setInterval(() => void reload(), 4000);
+    window.addEventListener("michelada-api-recovered", onSync);
+    window.addEventListener("focus", onSync);
+    const interval = window.setInterval(() => {
+      if (!cobrarId && !editarId) void reload({ silent: true });
+    }, 2000);
     return () => {
       window.removeEventListener("michelada-sync-change", onSync);
+      window.removeEventListener("michelada-api-recovered", onSync);
+      window.removeEventListener("focus", onSync);
       window.clearInterval(interval);
     };
-  }, [reload]);
+  }, [reload, cobrarId, editarId]);
 
   function openCobrar(c: Comanda) {
     setCobrarId(c.id);
@@ -285,8 +297,12 @@ export function AdminCaja() {
                       <Badge variant="outline">{c.status}</Badge>
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <span className="text-lg font-bold">{money(c.total)}</span>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setEditarId(c.id)}>
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </Button>
                     <Button onClick={() => openCobrar(c)}>Cobrar</Button>
                   </div>
                 </CardContent>
@@ -524,6 +540,15 @@ export function AdminCaja() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {comandaEditar && (
+        <AdminEditarPedidoDialog
+          comanda={comandaEditar}
+          open={!!editarId}
+          onOpenChange={(o) => !o && setEditarId(null)}
+          onSaved={() => void reload({ silent: true })}
+        />
+      )}
     </div>
   );
 }
