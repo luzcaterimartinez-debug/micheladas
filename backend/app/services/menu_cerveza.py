@@ -124,20 +124,15 @@ def ensure_fase_cerveza(cursor: Any) -> int:
             "UPDATE menu_productos SET pasos = %s WHERE id = %s",
             (_ensure_pasos(row["pasos"]), pid),
         )
-        # Solo las opciones vigentes en cada producto *_cerveza.
-        if keep_ids:
-            ph = ", ".join(["%s"] * len(keep_ids))
-            cursor.execute(
-                f"""
-                DELETE FROM menu_producto_fase_opcion
-                WHERE producto_id = %s
-                  AND opcion_id IN (
-                    SELECT id FROM menu_fase_opciones WHERE fase_id = %s
-                  )
-                  AND opcion_id NOT IN ({ph})
-                """,
-                (pid, FASE_ID, *keep_ids),
-            )
+        # Reemplazar vínculos: solo Águila, Poker, Light y Budweiser.
+        cursor.execute(
+            """
+            DELETE pfo FROM menu_producto_fase_opcion pfo
+            INNER JOIN menu_fase_opciones o ON o.id = pfo.opcion_id
+            WHERE pfo.producto_id = %s AND o.fase_id = %s
+            """,
+            (pid, FASE_ID),
+        )
         for oid, _n, _c in OPCIONES:
             cursor.execute(
                 """

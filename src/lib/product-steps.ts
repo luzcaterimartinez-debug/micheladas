@@ -36,24 +36,8 @@ export const CERVEZA_FASE_ID = "cerveza";
 
 /** Variaciones si el menú aún no trae la fase configurada. */
 export const FALLBACK_CERVEZA_OPCIONES: FaseOpcion[] = [
-  { id: "tipo_coronita", name: "Coronita", faseId: CERVEZA_FASE_ID, stockKey: "coronita", cantidad: 1 },
-  { id: "tipo_corona", name: "Corona", faseId: CERVEZA_FASE_ID, stockKey: "corona", cantidad: 1 },
-  {
-    id: "tipo_cerveza_latona",
-    name: "Cerveza latona",
-    faseId: CERVEZA_FASE_ID,
-    stockKey: "cerveza_latona",
-    cantidad: 1,
-  },
-  {
-    id: "tipo_cerveza_personal",
-    name: "Cerveza personal",
-    faseId: CERVEZA_FASE_ID,
-    stockKey: "cerveza_personal",
-    cantidad: 1,
-  },
-  { id: "tipo_poker", name: "Poker", faseId: CERVEZA_FASE_ID, stockKey: "poker", cantidad: 1 },
   { id: "tipo_aguila", name: "Águila", faseId: CERVEZA_FASE_ID, stockKey: "aguila", cantidad: 1 },
+  { id: "tipo_poker", name: "Poker", faseId: CERVEZA_FASE_ID, stockKey: "poker", cantidad: 1 },
   {
     id: "tipo_cerveza_light",
     name: "Light",
