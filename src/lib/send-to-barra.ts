@@ -21,6 +21,8 @@ type SendDeps = {
     c: Omit<Comanda, "id" | "folio" | "queueOrder" | "createdAt" | "status">,
     clientId?: string,
   ) => Promise<Comanda>;
+  /** Marca la comanda como atendida (entregada) tras enviarla. */
+  markEntregada: (id: string) => Promise<void>;
   decrementBatch: (deductions: Record<string, number>) => void;
   reloadInventario: () => Promise<void>;
   adiciones: Addition[];
@@ -33,7 +35,7 @@ export type SendToBarraResult =
   | { ok: true; comanda: Comanda; queued: boolean }
   | { ok: false; error: string };
 
-/** Envía la comanda a barra y abre /ticket para imprimir. */
+/** Envía la comanda a barra, la marca atendida y abre /ticket para imprimir. */
 export async function sendToBarraAndOpenTicket(
   order: BarraOrderPayload,
   productos: MicheladaType[],
@@ -44,6 +46,15 @@ export async function sendToBarraAndOpenTicket(
     const pendingBefore = getPendingCount();
     const comanda = await deps.addComanda(payload, clientId);
     const queued = getPendingCount() > pendingBefore;
+
+    // Admin / caja: el pedido llega como atendido (entregada), no pendiente.
+    let finalComanda: Comanda = { ...comanda, status: "entregada" };
+    try {
+      await deps.markEntregada(comanda.id);
+    } catch {
+      // Si falla el patch, igual devolvemos la comanda; el envío ya ocurrió.
+      finalComanda = comanda;
+    }
 
     if (!getStoredSession() || !isAppOnline() || queued) {
       deps.decrementBatch(
@@ -56,12 +67,15 @@ export async function sendToBarraAndOpenTicket(
     armMeseroFreshStart();
     deps.beforeOpenTicket?.();
 
-    const opened = openComandaTicketView(comanda, productos, false);
+    const opened = openComandaTicketView(finalComanda, productos, false);
     if (!opened) {
-      return { ok: false, error: "Comanda enviada, pero no se pudo abrir el ticket para imprimir" };
+      return {
+        ok: false,
+        error: "Comanda enviada, pero no se pudo abrir el ticket para imprimir",
+      };
     }
 
-    return { ok: true, comanda, queued };
+    return { ok: true, comanda: finalComanda, queued };
   } catch (err) {
     return {
       ok: false,

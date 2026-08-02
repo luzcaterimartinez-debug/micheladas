@@ -188,7 +188,7 @@ export function MeseroPasoProducto({
                             </div>
                             {!cervezaPick && (
                               <p className="text-xs font-medium text-amber-700">
-                                Elige Coronita, Corona, latona o personal
+                                Elige Águila, Poker, Light o Budweiser
                               </p>
                             )}
                           </div>

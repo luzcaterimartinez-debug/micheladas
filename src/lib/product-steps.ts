@@ -34,7 +34,7 @@ export const MESERO_STEP_LABELS: Record<string, string> = {
 
 export const CERVEZA_FASE_ID = "cerveza";
 
-/** Variaciones si el menú aún no trae la fase configurada. */
+/** Únicas marcas permitidas en el paso tipo de cerveza (micheladas). */
 export const FALLBACK_CERVEZA_OPCIONES: FaseOpcion[] = [
   { id: "tipo_aguila", name: "Águila", faseId: CERVEZA_FASE_ID, stockKey: "aguila", cantidad: 1 },
   { id: "tipo_poker", name: "Poker", faseId: CERVEZA_FASE_ID, stockKey: "poker", cantidad: 1 },
@@ -67,14 +67,20 @@ export function getMeseroStepLabel(step: string, fases: Fase[]): string {
   return MESERO_STEP_LABELS[step] ?? step;
 }
 
+function onlyCervezasVigentes(ops: FaseOpcion[]): FaseOpcion[] {
+  const byId = new Map(ops.map((o) => [o.id, o]));
+  // Siempre Águila, Poker, Light y Budweiser (ignora Coronita/Corona/etc. en caché vieja).
+  return FALLBACK_CERVEZA_OPCIONES.map((want) => byId.get(want.id) ?? want);
+}
+
 export function cervezaOpcionesForProduct(
   michelada: Pick<MicheladaType, "faseOpciones"> | undefined,
   fases: Fase[],
 ): FaseOpcion[] {
   const fromProduct = (michelada?.faseOpciones ?? []).filter((o) => o.faseId === CERVEZA_FASE_ID);
-  if (fromProduct.length > 0) return fromProduct;
+  if (fromProduct.length > 0) return onlyCervezasVigentes(fromProduct);
   const fromCatalog = fases.find((f) => f.id === CERVEZA_FASE_ID)?.opciones ?? [];
-  if (fromCatalog.length > 0) return fromCatalog;
+  if (fromCatalog.length > 0) return onlyCervezasVigentes(fromCatalog);
   return FALLBACK_CERVEZA_OPCIONES;
 }
 

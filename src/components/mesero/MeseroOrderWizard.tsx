@@ -624,6 +624,7 @@ export function MeseroOrderWizard() {
       setSending(true);
       const result = await sendToBarraAndOpenTicket(snapshot, productos, {
         addComanda,
+        markEntregada: (id) => updateStatus(id, "entregada"),
         decrementBatch,
         reloadInventario,
         adiciones,

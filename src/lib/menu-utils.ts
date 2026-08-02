@@ -53,10 +53,11 @@ export function normalizeMenuFromApi(data: {
 }): MenuData {
   const fallback = getFallbackMenu();
   const fases = data.fases ?? fallback.fases;
+  const adiciones = mergeAdiciones(data.adiciones ?? [], fallback.adiciones);
   if (data.categorias?.length) {
     return {
       categorias: data.categorias,
-      adiciones: data.adiciones ?? fallback.adiciones,
+      adiciones,
       fases,
     };
   }
@@ -69,9 +70,31 @@ export function normalizeMenuFromApi(data: {
           productos: data.productos,
         },
       ],
-      adiciones: data.adiciones ?? fallback.adiciones,
+      adiciones,
       fases,
     };
   }
-  return fallback;
+  return { ...fallback, adiciones: mergeAdiciones(fallback.adiciones, fallback.adiciones) };
+}
+
+/** Asegura Sal, Trululu y demás del fallback aunque el caché/API vengan incompletos. */
+function mergeAdiciones(fromApi: Addition[], fallback: Addition[]): Addition[] {
+  const byId = new Map(fromApi.map((a) => [a.id, a]));
+  for (const a of fallback) {
+    if (!byId.has(a.id)) byId.set(a.id, a);
+  }
+  // Preferir orden del fallback + extras del API.
+  const ordered: Addition[] = [];
+  const seen = new Set<string>();
+  for (const a of fallback) {
+    const hit = byId.get(a.id);
+    if (hit) {
+      ordered.push(hit);
+      seen.add(a.id);
+    }
+  }
+  for (const a of fromApi) {
+    if (!seen.has(a.id)) ordered.push(a);
+  }
+  return ordered.length > 0 ? ordered : fallback;
 }

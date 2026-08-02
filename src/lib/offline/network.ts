@@ -1,6 +1,6 @@
 import { getApiUrl } from "@/lib/auth";
 
-export const LS_MENU = "michelada_menu_v3";
+export const LS_MENU = "michelada_menu_v4";
 export const LS_OUTBOX = "michelada_outbox_v1";
 export const LS_SYNC_META = "michelada_sync_meta_v1";
 

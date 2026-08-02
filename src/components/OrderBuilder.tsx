@@ -40,7 +40,7 @@ import { formatAppMoney } from "@/lib/local-date";
 
 export function OrderBuilder() {
   const { productos, adiciones, faseOpciones } = useMenu();
-  const { addComanda } = useComandas();
+  const { addComanda, updateStatus } = useComandas();
   const { decrementBatch, reload: reloadInventario } = useInventory();
   const [selectedId, setSelectedId] = useState<string>("");
   const [toppings, setToppings] = useState<string[]>([]);
@@ -178,6 +178,7 @@ export function OrderBuilder() {
       setSending(true);
       const result = await sendToBarraAndOpenTicket(snapshot, productos, {
         addComanda,
+        markEntregada: (id) => updateStatus(id, "entregada"),
         decrementBatch,
         reloadInventario,
         adiciones,
