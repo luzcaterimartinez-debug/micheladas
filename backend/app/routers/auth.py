@@ -2,9 +2,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import AUTH_USER_CACHE_PREFIX, get_current_user
 from app.auth.jwt import create_access_token
 from app.auth.password import verify_password
+from app.cache import cache_put
+from app.config import get_settings
 from app.database import fetch_one, get_db
 from app.models.user import LoginRequest, LoginResponse, UserPublic
 
@@ -43,6 +45,12 @@ def login(body: LoginRequest) -> LoginResponse:
         email=row["email"],
     )
     user = UserPublic(id=row["id"], nombre=row["nombre"], email=row["email"], rol=row["rol"])
+    # Sembrar caché de /me para no reabrir MySQL en cada request autenticado.
+    cache_put(
+        f"{AUTH_USER_CACHE_PREFIX}{user.id}",
+        user,
+        ttl_seconds=float(get_settings().query_cache_auth_ttl_seconds),
+    )
     return LoginResponse(access_token=token, user=user)
 
 

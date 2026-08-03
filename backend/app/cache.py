@@ -85,6 +85,16 @@ def query_cache(key: str, loader: Callable[[], T], *, ttl_seconds: float | None 
     return cache_get(key, ttl_seconds, loader)
 
 
+def cache_put(key: str, value: Any, *, ttl_seconds: float | None = None) -> None:
+    """Escribe un valor en caché (p. ej. sembrar auth tras login)."""
+    if ttl_seconds is None:
+        from app.config import get_settings
+
+        ttl_seconds = float(get_settings().query_cache_ttl_seconds)
+    with _lock:
+        _store[key] = (time.monotonic() + max(0.1, ttl_seconds), value)
+
+
 def cache_invalidate(prefix: str) -> None:
     """
     Marca entradas como vencidas pero conserva el valor (stale).

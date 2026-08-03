@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     query_cache_reportes_ttl_seconds: int = 120
     query_cache_gastos_ttl_seconds: int = 60
     query_cache_menu_ttl_seconds: int = 300
+    query_cache_nomina_ttl_seconds: int = 90
 
     jwt_secret: str = _DEV_JWT_SECRET
     jwt_expire_minutes: int = 480

@@ -5,6 +5,8 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from app.cache import cache_invalidate, query_cache
+from app.config import get_settings
 from app.database import fetch_all, fetch_one, get_db
 from app.models.nomina import (
     DIAS_POR_TIPO,
@@ -37,6 +39,16 @@ MESES_ES = (
     "Noviembre",
     "Diciembre",
 )
+
+NOMINA_CACHE_PREFIX = "nomina:"
+
+
+def invalidate_nomina_cache() -> None:
+    cache_invalidate(NOMINA_CACHE_PREFIX)
+
+
+def _nomina_ttl() -> float:
+    return float(get_settings().query_cache_nomina_ttl_seconds)
 
 
 def _normalize_quincena(quincena: int | None) -> int:
@@ -182,6 +194,7 @@ def create_prestamo(body: NominaPrestamoIn) -> NominaPrestamoOut:
         conn.commit()
         row = fetch_one(cursor, "SELECT * FROM nomina_prestamos WHERE id = %s", (prestamo_id,))
     assert row is not None
+    invalidate_nomina_cache()
     return _prestamo_out(row)
 
 
@@ -212,6 +225,7 @@ def update_prestamo(prestamo_id: str, body: NominaPrestamoUpdate) -> NominaPrest
         conn.commit()
         row = fetch_one(cursor, "SELECT * FROM nomina_prestamos WHERE id = %s", (prestamo_id,))
     assert row is not None
+    invalidate_nomina_cache()
     return _prestamo_out(row)
 
 
@@ -231,7 +245,7 @@ def delete_prestamo(prestamo_id: str) -> None:
         if cursor.rowcount == 0:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Préstamo no encontrado")
         conn.commit()
-
+    invalidate_nomina_cache()
 
 def _max_descuento_prestamos(cursor: Any, usuario_id: int) -> float:
     return round(
@@ -350,11 +364,17 @@ def upsert_config(usuario_id: int, body: NominaConfigIn) -> NominaConfigOut:
         conn.commit()
         row = _get_config(cursor, usuario_id)
     assert row is not None
+    invalidate_nomina_cache()
     return _config_out(row)
 
 
 def get_periodo(anio: int, mes: int, quincena: int | None) -> NominaPeriodoOut:
     q = _normalize_quincena(quincena)
+    key = f"{NOMINA_CACHE_PREFIX}periodo:{anio}:{mes}:{q}"
+    return query_cache(key, lambda: _get_periodo_db(anio, mes, q), ttl_seconds=_nomina_ttl())
+
+
+def _get_periodo_db(anio: int, mes: int, q: int) -> NominaPeriodoOut:
     with get_db() as (_, cursor):
         users = fetch_all(
             cursor,
@@ -521,6 +541,7 @@ def save_recibo(body: NominaReciboIn) -> NominaReciboOut:
             conn.commit()
         row = fetch_one(cursor, "SELECT * FROM nomina_recibos WHERE id = %s", (recibo_id,))
     assert row is not None
+    invalidate_nomina_cache()
     return _recibo_out(row)
 
 
@@ -588,6 +609,7 @@ def update_recibo(recibo_id: str, body: NominaReciboUpdate) -> NominaReciboOut:
             conn.commit()
         row = fetch_one(cursor, "SELECT * FROM nomina_recibos WHERE id = %s", (recibo_id,))
     assert row is not None
+    invalidate_nomina_cache()
     return _recibo_out(row)
 
 
@@ -597,3 +619,4 @@ def delete_recibo(recibo_id: str) -> None:
         if cursor.rowcount == 0:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recibo no encontrado")
         conn.commit()
+    invalidate_nomina_cache()
