@@ -8,6 +8,8 @@ T = TypeVar("T")
 
 _store: dict[str, tuple[float, Any]] = {}
 _lock = threading.Lock()
+# Evita stampede: N requests concurrentes con la misma key → 1 sola carga a MySQL.
+_inflight: dict[str, threading.Event] = {}
 
 
 def cache_get(key: str, ttl_seconds: float, loader: Callable[[], T]) -> T:
@@ -19,11 +21,33 @@ def cache_get(key: str, ttl_seconds: float, loader: Callable[[], T]) -> T:
             if now < expires:
                 return value
 
-    value = loader()
+        waiter = _inflight.get(key)
+        if waiter is None:
+            event = threading.Event()
+            _inflight[key] = event
+            leader = True
+        else:
+            event = waiter
+            leader = False
 
-    with _lock:
-        _store[key] = (now + max(0.1, ttl_seconds), value)
-    return value
+    if not leader:
+        event.wait(timeout=25)
+        with _lock:
+            hit2 = _store.get(key)
+            if hit2 is not None and time.monotonic() < hit2[0]:
+                return hit2[1]
+        # Líder falló o timeout: cargar por cuenta propia (mejor que romper).
+        return loader()
+
+    try:
+        value = loader()
+        with _lock:
+            _store[key] = (time.monotonic() + max(0.1, ttl_seconds), value)
+        return value
+    finally:
+        with _lock:
+            _inflight.pop(key, None)
+        event.set()
 
 
 def query_cache(key: str, loader: Callable[[], T], *, ttl_seconds: float | None = None) -> T:
@@ -49,4 +73,4 @@ def cache_clear() -> None:
 
 def cache_stats() -> dict[str, int]:
     with _lock:
-        return {"entries": len(_store)}
+        return {"entries": len(_store), "inflight": len(_inflight)}

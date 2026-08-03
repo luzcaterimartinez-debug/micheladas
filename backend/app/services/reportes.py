@@ -7,6 +7,8 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from app.cache import cache_invalidate, query_cache
+from app.config import get_settings
 from app.database import fetch_all, fetch_one, get_db
 from app.models.reportes import (
     PeriodoReporte,
@@ -85,6 +87,27 @@ def build_reporte(
     mes: int | None = None,
 ) -> ReporteOut:
     start, end, label, desde, hasta = _period_bounds(periodo, fecha=fecha, anio=anio, mes=mes)
+    key = f"reportes:{periodo}:{desde}:{hasta}:{anio}:{mes}"
+    ttl = float(get_settings().query_cache_reportes_ttl_seconds)
+    return query_cache(
+        key,
+        lambda: _build_reporte_db(periodo, start, end, label, desde, hasta),
+        ttl_seconds=ttl,
+    )
+
+
+def invalidate_reportes_cache() -> None:
+    cache_invalidate("reportes:")
+
+
+def _build_reporte_db(
+    periodo: PeriodoReporte,
+    start: datetime,
+    end: datetime,
+    label: str,
+    desde: str,
+    hasta: str,
+) -> ReporteOut:
     bounds = (start, end)
 
     with get_db() as (_, cursor):

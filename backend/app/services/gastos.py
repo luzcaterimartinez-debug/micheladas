@@ -6,6 +6,8 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from app.cache import cache_invalidate, query_cache
+from app.config import get_settings
 from app.database import fetch_all, fetch_one, get_db
 from app.models.gastos import (
     CategoriaGasto,
@@ -15,7 +17,23 @@ from app.models.gastos import (
     GastoUpdate,
     GastosResumenOut,
 )
+from app.services.reportes import invalidate_reportes_cache
 from app.tz import today_co, to_ms
+
+GASTOS_CACHE_PREFIX = "gastos:"
+
+
+def invalidate_gastos_cache() -> None:
+    cache_invalidate(GASTOS_CACHE_PREFIX)
+
+
+def _gastos_ttl() -> float:
+    return float(get_settings().query_cache_gastos_ttl_seconds)
+
+
+def _invalidate_after_gasto_write() -> None:
+    invalidate_gastos_cache()
+    invalidate_reportes_cache()
 
 
 def _gasto_out(row: dict[str, Any]) -> GastoOut:
@@ -55,6 +73,31 @@ def _load_gasto(cursor: Any, gasto_id: str) -> GastoOut | None:
 
 
 def list_gastos(
+    *,
+    fecha: date | None = None,
+    desde: date | None = None,
+    hasta: date | None = None,
+    categoria: CategoriaGasto | None = None,
+    limit: int = 200,
+) -> list[GastoOut]:
+    key = (
+        f"{GASTOS_CACHE_PREFIX}list:"
+        f"{fecha}:{desde}:{hasta}:{categoria}:{limit}"
+    )
+    return query_cache(
+        key,
+        lambda: _list_gastos_db(
+            fecha=fecha,
+            desde=desde,
+            hasta=hasta,
+            categoria=categoria,
+            limit=limit,
+        ),
+        ttl_seconds=_gastos_ttl(),
+    )
+
+
+def _list_gastos_db(
     *,
     fecha: date | None = None,
     desde: date | None = None,
@@ -114,7 +157,15 @@ def resumen_gastos(
         hasta = desde
 
     assert desde is not None and hasta is not None
+    key = f"{GASTOS_CACHE_PREFIX}resumen:{desde}:{hasta}"
+    return query_cache(
+        key,
+        lambda: _resumen_gastos_db(desde=desde, hasta=hasta),
+        ttl_seconds=_gastos_ttl(),
+    )
 
+
+def _resumen_gastos_db(*, desde: date, hasta: date) -> GastosResumenOut:
     with get_db() as (_, cursor):
         total_row = fetch_one(
             cursor,
@@ -174,6 +225,7 @@ def create_gasto(body: GastoCreate, user_id: int) -> GastoOut:
         out = _load_gasto(cursor, gasto_id)
     if not out:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "No se pudo crear el gasto")
+    _invalidate_after_gasto_write()
     return out
 
 
@@ -219,6 +271,7 @@ def update_gasto(gasto_id: str, body: GastoUpdate) -> GastoOut:
         out = _load_gasto(cursor, gasto_id)
     if not out:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Gasto no encontrado")
+    _invalidate_after_gasto_write()
     return out
 
 
@@ -227,3 +280,4 @@ def delete_gasto(gasto_id: str) -> None:
         cursor.execute("DELETE FROM gastos WHERE id = %s", (gasto_id,))
         if cursor.rowcount == 0:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Gasto no encontrado")
+    _invalidate_after_gasto_write()

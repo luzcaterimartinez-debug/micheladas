@@ -60,6 +60,7 @@ def invalidate_pos_cache() -> None:
     invalidate_comandas_cache()
     # Caja resume/lista dependen de comandas pagadas.
     cache_invalidate("caja:")
+    cache_invalidate("reportes:")
 
 
 def _comandas_cache_ttl() -> float:
@@ -157,7 +158,8 @@ def _row_to_comanda(cursor: Any, row: dict[str, Any]) -> ComandaOut:
 
 
 def list_mesas() -> list[MesaOut]:
-    return query_cache(MESAS_CACHE_KEY, _list_mesas_db)
+    ttl = float(get_settings().query_cache_mesas_ttl_seconds)
+    return query_cache(MESAS_CACHE_KEY, _list_mesas_db, ttl_seconds=ttl)
 
 
 def _list_mesas_db() -> list[MesaOut]:

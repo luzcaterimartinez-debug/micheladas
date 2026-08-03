@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:backend": "cd backend; python -m pytest -v"
+    "test:backend": "cd backend; python -m pytest -v",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

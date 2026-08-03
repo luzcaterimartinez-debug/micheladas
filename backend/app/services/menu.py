@@ -159,8 +159,15 @@ def invalidate_menu_cache() -> None:
 
 
 def load_menu(*, include_inactive: bool = False) -> MenuOut:
+    from app.config import get_settings
+
     key = f"{MENU_CACHE_PREFIX}{'all' if include_inactive else 'active'}"
-    return query_cache(key, lambda: _load_menu_db(include_inactive=include_inactive))
+    ttl = float(get_settings().query_cache_menu_ttl_seconds)
+    return query_cache(
+        key,
+        lambda: _load_menu_db(include_inactive=include_inactive),
+        ttl_seconds=ttl,
+    )
 
 
 def _ensure_cerveza_fase_if_needed(cursor: Any) -> bool:
