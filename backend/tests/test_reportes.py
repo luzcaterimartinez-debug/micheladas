@@ -30,6 +30,12 @@ def test_reporte_dia(client: TestClient, admin_token: str) -> None:
     assert "totalVentas" in data
     assert "numComandas" in data
     assert isinstance(data["serie"], list)
+    assert isinstance(data["pedidos"], list)
+    if data["pedidos"]:
+        pedido = data["pedidos"][0]
+        assert "folio" in pedido
+        assert "items" in pedido
+        assert isinstance(pedido["items"], list)
 
 
 def test_reporte_mes(client: TestClient, admin_token: str) -> None:

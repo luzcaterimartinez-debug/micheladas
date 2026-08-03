@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from calendar import monthrange
 from datetime import date, datetime
 from typing import Any
@@ -13,10 +14,12 @@ from app.models.reportes import (
     ReporteMesaRow,
     ReporteMeseroRow,
     ReporteOut,
+    ReportePedido,
+    ReportePedidoItem,
     ReporteProductoRow,
     ReporteSeriePunto,
 )
-from app.tz import day_bounds, today_co
+from app.tz import day_bounds, today_co, to_ms
 
 MESES_ES = (
     "",
@@ -171,6 +174,7 @@ def build_reporte(
         )
 
         serie = _fetch_serie(cursor, periodo, bounds)
+        pedidos = _fetch_pedidos(cursor, bounds)
 
     num_comandas = int(summary["num_comandas"]) if summary else 0
     total_ventas = float(summary["total_ventas"]) if summary else 0.0
@@ -213,6 +217,7 @@ def build_reporte(
             for r in por_mesero
         ],
         serie=serie,
+        pedidos=pedidos,
     )
 
 
@@ -279,6 +284,104 @@ def _fetch_serie(
             label=MESES_ES[int(r["bucket"])][:3],
             count=int(r["cnt"]),
             total=float(r["tot"]),
+        )
+        for r in rows
+    ]
+
+
+def _parse_json_list(raw: Any) -> list:
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, (bytes, bytearray)):
+        raw = raw.decode()
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+    return []
+
+
+def _addition_labels(raw: Any) -> list[str]:
+    labels: list[str] = []
+    for a in _parse_json_list(raw):
+        if not isinstance(a, dict):
+            continue
+        name = str(a.get("name") or a.get("nombre") or "").strip()
+        if not name:
+            continue
+        qty = int(a.get("quantity") or 1)
+        labels.append(f"{name} ×{qty}" if qty > 1 else name)
+    return labels
+
+
+PEDIDOS_LIMIT = 300
+
+
+def _fetch_pedidos(cursor: Any, bounds: tuple[datetime, datetime]) -> list[ReportePedido]:
+    rows = fetch_all(
+        cursor,
+        f"""
+        SELECT
+          c.id, c.folio, c.orden_cola, c.cliente, c.mesa_nombre, c.total,
+          c.status, c.pagado, c.metodo_pago, c.creado_en,
+          COALESCE(u.nombre, NULL) AS mesero_nombre
+        FROM comandas c
+        LEFT JOIN usuarios u ON u.id = c.mesero_id
+        WHERE {_comandas_where()}
+        ORDER BY c.creado_en DESC
+        LIMIT {PEDIDOS_LIMIT}
+        """,
+        bounds,
+    )
+    if not rows:
+        return []
+
+    ids = [str(r["id"]) for r in rows]
+    placeholders = ", ".join(["%s"] * len(ids))
+    item_rows = fetch_all(
+        cursor,
+        f"""
+        SELECT comanda_id, producto_nombre, tamano, cantidad, toppings_json, adiciones_json, notas, total
+        FROM comanda_items
+        WHERE comanda_id IN ({placeholders})
+        ORDER BY orden ASC, id ASC
+        """,
+        tuple(ids),
+    )
+    items_by_comanda: dict[str, list[ReportePedidoItem]] = {cid: [] for cid in ids}
+    for it in item_rows:
+        cid = str(it["comanda_id"])
+        if cid not in items_by_comanda:
+            continue
+        items_by_comanda[cid].append(
+            ReportePedidoItem(
+                productoNombre=str(it["producto_nombre"]),
+                cantidad=max(1, int(it.get("cantidad") or 1)),
+                size=str(it["tamano"]) if it.get("tamano") else None,
+                notes=str(it["notas"]).strip() if it.get("notas") else None,
+                additions=_addition_labels(it.get("adiciones_json")),
+                toppings=[str(t) for t in _parse_json_list(it.get("toppings_json"))],
+                total=float(it["total"]),
+            )
+        )
+
+    return [
+        ReportePedido(
+            id=str(r["id"]),
+            folio=int(r["folio"]),
+            queueOrder=int(r.get("orden_cola") or 1),
+            cliente=str(r["cliente"]),
+            mesa=str(r["mesa_nombre"]) if r.get("mesa_nombre") else None,
+            meseroNombre=str(r["mesero_nombre"]) if r.get("mesero_nombre") else None,
+            status=str(r["status"]),
+            pagado=bool(r.get("pagado")),
+            metodoPago=str(r["metodo_pago"]) if r.get("metodo_pago") else None,
+            total=float(r["total"]),
+            createdAt=to_ms(r["creado_en"]) if r.get("creado_en") else 0,
+            items=items_by_comanda.get(str(r["id"]), []),
         )
         for r in rows
     ]

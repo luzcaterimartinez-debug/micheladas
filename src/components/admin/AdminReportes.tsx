@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BarChart3, Calendar, Loader2, RefreshCw } from "lucide-react";
+import { BarChart3, Calendar, Loader2, RefreshCw, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,8 +21,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { localDateIso, formatAppMoney } from "@/lib/local-date";
-import { fetchReporte, type PeriodoReporte, type ReporteData } from "@/lib/reportes-api";
+import { localDateIso, formatAppDateTime, formatAppMoney } from "@/lib/local-date";
+import {
+  fetchReporte,
+  type PeriodoReporte,
+  type ReporteData,
+  type ReportePedido,
+} from "@/lib/reportes-api";
 
 const MESES = [
   { value: 1, label: "Enero" },
@@ -38,8 +50,110 @@ const ESTADO_LABEL: Record<string, string> = {
   entregada: "Entregada",
 };
 
+const METODO_LABEL: Record<string, string> = {
+  efectivo: "Efectivo",
+  tarjeta: "Tarjeta",
+  transferencia: "Transferencia",
+  mixto: "Mixto",
+};
+
 function money(n: number) {
   return formatAppMoney(n, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function toppingLabel(raw: string) {
+  return raw
+    .replace(/^tipo_/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function PedidosList({ pedidos, totalComandas }: { pedidos: ReportePedido[]; totalComandas: number }) {
+  if (pedidos.length === 0) {
+    return <p className="text-sm text-muted-foreground py-6 text-center">Sin pedidos en el periodo</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {totalComandas > pedidos.length && (
+        <p className="text-xs text-muted-foreground">
+          Mostrando los {pedidos.length} más recientes de {totalComandas} pedidos.
+        </p>
+      )}
+      <Accordion type="multiple" className="rounded-lg border px-3">
+        {pedidos.map((p) => {
+          const itemCount = p.items.reduce((s, it) => s + it.cantidad, 0);
+          return (
+            <AccordionItem key={p.id} value={p.id}>
+              <AccordionTrigger className="hover:no-underline py-3 gap-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-1 text-left sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">
+                      #{p.folio}
+                      <span className="text-muted-foreground font-normal"> · T{p.queueOrder}</span>
+                      {" — "}
+                      {p.cliente}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {p.createdAt ? formatAppDateTime(p.createdAt) : "—"}
+                      {" · "}
+                      {p.mesa ?? "Sin mesa"}
+                      {p.meseroNombre ? ` · ${p.meseroNombre}` : ""}
+                      {" · "}
+                      {itemCount} bebida{itemCount === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <Badge variant="outline">{ESTADO_LABEL[p.status] ?? p.status}</Badge>
+                    <Badge variant={p.pagado ? "default" : "secondary"}>
+                      {p.pagado
+                        ? p.metodoPago
+                          ? METODO_LABEL[p.metodoPago] ?? p.metodoPago
+                          : "Pagado"
+                        : "Sin cobrar"}
+                    </Badge>
+                    <span className="text-sm font-bold tabular-nums">{money(p.total)}</span>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <ul className="divide-y rounded-md border bg-muted/30">
+                  {p.items.map((it, idx) => {
+                    const extras = [
+                      it.size,
+                      ...it.toppings.map(toppingLabel),
+                      ...it.additions,
+                    ].filter(Boolean) as string[];
+                    return (
+                      <li key={`${p.id}-${idx}`} className="flex items-start justify-between gap-3 px-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">
+                            {it.cantidad > 1 ? `${it.cantidad}× ` : ""}
+                            {it.productoNombre}
+                          </p>
+                          {extras.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                              {extras.join(" · ")}
+                            </p>
+                          )}
+                          {it.notes && (
+                            <p className="text-xs text-muted-foreground mt-1 italic">“{it.notes}”</p>
+                          )}
+                        </div>
+                        <span className="text-sm font-semibold tabular-nums shrink-0">
+                          {money(it.total)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
+    </div>
+  );
 }
 
 function SerieChart({ serie }: { serie: ReporteData["serie"] }) {
@@ -385,6 +499,21 @@ export function AdminReportes() {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShoppingBag className="h-4 w-4" />
+                Pedidos del periodo
+              </CardTitle>
+              <CardDescription>
+                Toca un pedido para ver productos, adiciones y notas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PedidosList pedidos={reporte.pedidos} totalComandas={reporte.numComandas} />
+            </CardContent>
+          </Card>
         </>
       ) : (
         <p className="text-sm text-muted-foreground text-center py-8">No se pudo cargar el reporte</p>

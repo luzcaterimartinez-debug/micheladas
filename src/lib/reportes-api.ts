@@ -2,6 +2,31 @@ import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
 
 export type PeriodoReporte = "dia" | "mes" | "anio";
 
+export type ReportePedidoItem = {
+  productoNombre: string;
+  cantidad: number;
+  size?: string | null;
+  notes?: string | null;
+  additions: string[];
+  toppings: string[];
+  total: number;
+};
+
+export type ReportePedido = {
+  id: string;
+  folio: number;
+  queueOrder: number;
+  cliente: string;
+  mesa?: string | null;
+  meseroNombre?: string | null;
+  status: string;
+  pagado: boolean;
+  metodoPago?: string | null;
+  total: number;
+  createdAt: number;
+  items: ReportePedidoItem[];
+};
+
 export type ReporteData = {
   periodo: PeriodoReporte;
   label: string;
@@ -26,6 +51,7 @@ export type ReporteData = {
     total: number;
   }[];
   serie: { label: string; count: number; total: number }[];
+  pedidos: ReportePedido[];
 };
 
 export type ReporteParams = {
@@ -34,6 +60,31 @@ export type ReporteParams = {
   anio?: number;
   mes?: number;
 };
+
+function mapPedido(raw: Record<string, unknown>): ReportePedido {
+  return {
+    id: String(raw.id),
+    folio: Number(raw.folio),
+    queueOrder: Number(raw.queueOrder ?? 1),
+    cliente: String(raw.cliente),
+    mesa: raw.mesa != null ? String(raw.mesa) : null,
+    meseroNombre: raw.meseroNombre != null ? String(raw.meseroNombre) : null,
+    status: String(raw.status),
+    pagado: Boolean(raw.pagado),
+    metodoPago: raw.metodoPago != null ? String(raw.metodoPago) : null,
+    total: Number(raw.total),
+    createdAt: Number(raw.createdAt ?? 0),
+    items: ((raw.items as Record<string, unknown>[]) ?? []).map((it) => ({
+      productoNombre: String(it.productoNombre),
+      cantidad: Math.max(1, Number(it.cantidad ?? 1)),
+      size: it.size != null ? String(it.size) : null,
+      notes: it.notes != null ? String(it.notes) : null,
+      additions: ((it.additions as string[]) ?? []).map(String),
+      toppings: ((it.toppings as string[]) ?? []).map(String),
+      total: Number(it.total),
+    })),
+  };
+}
 
 function mapReporte(raw: Record<string, unknown>): ReporteData {
   return {
@@ -72,6 +123,7 @@ function mapReporte(raw: Record<string, unknown>): ReporteData {
       count: Number(r.count),
       total: Number(r.total),
     })),
+    pedidos: ((raw.pedidos as Record<string, unknown>[]) ?? []).map(mapPedido),
   };
 }
 
