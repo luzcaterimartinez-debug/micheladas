@@ -53,3 +53,4 @@ class TokenPayload(BaseModel):
     sub: str
     rol: RolLiteral
     nombre: str
+    email: str | None = None

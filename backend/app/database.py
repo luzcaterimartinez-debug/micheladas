@@ -105,41 +105,6 @@ def _is_pool_exhausted(exc: BaseException) -> bool:
     return "pool exhausted" in msg or "failed getting connection" in msg
 
 
-def get_connection() -> Any:
-    """
-    Obtiene una conexión lista para usar.
-    En Vercel: conexión directa (evita 'pool exhausted').
-    En local/VPS: pool con reset+reintento si se agota.
-    """
-    if _is_serverless():
-        conn = _connect_direct()
-        try:
-            _apply_session_timezone(conn)
-        except Exception as exc:
-            logger.warning("No se pudo fijar time_zone MySQL a %s: %s", MYSQL_TIME_ZONE, exc)
-        return conn
-
-    try:
-        conn = get_pool().get_connection()
-    except Exception as exc:
-        if _is_pool_exhausted(exc):
-            reset_pool()
-            conn = get_pool().get_connection()
-        else:
-            raise
-
-    try:
-        _apply_session_timezone(conn)
-    except Exception as exc:
-        logger.warning("No se pudo fijar time_zone MySQL a %s: %s", MYSQL_TIME_ZONE, exc)
-        try:
-            conn.close()
-        except Exception:
-            pass
-        raise
-    return conn
-
-
 def _safe_close(conn: Any) -> None:
     if conn is None:
         return
@@ -174,6 +139,67 @@ def peek_database_status() -> tuple[bool, str | None] | None:
     return None
 
 
+def _raise_circuit_open(err: str) -> None:
+    """Sin abrir socket: repropaga el error de cuota cacheado."""
+    raise mysql.connector.errors.ProgrammingError(msg=err, errno=1226)
+
+
+def get_connection(*, bypass_circuit: bool = False) -> Any:
+    """
+    Obtiene una conexión lista para usar.
+    En Vercel: conexión directa (evita 'pool exhausted').
+    En local/VPS: pool con reset+reintento si se agota.
+
+    Si Hostinger ya respondió 1226, no se abre otra conexión durante el TTL
+    (evita quemar la cuota restante y permite servir datos desde caché).
+    """
+    global _check_cache
+    if not bypass_circuit:
+        cached = peek_database_status()
+        if cached is not None:
+            ok, err = cached
+            if not ok and err and _is_hourly_quota_error(err):
+                _raise_circuit_open(err)
+
+    try:
+        if _is_serverless():
+            conn = _connect_direct()
+            try:
+                _apply_session_timezone(conn)
+            except Exception as exc:
+                logger.warning("No se pudo fijar time_zone MySQL a %s: %s", MYSQL_TIME_ZONE, exc)
+                _safe_close(conn)
+                raise
+        else:
+            try:
+                conn = get_pool().get_connection()
+            except Exception as exc:
+                if _is_pool_exhausted(exc):
+                    reset_pool()
+                    conn = get_pool().get_connection()
+                else:
+                    raise
+            try:
+                _apply_session_timezone(conn)
+            except Exception as exc:
+                logger.warning("No se pudo fijar time_zone MySQL a %s: %s", MYSQL_TIME_ZONE, exc)
+                _safe_close(conn)
+                raise
+        _check_cache = (time.monotonic(), True, None)
+        return conn
+    except Exception as exc:
+        msg = f"{type(exc).__name__}: {exc}".strip()
+        if msg.endswith(":"):
+            msg = type(exc).__name__
+        if _is_hourly_quota_error(msg):
+            _check_cache = (time.monotonic(), False, msg)
+            logger.error("MySQL cuota por hora agotada — circuit open ~55 min")
+        elif _is_pool_exhausted(exc):
+            reset_pool()
+            _check_cache = (time.monotonic(), False, msg)
+        raise
+
+
 def check_database(*, force: bool = False) -> tuple[bool, str | None]:
     """Ping MySQL; returns (ok, error_message). Resultado cacheado para no agotar cuota Hostinger."""
     global _check_cache
@@ -186,7 +212,7 @@ def check_database(*, force: bool = False) -> tuple[bool, str | None]:
     target = _connection_target()
     conn: Any = None
     try:
-        conn = get_connection()
+        conn = get_connection(bypass_circuit=force)
         cursor = conn.cursor()
         try:
             cursor.execute("SELECT 1")

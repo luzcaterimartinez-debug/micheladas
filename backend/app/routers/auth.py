@@ -36,7 +36,12 @@ def login(body: LoginRequest) -> LoginResponse:
             detail="Correo o contraseña incorrectos",
         )
 
-    token = create_access_token(user_id=row["id"], rol=row["rol"], nombre=row["nombre"])
+    token = create_access_token(
+        user_id=row["id"],
+        rol=row["rol"],
+        nombre=row["nombre"],
+        email=row["email"],
+    )
     user = UserPublic(id=row["id"], nombre=row["nombre"], email=row["email"], rol=row["rol"])
     return LoginResponse(access_token=token, user=user)
 

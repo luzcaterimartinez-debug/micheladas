@@ -81,7 +81,10 @@ export function markApiFailureFromStatus(status: number, bodyText?: string): voi
     markMysqlQuotaBackoff(bodyText);
     return;
   }
-  if (status >= 500 || status === 429) markApiUnreachable();
+  // 503 de MySQL: no matar la UX; solo pausar sync agresivo un rato.
+  if (status === 503 || status === 429 || status >= 500) {
+    markApiUnreachable();
+  }
 }
 
 export async function checkServerReachable(opts?: { force?: boolean }): Promise<boolean> {
@@ -173,10 +176,17 @@ export function isRetryableSyncError(err: unknown): boolean {
       msg.includes("servidor no disponible") ||
       msg.includes("error del servidor") ||
       msg.includes("base de datos") ||
+      msg.includes("quedó en cola") ||
+      msg.includes("quedo en cola") ||
+      msg.includes("reintentará") ||
+      msg.includes("reintentara") ||
+      msg.includes("conserva la") ||
       msg.includes("503") ||
       msg.includes("502") ||
       msg.includes("504") ||
-      msg.includes("429")
+      msg.includes("429") ||
+      msg.includes("1226") ||
+      msg.includes("max_connections")
     );
   }
   return false;

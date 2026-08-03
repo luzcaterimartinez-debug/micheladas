@@ -310,7 +310,11 @@ export function useComandas() {
         setError(null);
       } catch (err) {
         applyFromCache();
-        if (isNetworkFailure(err) || !shouldSyncWithServer()) {
+        if (
+          isNetworkFailure(err) ||
+          isRetryableSyncError(err) ||
+          !shouldSyncWithServer()
+        ) {
           setError(null);
         } else {
           setError(err instanceof Error ? err.message : "Error al cargar comandas");
@@ -465,7 +469,7 @@ export function useComandas() {
         );
         notifySyncChange();
       } catch (err) {
-        if (isNetworkFailure(err)) {
+        if (isNetworkFailure(err) || isRetryableSyncError(err)) {
           enqueueOp({ type: "comanda:patch", comandaId: id, patch: { status } });
           notifySyncChange();
           return;

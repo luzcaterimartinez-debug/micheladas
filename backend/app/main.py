@@ -46,7 +46,7 @@ async def mysql_error_handler(request: Request, exc: mysql.connector.Error) -> J
     settings = get_settings()
     logger.error("MySQL error: %s", exc)
     payload: dict[str, str] = {
-        "detail": "Base de datos no disponible",
+        "detail": "No se pudo completar ahora. El POS conserva la última copia y reintentará.",
         "database_error": f"{type(exc).__name__}: {exc}",
     }
     logger.error(

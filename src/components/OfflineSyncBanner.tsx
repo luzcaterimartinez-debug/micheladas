@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CloudOff, CloudUpload, ChevronDown, ChevronUp, Loader2, ServerCrash, Wifi } from "lucide-react";
+import { CloudOff, CloudUpload, ChevronDown, ChevronUp, Loader2, Wifi } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 
 import { useOfflineSync } from "@/hooks/use-offline-sync";
@@ -32,8 +32,12 @@ function opLabel(op: OutboxOp): string {
   }
 }
 
+/**
+ * Banner solo si hay cambios locales pendientes o no hay internet.
+ * No mostramos "base de datos caída": el POS sigue con caché/local.
+ */
 export function OfflineSyncBanner() {
-  const { online, serverReachable, quotaBackoff, pending, syncing, syncNow } = useOfflineSync();
+  const { online, serverReachable, pending, syncing, syncNow } = useOfflineSync();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const hasSession = typeof window !== "undefined" && !!getStoredSession();
   const [expanded, setExpanded] = useState(false);
@@ -41,17 +45,18 @@ export function OfflineSyncBanner() {
   const ops = useMemo(() => (pending > 0 ? listOutbox() : []), [pending, online, serverReachable, syncing]);
 
   if (!hasSession && PUBLIC_ROUTES.has(pathname)) return null;
-  if (online && serverReachable && pending === 0) return null;
+
+  // Solo internet real o cola de sync. Nunca mensajes de "BD no disponible".
+  if (online && pending === 0) return null;
 
   const offline = !online;
-  const serverDown = online && !serverReachable;
 
   return (
     <div
       className={cn(
         "fixed top-0 left-0 right-0 z-[100] px-3 py-2 text-sm font-semibold shadow-md",
         "pt-[max(0.5rem,env(safe-area-inset-top))]",
-        offline ? "bg-slate-900 text-white" : serverDown ? "bg-red-600 text-white" : "bg-amber-500 text-slate-900",
+        offline ? "bg-slate-900 text-white" : "bg-amber-500 text-slate-900",
       )}
     >
       <div className="mx-auto max-w-lg space-y-2">
@@ -61,17 +66,6 @@ export function OfflineSyncBanner() {
               <>
                 <CloudOff className="h-4 w-4 shrink-0" />
                 <span className="truncate">Sin internet — los cambios se guardan localmente</span>
-              </>
-            ) : serverDown ? (
-              <>
-                <ServerCrash className="h-4 w-4 shrink-0" />
-                <span className="truncate">
-                  {quotaBackoff
-                    ? "Hostinger: límite de conexiones MySQL — espera ~1 h (cierra pestañas extra)"
-                    : import.meta.env.PROD
-                      ? "Base de datos no disponible — reintentando en silencio…"
-                      : "Servidor no disponible — inicia el backend (puerto 8000)"}
-                </span>
               </>
             ) : (
               <>
@@ -94,7 +88,7 @@ export function OfflineSyncBanner() {
                 Ver
               </button>
             )}
-            {online && (
+            {online && pending > 0 && (
               <button
                 type="button"
                 onClick={() => void syncNow()}
@@ -102,7 +96,7 @@ export function OfflineSyncBanner() {
                 className="inline-flex items-center gap-1 rounded-full bg-slate-900 text-white px-3 py-1 text-xs font-bold disabled:opacity-60"
               >
                 {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
-                {syncing ? "Sync…" : serverDown ? "Reintentar" : "Sincronizar"}
+                {syncing ? "Sync…" : "Sincronizar"}
               </button>
             )}
           </div>
@@ -114,7 +108,7 @@ export function OfflineSyncBanner() {
                 • {opLabel(op)}
               </li>
             ))}
-            {ops.length > 12 && <li>… y {ops.length - 12} más</li>}
+            {ops.length > 12 && <li>… y {ops.length > 12} más</li>}
           </ul>
         )}
       </div>

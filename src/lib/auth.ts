@@ -143,8 +143,8 @@ export function parseApiError(data: unknown, status: number): string {
     }
   }
   if (status === 422) return "Datos inválidos. Revisa el correo y la contraseña.";
-  if (status === 503) return "Servidor no disponible (base de datos). Intenta más tarde.";
-  if (status >= 500) return "Error del servidor. Intenta más tarde.";
+  if (status === 503) return "No se pudo guardar ahora. El cambio quedó en cola y se reintentará.";
+  if (status >= 500) return "Error del servidor. Se reintentará automáticamente.";
   if (status === 401) return "Sesión expirada. Vuelve a iniciar sesión.";
   return "No se pudo completar la solicitud";
 }
