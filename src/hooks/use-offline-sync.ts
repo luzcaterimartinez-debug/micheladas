@@ -11,14 +11,14 @@ import {
 
 /** Hostinger limita conexiones/hora: no martillar /api/health. */
 const HEALTH_OK_MS = 45_000;
-const HEALTH_DOWN_MS = 90_000;
+const HEALTH_DOWN_MS = 30_000;
 
 export function useOfflineSync() {
   const [online, setOnline] = useState(() => isAppOnline());
-  const [serverReachable, setServerReachable] = useState(true);
+  const [serverReachable, setServerReachable] = useState(() => isApiReachable());
   const [pending, setPending] = useState(() => getPendingCount());
   const [syncing, setSyncing] = useState(false);
-  const wasReachableRef = useRef(true);
+  const wasReachableRef = useRef(isApiReachable());
   const intervalRef = useRef<number | null>(null);
 
   const refresh = useCallback(() => {
@@ -52,10 +52,10 @@ export function useOfflineSync() {
   pingRef.current = pingServer;
 
   const syncNow = useCallback(async () => {
-    const reachable = await pingServer();
-    if (!reachable) return;
     setSyncing(true);
     try {
+      const reachable = await pingServer();
+      if (!reachable) return;
       await runAutoSync();
     } finally {
       setSyncing(false);
@@ -67,7 +67,13 @@ export function useOfflineSync() {
     const teardown = initOfflineSync();
     const onChange = () => {
       refresh();
-      // No ping en cada sync-change (comandas cada 2s): solo refrescar contadores.
+    };
+    const onRecovered = () => {
+      wasReachableRef.current = true;
+      setServerReachable(true);
+      refresh();
+      scheduleNext(true);
+      void runAutoSync();
     };
     const onOnline = () => {
       refresh();
@@ -76,6 +82,7 @@ export function useOfflineSync() {
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOnline);
     window.addEventListener("michelada-sync-change", onChange);
+    window.addEventListener("michelada-api-recovered", onRecovered);
     refresh();
     void pingServer();
     return () => {
@@ -84,8 +91,9 @@ export function useOfflineSync() {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOnline);
       window.removeEventListener("michelada-sync-change", onChange);
+      window.removeEventListener("michelada-api-recovered", onRecovered);
     };
-  }, [pingServer, refresh]);
+  }, [pingServer, refresh, scheduleNext]);
 
   return { online, serverReachable, pending, syncing, syncNow };
 }

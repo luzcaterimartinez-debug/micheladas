@@ -96,7 +96,7 @@ export function OfflineSyncBanner() {
               <button
                 type="button"
                 onClick={() => void syncNow()}
-                disabled={syncing || (!serverReachable && pending === 0)}
+                disabled={syncing}
                 className="inline-flex items-center gap-1 rounded-full bg-slate-900 text-white px-3 py-1 text-xs font-bold disabled:opacity-60"
               >
                 {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}

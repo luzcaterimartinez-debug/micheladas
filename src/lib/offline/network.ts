@@ -45,7 +45,7 @@ export function markApiFailureFromStatus(status: number): void {
 }
 
 export async function checkServerReachable(opts?: { force?: boolean }): Promise<boolean> {
-  void opts; // force reservado; el health siempre puede sondear
+  void opts;
   if (!isAppOnline()) {
     markApiUnreachable();
     return false;
@@ -53,20 +53,31 @@ export async function checkServerReachable(opts?: { force?: boolean }): Promise<
   const base = getApiUrl();
   const url = base ? `${base}/api/health` : "/api/health";
   try {
+    // Hostinger desde Vercel a menudo supera 5s; un abort falso marcaba la API como caída.
     const res = await fetch(url, {
       method: "GET",
       cache: "no-store",
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(15_000),
     });
-    const data = (await res.json().catch(() => null)) as { database?: string } | null;
-    const dbOk = res.ok && data?.database === "ok";
+    const data = (await res.json().catch(() => null)) as { database?: string; status?: string } | null;
+    const dbOk = res.ok && (data?.database === "ok" || data?.status === "ok");
     if (dbOk) {
       markApiReachable();
       return true;
     }
-    markApiFailureFromStatus(res.status || 503);
+    // 503 con body degraded: marcar caída; otros códigos no necesariamente.
+    if (res.status >= 500 || res.status === 429 || data?.database === "error") {
+      markApiUnreachable();
+    }
     return false;
-  } catch {
+  } catch (err) {
+    // Timeout/abort: no martillar estado "caído" si ya estábamos OK (flapeo).
+    const timedOut =
+      err instanceof Error &&
+      (err.name === "TimeoutError" || err.name === "AbortError" || /timeout|aborted/i.test(err.message));
+    if (timedOut && apiReachable) {
+      return true;
+    }
     markApiUnreachable();
     return false;
   }

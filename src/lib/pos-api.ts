@@ -1,6 +1,6 @@
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
 import { fetchWithTimeout } from "@/lib/api-fetch";
-import { markApiFailureFromStatus } from "@/lib/offline/network";
+import { markApiFailureFromStatus, markApiReachable } from "@/lib/offline/network";
 import type { Comanda, Mesa, OrderItem } from "@/lib/micheladas-store";
 import { LLEVAR_EXTRA, MESA_LLEVAR_ID } from "@/lib/micheladas-store";
 
@@ -9,6 +9,7 @@ function assertOk(res: Response, data: unknown): asserts res is Response & { ok:
     markApiFailureFromStatus(res.status);
     throw new Error(parseApiError(data, res.status));
   }
+  markApiReachable();
 }
 
 function authHeaders(): HeadersInit {

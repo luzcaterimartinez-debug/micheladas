@@ -1,6 +1,6 @@
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
 import { fetchWithTimeout } from "@/lib/api-fetch";
-import { markApiFailureFromStatus } from "@/lib/offline/network";
+import { markApiFailureFromStatus, markApiReachable } from "@/lib/offline/network";
 import type { Comanda } from "@/lib/micheladas-store";
 import { mapComanda } from "@/lib/pos-api";
 
@@ -113,6 +113,7 @@ function assertCajaOk(res: Response, data: unknown): asserts res is Response & {
     markApiFailureFromStatus(res.status);
     throw new Error(parseApiError(data, res.status));
   }
+  markApiReachable();
 }
 
 export async function fetchCajaResumen(fecha?: string): Promise<CajaResumen> {
