@@ -59,8 +59,12 @@ export function markApiUnreachable(): void {
 }
 
 export function markApiReachable(): void {
-  if (apiReachable && !isMysqlQuotaBackoff()) return;
-  quotaBackoffUntil = 0;
+  // No borrar backoff de cuota Hostinger: un /api/ping OK no significa que MySQL ya acepte conexiones.
+  if (isMysqlQuotaBackoff()) {
+    apiReachable = false;
+    return;
+  }
+  if (apiReachable) return;
   const was = apiReachable;
   apiReachable = true;
   if (!was) {
@@ -92,32 +96,24 @@ export async function checkServerReachable(opts?: { force?: boolean }): Promise<
   }
 
   const base = getApiUrl();
-  const url = base ? `${base}/api/health` : "/api/health";
+  // Preferir /api/ping (nunca toca MySQL). Fallback a /api/health si hace falta.
+  const pingUrl = base ? `${base}/api/ping` : "/api/ping";
   try {
-    const res = await fetch(url, {
+    const res = await fetch(pingUrl, {
       method: "GET",
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
     });
-    const data = (await res.json().catch(() => null)) as {
-      database?: string;
-      status?: string;
-      database_error?: string;
-      hint?: string;
-    } | null;
-
-    const errText = `${data?.database_error ?? ""} ${data?.hint ?? ""}`;
-    if (isQuotaErrorText(errText)) {
-      markMysqlQuotaBackoff(errText);
-      return false;
-    }
-
-    const dbOk = res.ok && (data?.database === "ok" || data?.status === "ok");
-    if (dbOk) {
+    if (res.ok) {
+      // Durante backoff de cuota no marcar reachable: login/comandas seguirían quemando conexiones.
+      if (isMysqlQuotaBackoff()) {
+        markApiUnreachable();
+        return false;
+      }
       markApiReachable();
       return true;
     }
-    if (res.status >= 500 || res.status === 429 || data?.database === "error") {
+    if (res.status >= 500 || res.status === 429) {
       markApiUnreachable();
     }
     return false;

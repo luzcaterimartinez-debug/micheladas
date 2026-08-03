@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import logging
 
 from app.config import get_settings, production_config_errors
-from app.database import check_database
+from app.database import check_database, peek_database_status
 from app.routers import admin, admin_menu, auth, caja, comandas, gastos, inventario, menu, mesas, nomina, reportes
 from app.tz import APP_TZ_NAME, ensure_process_timezone
 
@@ -122,11 +122,19 @@ def ping() -> dict[str, str | bool]:
 
 
 @app.get("/api/status")
-def status(response: Response) -> dict[str, str | list[str] | bool]:
-    """Diagnóstico: config + MySQL (sin secretos)."""
+def status(response: Response, deep: bool = False) -> dict[str, str | list[str] | bool]:
+    """Diagnóstico: config + MySQL (sin secretos). Usa caché salvo ?deep=1."""
     settings = get_settings()
     config_errors = production_config_errors(settings)
-    db_ok, db_error = check_database()
+    if deep:
+        db_ok, db_error = check_database(force=True)
+    else:
+        cached = peek_database_status()
+        if cached is None:
+            # No forzar ping: status también lo usa el front/diagnóstico espontáneo.
+            db_ok, db_error = check_database(force=False)
+        else:
+            db_ok, db_error = cached
     payload: dict[str, str | list[str] | bool] = {
         "api": "micheladas",
         "env": settings.app_env,
@@ -151,7 +159,14 @@ def status(response: Response) -> dict[str, str | list[str] | bool]:
 
 
 @app.get("/api/health")
-def health(response: Response) -> dict[str, str | list[str]]:
+def health(response: Response, deep: bool = False) -> dict[str, str | list[str]]:
+    """
+    Liveness del API. Por defecto NO abre MySQL (evita gastar max_connections_per_hour
+    en Hostinger con cold starts de Vercel + polls del front).
+
+    - Sin query: solo config + caché local del último check DB (si existe).
+    - ?deep=1: sí hace ping a MySQL (diagnóstico manual /ops).
+    """
     settings = get_settings()
     config_errors = production_config_errors(settings)
     if config_errors:
@@ -163,19 +178,26 @@ def health(response: Response) -> dict[str, str | list[str]]:
             "env": settings.app_env,
         }
 
-    db_ok, db_error = check_database()
-    if db_ok:
-        logger.info("Health check: base de datos conectada (%s)", settings.mysql_database)
+    if deep:
+        db_ok, db_error = check_database(force=True)
+        db_state = "ok" if db_ok else "error"
     else:
-        logger.warning("Health check: base de datos no disponible (%s) — %s", settings.mysql_database, db_error)
+        cached = peek_database_status()
+        if cached is None:
+            # API arriba; no sabemos BD sin gastar una conexión.
+            db_ok, db_error = True, None
+            db_state = "skipped"
+        else:
+            db_ok, db_error = cached
+            db_state = "ok" if db_ok else "error"
+
     payload: dict[str, str | list[str]] = {
         "status": "ok" if db_ok else "degraded",
-        "database": "ok" if db_ok else "error",
+        "database": db_state,
         "env": settings.app_env,
         "mysql_host": settings.mysql_host,
     }
     if db_error:
-        # Mensaje operativo (sin secretos): ayuda a diagnosticar cuota Hostinger, firewall, etc.
         payload["database_error"] = db_error
         if "max_connections_per_hour" in db_error.lower() or "1226" in db_error:
             payload["hint"] = (
@@ -188,6 +210,8 @@ def health(response: Response) -> dict[str, str | list[str]]:
                 "Pool MySQL agotado en la función serverless. "
                 "Redeploy con conexiones directas (sin pool) en Vercel."
             )
-    if not db_ok:
+    # Solo 503 cuando sabemos que la BD falló (deep o caché de error).
+    # Con database=skipped devolvemos 200: el front puede tratar la API como viva.
+    if not db_ok and db_state == "error":
         response.status_code = 503
     return payload

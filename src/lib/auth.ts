@@ -71,7 +71,8 @@ export async function login(email: string, password: string): Promise<AuthSessio
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    markApiFailureFromStatus(res.status);
+    const bodyText = JSON.stringify(data);
+    markApiFailureFromStatus(res.status, bodyText);
     throw new Error(parseApiError(data, res.status));
   }
 
@@ -105,8 +106,14 @@ export async function validateSession(): Promise<AuthSession | null> {
       headers: { Authorization: `Bearer ${stored.accessToken}` },
     });
     if (!res.ok) {
-      clearSession();
-      return null;
+      // Solo invalidar sesión con 401 (token/usuario). 5xx/503/cuota Hostinger → conservar local.
+      if (res.status === 401) {
+        clearSession();
+        return null;
+      }
+      const bodyText = await res.text().catch(() => "");
+      markApiFailureFromStatus(res.status, bodyText);
+      return stored;
     }
     user = await res.json();
     if (!user) {

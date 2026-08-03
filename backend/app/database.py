@@ -154,22 +154,34 @@ def _is_hourly_quota_error(message: str) -> bool:
     return "max_connections_per_hour" in lower or "1226" in lower
 
 
+def _cache_ttl(ok: bool, err: str | None) -> float:
+    if ok:
+        return _CHECK_OK_TTL_S
+    if err and _is_hourly_quota_error(err):
+        return _CHECK_QUOTA_TTL_S
+    if err and _is_pool_exhausted(Exception(err)):
+        return _CHECK_POOL_TTL_S
+    return _CHECK_FAIL_TTL_S
+
+
+def peek_database_status() -> tuple[bool, str | None] | None:
+    """Devuelve el último check cacheado si aún es válido. No abre MySQL."""
+    if _check_cache is None:
+        return None
+    cached_at, ok, err = _check_cache
+    if time.monotonic() - cached_at < _cache_ttl(ok, err):
+        return ok, err
+    return None
+
+
 def check_database(*, force: bool = False) -> tuple[bool, str | None]:
     """Ping MySQL; returns (ok, error_message). Resultado cacheado para no agotar cuota Hostinger."""
     global _check_cache
     now = time.monotonic()
-    if not force and _check_cache is not None:
-        cached_at, ok, err = _check_cache
-        if ok:
-            ttl = _CHECK_OK_TTL_S
-        elif err and _is_hourly_quota_error(err):
-            ttl = _CHECK_QUOTA_TTL_S
-        elif err and _is_pool_exhausted(Exception(err)):
-            ttl = _CHECK_POOL_TTL_S
-        else:
-            ttl = _CHECK_FAIL_TTL_S
-        if now - cached_at < ttl:
-            return ok, err
+    if not force:
+        cached = peek_database_status()
+        if cached is not None:
+            return cached
 
     target = _connection_target()
     conn: Any = None
