@@ -184,7 +184,12 @@ def health(response: Response) -> dict[str, str | list[str]]:
         if "max_connections_per_hour" in db_error.lower() or "1226" in db_error:
             payload["hint"] = (
                 "Hostinger: se agotó max_connections_per_hour. "
-                "Espera ~1h o reduce polling; en Vercel usa MYSQL_POOL_SIZE=1."
+                "Espera ~1h; en Vercel usa MYSQL_POOL_SIZE=1 y evita muchas pestañas abiertas."
+            )
+        elif "pool exhausted" in db_error.lower():
+            payload["hint"] = (
+                "Pool MySQL agotado en la función serverless. "
+                "Redeploy con conexiones directas (sin pool) en Vercel."
             )
     if not db_ok:
         response.status_code = 503
