@@ -139,6 +139,15 @@ def peek_database_status() -> tuple[bool, str | None] | None:
     return None
 
 
+def is_mysql_circuit_open() -> bool:
+    """True si ya sabemos que Hostinger bloqueó conexiones (no reabrir sockets)."""
+    cached = peek_database_status()
+    if cached is None:
+        return False
+    ok, err = cached
+    return (not ok) and bool(err) and _is_hourly_quota_error(err)
+
+
 def _raise_circuit_open(err: str) -> None:
     """Sin abrir socket: repropaga el error de cuota cacheado."""
     raise mysql.connector.errors.ProgrammingError(msg=err, errno=1226)

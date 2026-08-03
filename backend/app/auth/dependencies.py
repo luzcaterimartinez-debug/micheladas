@@ -9,7 +9,7 @@ import mysql.connector
 from app.auth.jwt import decode_access_token
 from app.cache import cache_invalidate, query_cache
 from app.config import get_settings
-from app.database import fetch_one, get_db
+from app.database import fetch_one, get_db, is_mysql_circuit_open
 from app.models.user import Rol, UserPublic
 
 logger = logging.getLogger(__name__)
@@ -86,6 +86,15 @@ def get_current_user(
 
     user_id = int(payload.sub)
     ttl = float(get_settings().query_cache_auth_ttl_seconds)
+
+    # Circuit Hostinger abierto: no tocar MySQL; JWT basta para el turno.
+    if is_mysql_circuit_open():
+        return _user_from_token(
+            user_id=user_id,
+            rol=payload.rol,
+            nombre=payload.nombre,
+            email=payload.email,
+        )
 
     try:
         return query_cache(

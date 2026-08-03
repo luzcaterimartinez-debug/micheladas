@@ -11,10 +11,10 @@ import {
   notifySyncChange,
 } from "@/lib/offline/network";
 
-/** Hostinger limita conexiones/hora: health poco frecuente. */
-const HEALTH_OK_MS = 60_000;
-const HEALTH_DOWN_MS = 2 * 60_000;
-const HEALTH_QUOTA_MS = 15 * 60_000;
+/** Hostinger limita conexiones/hora: health poco frecuente y NUNCA si hay cuota. */
+const HEALTH_OK_MS = 3 * 60_000;
+const HEALTH_DOWN_MS = 5 * 60_000;
+const HEALTH_QUOTA_MS = 20 * 60_000;
 
 export function useOfflineSync() {
   const [online, setOnline] = useState(() => isAppOnline());

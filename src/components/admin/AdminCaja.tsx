@@ -116,8 +116,9 @@ export function AdminCaja() {
     window.addEventListener("michelada-api-recovered", onSync);
     window.addEventListener("focus", onSync);
     const interval = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
       if (!cobrarId && !editarId && isApiReachable()) void reload({ silent: true });
-    }, 4000);
+    }, 20_000);
     return () => {
       window.removeEventListener("michelada-sync-change", onSync);
       window.removeEventListener("michelada-api-recovered", onSync);

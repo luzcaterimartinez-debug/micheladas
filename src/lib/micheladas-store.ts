@@ -368,8 +368,9 @@ export function useComandas() {
 
     // Polling en tiempo real; si la API/MySQL está caída, no martillar (cuota Hostinger).
     const interval = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
       if (shouldSyncWithServer()) void reload();
-    }, 4000);
+    }, 20_000);
 
     return () => {
       window.clearInterval(interval);
@@ -694,8 +695,9 @@ export function useMesas() {
     window.addEventListener("michelada-mesas-change", onMesasLocal);
 
     const interval = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
       if (shouldSyncWithServer()) void reload();
-    }, 10000);
+    }, 45_000);
 
     return () => {
       window.clearInterval(interval);
@@ -853,8 +855,9 @@ export function useInventory(opts?: { pauseAutoReload?: boolean }) {
     }
     if (pauseAutoReload) return;
     const interval = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
       if (shouldSyncWithServer()) void reload();
-    }, 20000);
+    }, 60_000);
     return () => window.clearInterval(interval);
   }, [reload, pauseAutoReload]);
 

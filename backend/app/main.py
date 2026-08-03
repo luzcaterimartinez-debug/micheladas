@@ -122,38 +122,45 @@ def ping() -> dict[str, str | bool]:
 
 
 @app.get("/api/status")
-def status(response: Response, deep: bool = False) -> dict[str, str | list[str] | bool]:
-    """Diagnóstico: config + MySQL (sin secretos). Usa caché salvo ?deep=1."""
+def status(response: Response, deep: bool = False) -> dict[str, str | list[str] | bool | int]:
+    """Diagnóstico: config + MySQL (sin secretos). Por defecto NO abre MySQL."""
+    from app.cache import cache_stats
+
     settings = get_settings()
     config_errors = production_config_errors(settings)
     if deep:
         db_ok, db_error = check_database(force=True)
+        db_state = "ok" if db_ok else "error"
     else:
         cached = peek_database_status()
         if cached is None:
-            # No forzar ping: status también lo usa el front/diagnóstico espontáneo.
-            db_ok, db_error = check_database(force=False)
+            db_ok, db_error = True, None
+            db_state = "skipped"
         else:
             db_ok, db_error = cached
-    payload: dict[str, str | list[str] | bool] = {
+            db_state = "ok" if db_ok else "error"
+    payload: dict[str, str | list[str] | bool | int] = {
         "api": "micheladas",
         "env": settings.app_env,
         "config_ok": len(config_errors) == 0,
-        "database": "ok" if db_ok else "error",
+        "database": db_state if db_state != "skipped" else ("ok" if db_ok else "error"),
         "mysql_host": settings.mysql_host,
         "mysql_database": settings.mysql_database,
+        "cache_entries": cache_stats().get("entries", 0),
     }
+    if db_state == "skipped":
+        payload["database"] = "skipped"
     if config_errors:
         payload["config_errors"] = config_errors
         response.status_code = 503
-    elif not db_ok:
+    elif db_state == "error":
         payload["database_error"] = db_error or "sin detalle"
-        response.status_code = 503
+        # No 503 por DB degradada en status sin deep: evita paneles de monitores reabriendo conexiones.
     logger.info(
         "Status endpoint: env=%s, config_ok=%s, db=%s",
         settings.app_env,
         len(config_errors) == 0,
-        "ok" if db_ok else "error",
+        db_state,
     )
     return payload
 

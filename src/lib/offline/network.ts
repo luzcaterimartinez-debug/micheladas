@@ -3,16 +3,49 @@ import { getApiUrl } from "@/lib/auth";
 export const LS_MENU = "michelada_menu_v4";
 export const LS_OUTBOX = "michelada_outbox_v1";
 export const LS_SYNC_META = "michelada_sync_meta_v1";
+const LS_QUOTA_UNTIL = "michelada_mysql_quota_until";
+const LS_API_DOWN_UNTIL = "michelada_api_down_until";
 
 let apiReachable = true;
 let lastUnreachableAt = 0;
-/** Si Hostinger cortó por max_connections_per_hour, no pegarle a /api/health hasta esta hora. */
+/** Si Hostinger cortó por max_connections_per_hour, no pegarle a MySQL hasta esta hora. */
 let quotaBackoffUntil = 0;
 
-/** Tras un 503/5xx, esperar antes de volver a sincronizar (evita martillar MySQL). */
-const API_RECOVERY_COOLDOWN_MS = 30_000;
-/** Hostinger reinicia la cuota ~cada hora; no reintentar MySQL antes. */
-const QUOTA_BACKOFF_MS = 50 * 60_000;
+/** Tras un 503 temporal, pausar sync (sin quemar Hostinger). */
+const API_RECOVERY_COOLDOWN_MS = 2 * 60_000;
+/** Hostinger reinicia la cuota ~cada hora. */
+const QUOTA_BACKOFF_MS = 55 * 60_000;
+/** 503 genérico (sin texto 1226): no reintentar MySQL por este rato. */
+const SOFT_DB_BACKOFF_MS = 5 * 60_000;
+
+function readStoredQuotaUntil(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const n = Number(localStorage.getItem(LS_QUOTA_UNTIL) || "0");
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeStoredQuotaUntil(until: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (until <= Date.now()) localStorage.removeItem(LS_QUOTA_UNTIL);
+    else localStorage.setItem(LS_QUOTA_UNTIL, String(until));
+  } catch {
+    /* private mode */
+  }
+}
+
+// Restaurar backoff entre recargas / pestañas.
+if (typeof window !== "undefined") {
+  const stored = readStoredQuotaUntil();
+  if (stored > Date.now()) {
+    quotaBackoffUntil = stored;
+    apiReachable = false;
+  }
+}
 
 export function isAppOnline(): boolean {
   return typeof navigator === "undefined" ? true : navigator.onLine;
@@ -20,15 +53,22 @@ export function isAppOnline(): boolean {
 
 /** navigator.onLine puede ser true sin DNS/internet; usar para evitar fetch innecesarios. */
 export function isApiReachable(): boolean {
-  return apiReachable;
+  return apiReachable && !isMysqlQuotaBackoff();
 }
 
 export function isMysqlQuotaBackoff(): boolean {
-  return Date.now() < quotaBackoffUntil;
+  if (Date.now() < quotaBackoffUntil) return true;
+  const stored = readStoredQuotaUntil();
+  if (stored > Date.now()) {
+    quotaBackoffUntil = stored;
+    return true;
+  }
+  return false;
 }
 
 export function mysqlQuotaBackoffRemainingMs(): number {
-  return Math.max(0, quotaBackoffUntil - Date.now());
+  const until = Math.max(quotaBackoffUntil, readStoredQuotaUntil());
+  return Math.max(0, until - Date.now());
 }
 
 export function shouldSyncWithServer(): boolean {
@@ -38,12 +78,29 @@ export function shouldSyncWithServer(): boolean {
 function isQuotaErrorText(text: string | undefined | null): boolean {
   if (!text) return false;
   const t = text.toLowerCase();
-  return t.includes("max_connections_per_hour") || t.includes("1226");
+  return (
+    t.includes("max_connections_per_hour") ||
+    t.includes("1226") ||
+    t.includes("too many connections") ||
+    (t.includes("user '") && t.includes("exceeded"))
+  );
 }
 
 export function markMysqlQuotaBackoff(fromMessage?: string): void {
   if (fromMessage && !isQuotaErrorText(fromMessage) && fromMessage !== "force") return;
-  quotaBackoffUntil = Date.now() + QUOTA_BACKOFF_MS;
+  const until = Date.now() + QUOTA_BACKOFF_MS;
+  quotaBackoffUntil = until;
+  writeStoredQuotaUntil(until);
+  markApiUnreachable();
+}
+
+/** Pausa corta ante cualquier 503 de BD (aunque no traiga el texto 1226). */
+export function markSoftDbBackoff(): void {
+  // No acortar un backoff de cuota más largo.
+  if (isMysqlQuotaBackoff()) return;
+  const until = Date.now() + SOFT_DB_BACKOFF_MS;
+  quotaBackoffUntil = until;
+  writeStoredQuotaUntil(until);
   markApiUnreachable();
 }
 
@@ -51,27 +108,31 @@ export function markApiUnreachable(): void {
   const wasReachable = apiReachable;
   apiReachable = false;
   lastUnreachableAt = Date.now();
-  // No disparar michelada-sync-change aquí: los listeners recargan comandas/caja/mesas
-  // y eso abre más conexiones MySQL cuando Hostinger ya cortó la cuota.
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(LS_API_DOWN_UNTIL, String(Date.now() + API_RECOVERY_COOLDOWN_MS));
+    } catch {
+      /* ignore */
+    }
+  }
+  // No disparar reloads en cascada (reabrirían MySQL).
   if (wasReachable && typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("michelada-api-down"));
   }
 }
 
 export function markApiReachable(): void {
-  // No borrar backoff de cuota Hostinger: un /api/ping OK no significa que MySQL ya acepte conexiones.
+  // No borrar backoff de cuota Hostinger: un /api/ping OK no significa que MySQL acepte conexiones.
   if (isMysqlQuotaBackoff()) {
     apiReachable = false;
     return;
   }
   if (apiReachable) return;
-  const was = apiReachable;
   apiReachable = true;
-  if (!was) {
-    notifySyncChange();
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("michelada-api-recovered"));
-    }
+  writeStoredQuotaUntil(0);
+  notifySyncChange();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("michelada-api-recovered"));
   }
 }
 
@@ -81,8 +142,12 @@ export function markApiFailureFromStatus(status: number, bodyText?: string): voi
     markMysqlQuotaBackoff(bodyText);
     return;
   }
-  // 503 de MySQL: no matar la UX; solo pausar sync agresivo un rato.
-  if (status === 503 || status === 429 || status >= 500) {
+  // Cualquier 503 de API en prod casi siempre es MySQL/Hostinger: activar modo local.
+  if (status === 503 || status === 429) {
+    markSoftDbBackoff();
+    return;
+  }
+  if (status >= 500) {
     markApiUnreachable();
   }
 }
@@ -92,23 +157,22 @@ export async function checkServerReachable(opts?: { force?: boolean }): Promise<
     markApiUnreachable();
     return false;
   }
-  // Durante cuota Hostinger no llamar health (cada intento cuenta como conexión).
+  // Durante cuota Hostinger no llamar ni ping de recuperación con MySQL detrás.
   if (!opts?.force && isMysqlQuotaBackoff()) {
     markApiUnreachable();
     return false;
   }
 
   const base = getApiUrl();
-  // Preferir /api/ping (nunca toca MySQL). Fallback a /api/health si hace falta.
+  // Solo /api/ping — nunca /api/health (health diagnosticaba MySQL y quemaba cuota).
   const pingUrl = base ? `${base}/api/ping` : "/api/ping";
   try {
     const res = await fetch(pingUrl, {
       method: "GET",
       cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(10_000),
     });
     if (res.ok) {
-      // Durante backoff de cuota no marcar reachable: login/comandas seguirían quemando conexiones.
       if (isMysqlQuotaBackoff()) {
         markApiUnreachable();
         return false;
