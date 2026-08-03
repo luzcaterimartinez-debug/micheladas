@@ -110,7 +110,13 @@ function mapCorte(raw: Record<string, unknown>): CorteCaja {
 
 function assertCajaOk(res: Response, data: unknown): asserts res is Response & { ok: true } {
   if (!res.ok) {
-    markApiFailureFromStatus(res.status);
+    const text =
+      data && typeof data === "object"
+        ? JSON.stringify(data)
+        : typeof data === "string"
+          ? data
+          : undefined;
+    markApiFailureFromStatus(res.status, text);
     throw new Error(parseApiError(data, res.status));
   }
   markApiReachable();

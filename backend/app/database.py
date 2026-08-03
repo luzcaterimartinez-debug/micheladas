@@ -20,10 +20,10 @@ _pool_lock = threading.Lock()
 # Cache del último ping: evita que health/status/polls martillen Hostinger
 # (límite típico: max_connections_per_hour).
 _check_cache: tuple[float, bool, str | None] | None = None
-_CHECK_OK_TTL_S = 30.0
-_CHECK_FAIL_TTL_S = 60.0
-_CHECK_QUOTA_TTL_S = 300.0  # 5 min si Hostinger cortó por cuota horaria
-_CHECK_POOL_TTL_S = 15.0  # pool exhausted: reintentar pronto tras reset
+_CHECK_OK_TTL_S = 45.0
+_CHECK_FAIL_TTL_S = 90.0
+_CHECK_QUOTA_TTL_S = 55 * 60.0  # ~55 min: Hostinger resetea max_connections_per_hour cada hora
+_CHECK_POOL_TTL_S = 30.0
 
 
 def _is_serverless() -> bool:

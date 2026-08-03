@@ -6,16 +6,20 @@ import {
   checkServerReachable,
   isApiReachable,
   isAppOnline,
+  isMysqlQuotaBackoff,
+  mysqlQuotaBackoffRemainingMs,
   notifySyncChange,
 } from "@/lib/offline/network";
 
-/** Hostinger limita conexiones/hora: no martillar /api/health. */
-const HEALTH_OK_MS = 45_000;
-const HEALTH_DOWN_MS = 30_000;
+/** Hostinger limita conexiones/hora: health poco frecuente. */
+const HEALTH_OK_MS = 60_000;
+const HEALTH_DOWN_MS = 2 * 60_000;
+const HEALTH_QUOTA_MS = 15 * 60_000;
 
 export function useOfflineSync() {
   const [online, setOnline] = useState(() => isAppOnline());
   const [serverReachable, setServerReachable] = useState(() => isApiReachable());
+  const [quotaBackoff, setQuotaBackoff] = useState(() => isMysqlQuotaBackoff());
   const [pending, setPending] = useState(() => getPendingCount());
   const [syncing, setSyncing] = useState(false);
   const wasReachableRef = useRef(isApiReachable());
@@ -24,12 +28,13 @@ export function useOfflineSync() {
   const refresh = useCallback(() => {
     setOnline(isAppOnline());
     setServerReachable(isApiReachable());
+    setQuotaBackoff(isMysqlQuotaBackoff());
     setPending(getPendingCount());
   }, []);
 
   const scheduleNext = useCallback((ok: boolean) => {
     if (intervalRef.current != null) window.clearInterval(intervalRef.current);
-    const ms = ok ? HEALTH_OK_MS : HEALTH_DOWN_MS;
+    const ms = isMysqlQuotaBackoff() ? HEALTH_QUOTA_MS : ok ? HEALTH_OK_MS : HEALTH_DOWN_MS;
     intervalRef.current = window.setInterval(() => {
       void pingRef.current();
     }, ms);
@@ -42,6 +47,7 @@ export function useOfflineSync() {
     const ok = await checkServerReachable();
     wasReachableRef.current = ok;
     setServerReachable(ok);
+    setQuotaBackoff(isMysqlQuotaBackoff());
     scheduleNext(ok);
     if (ok && !wasReachable) {
       void runAutoSync();
@@ -54,23 +60,35 @@ export function useOfflineSync() {
   const syncNow = useCallback(async () => {
     setSyncing(true);
     try {
-      const reachable = await pingServer();
+      // Reintentar forzado aunque estemos en backoff de cuota (el usuario lo pide).
+      const reachable = await checkServerReachable({ force: true });
+      wasReachableRef.current = reachable;
+      setServerReachable(reachable);
+      setQuotaBackoff(isMysqlQuotaBackoff());
+      scheduleNext(reachable);
       if (!reachable) return;
       await runAutoSync();
     } finally {
       setSyncing(false);
       refresh();
     }
-  }, [pingServer, refresh]);
+  }, [refresh, scheduleNext]);
 
   useEffect(() => {
     const teardown = initOfflineSync();
     const onChange = () => {
       refresh();
     };
+    const onDown = () => {
+      wasReachableRef.current = false;
+      setServerReachable(false);
+      setQuotaBackoff(isMysqlQuotaBackoff());
+      scheduleNext(false);
+    };
     const onRecovered = () => {
       wasReachableRef.current = true;
       setServerReachable(true);
+      setQuotaBackoff(false);
       refresh();
       scheduleNext(true);
       void runAutoSync();
@@ -82,6 +100,7 @@ export function useOfflineSync() {
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOnline);
     window.addEventListener("michelada-sync-change", onChange);
+    window.addEventListener("michelada-api-down", onDown);
     window.addEventListener("michelada-api-recovered", onRecovered);
     refresh();
     void pingServer();
@@ -91,11 +110,20 @@ export function useOfflineSync() {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOnline);
       window.removeEventListener("michelada-sync-change", onChange);
+      window.removeEventListener("michelada-api-down", onDown);
       window.removeEventListener("michelada-api-recovered", onRecovered);
     };
   }, [pingServer, refresh, scheduleNext]);
 
-  return { online, serverReachable, pending, syncing, syncNow };
+  return {
+    online,
+    serverReachable,
+    quotaBackoff,
+    quotaRemainingMs: quotaBackoff ? mysqlQuotaBackoffRemainingMs() : 0,
+    pending,
+    syncing,
+    syncNow,
+  };
 }
 
 export function triggerSyncRefresh(): void {

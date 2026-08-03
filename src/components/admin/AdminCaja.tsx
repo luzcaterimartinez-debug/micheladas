@@ -110,14 +110,14 @@ export function AdminCaja() {
 
   useEffect(() => {
     const onSync = () => {
-      if (!cobrarId && !editarId) void reload({ silent: true });
+      if (!cobrarId && !editarId && isApiReachable()) void reload({ silent: true });
     };
     window.addEventListener("michelada-sync-change", onSync);
     window.addEventListener("michelada-api-recovered", onSync);
     window.addEventListener("focus", onSync);
     const interval = window.setInterval(() => {
       if (!cobrarId && !editarId && isApiReachable()) void reload({ silent: true });
-    }, 3000);
+    }, 4000);
     return () => {
       window.removeEventListener("michelada-sync-change", onSync);
       window.removeEventListener("michelada-api-recovered", onSync);

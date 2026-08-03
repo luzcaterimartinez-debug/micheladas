@@ -328,7 +328,8 @@ export function useComandas() {
     if (!getStoredSession()) return;
 
     const onSync = () => {
-      void reload();
+      if (shouldSyncWithServer()) void reload();
+      else applyFromCache();
     };
 
     const onStore = (e: Event) => {
@@ -343,7 +344,10 @@ export function useComandas() {
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel("michelada-sync");
-      bc.onmessage = () => void reload();
+      bc.onmessage = () => {
+        if (shouldSyncWithServer()) void reload();
+        else applyFromCache();
+      };
     } catch {
       bc = null;
     }
@@ -361,7 +365,7 @@ export function useComandas() {
     // Polling en tiempo real; si la API/MySQL está caída, no martillar (cuota Hostinger).
     const interval = window.setInterval(() => {
       if (shouldSyncWithServer()) void reload();
-    }, 3000);
+    }, 4000);
 
     return () => {
       window.clearInterval(interval);
@@ -846,7 +850,7 @@ export function useInventory(opts?: { pauseAutoReload?: boolean }) {
     if (pauseAutoReload) return;
     const interval = window.setInterval(() => {
       if (shouldSyncWithServer()) void reload();
-    }, 15000);
+    }, 20000);
     return () => window.clearInterval(interval);
   }, [reload, pauseAutoReload]);
 

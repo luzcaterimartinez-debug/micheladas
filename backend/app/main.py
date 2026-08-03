@@ -180,7 +180,8 @@ def health(response: Response) -> dict[str, str | list[str]]:
         if "max_connections_per_hour" in db_error.lower() or "1226" in db_error:
             payload["hint"] = (
                 "Hostinger: se agotó max_connections_per_hour. "
-                "Espera ~1h; en Vercel usa MYSQL_POOL_SIZE=1 y evita muchas pestañas abiertas."
+                "Cierra pestañas del POS y espera ~1 hora. "
+                "No reintentes health: cada intento consume la cuota."
             )
         elif "pool exhausted" in db_error.lower():
             payload["hint"] = (

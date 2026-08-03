@@ -33,7 +33,7 @@ function opLabel(op: OutboxOp): string {
 }
 
 export function OfflineSyncBanner() {
-  const { online, serverReachable, pending, syncing, syncNow } = useOfflineSync();
+  const { online, serverReachable, quotaBackoff, pending, syncing, syncNow } = useOfflineSync();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const hasSession = typeof window !== "undefined" && !!getStoredSession();
   const [expanded, setExpanded] = useState(false);
@@ -66,9 +66,11 @@ export function OfflineSyncBanner() {
               <>
                 <ServerCrash className="h-4 w-4 shrink-0" />
                 <span className="truncate">
-                  {import.meta.env.PROD
-                    ? "Base de datos no disponible — reintentando en silencio…"
-                    : "Servidor no disponible — inicia el backend (puerto 8000)"}
+                  {quotaBackoff
+                    ? "Hostinger: límite de conexiones MySQL — espera ~1 h (cierra pestañas extra)"
+                    : import.meta.env.PROD
+                      ? "Base de datos no disponible — reintentando en silencio…"
+                      : "Servidor no disponible — inicia el backend (puerto 8000)"}
                 </span>
               </>
             ) : (
