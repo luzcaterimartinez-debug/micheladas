@@ -6,7 +6,7 @@ import time
 from typing import Any, Generator
 
 import mysql.connector
-from mysql.connector import MySQLConnection, pooling
+from mysql.connector import pooling
 from mysql.connector.cursor import MySQLCursorDict
 
 from app.config import get_settings
@@ -49,11 +49,11 @@ def _connect_kwargs() -> dict[str, Any]:
     }
 
 
-def _connect_direct() -> MySQLConnection:
+def _connect_direct() -> Any:
     """Una conexión nueva (sin pool). Preferido en Vercel."""
-    conn = mysql.connector.connect(**_connect_kwargs())
-    assert isinstance(conn, MySQLConnection)
-    return conn
+    # No usar assert isinstance: en Vercel a menudo es CMySQLConnection
+    # (no siempre subclase de MySQLConnection) y el assert vacío rompía health/login.
+    return mysql.connector.connect(**_connect_kwargs())
 
 
 def _build_pool() -> pooling.MySQLConnectionPool:
@@ -91,7 +91,7 @@ def get_pool() -> pooling.MySQLConnectionPool:
         return _pool
 
 
-def _apply_session_timezone(conn: MySQLConnection) -> None:
+def _apply_session_timezone(conn: Any) -> None:
     """Fuerza hora Colombia en CURRENT_TIMESTAMP / CURDATE / comparaciones."""
     cursor = conn.cursor()
     try:
@@ -105,7 +105,7 @@ def _is_pool_exhausted(exc: BaseException) -> bool:
     return "pool exhausted" in msg or "failed getting connection" in msg
 
 
-def get_connection() -> MySQLConnection:
+def get_connection() -> Any:
     """
     Obtiene una conexión lista para usar.
     En Vercel: conexión directa (evita 'pool exhausted').
@@ -140,7 +140,7 @@ def get_connection() -> MySQLConnection:
     return conn
 
 
-def _safe_close(conn: MySQLConnection | None) -> None:
+def _safe_close(conn: Any) -> None:
     if conn is None:
         return
     try:
@@ -172,7 +172,7 @@ def check_database(*, force: bool = False) -> tuple[bool, str | None]:
             return ok, err
 
     target = _connection_target()
-    conn: MySQLConnection | None = None
+    conn: Any = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -185,7 +185,9 @@ def check_database(*, force: bool = False) -> tuple[bool, str | None]:
         _check_cache = (now, True, None)
         return True, None
     except Exception as exc:
-        msg = str(exc)
+        msg = f"{type(exc).__name__}: {exc}".strip()
+        if msg.endswith(":"):
+            msg = type(exc).__name__
         logger.error("Conexión MySQL falló → %s — %s", target, msg)
         if _is_pool_exhausted(exc):
             reset_pool()
@@ -196,7 +198,7 @@ def check_database(*, force: bool = False) -> tuple[bool, str | None]:
 
 
 @contextmanager
-def get_db() -> Generator[tuple[MySQLConnection, MySQLCursorDict], None, None]:
+def get_db() -> Generator[tuple[Any, MySQLCursorDict], None, None]:
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:

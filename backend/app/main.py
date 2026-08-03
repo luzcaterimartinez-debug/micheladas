@@ -45,9 +45,10 @@ app.add_middleware(
 async def mysql_error_handler(request: Request, exc: mysql.connector.Error) -> JSONResponse:
     settings = get_settings()
     logger.error("MySQL error: %s", exc)
-    payload: dict[str, str] = {"detail": "Base de datos no disponible"}
-    if not settings.is_production:
-        payload["database_error"] = str(exc)
+    payload: dict[str, str] = {
+        "detail": "Base de datos no disponible",
+        "database_error": f"{type(exc).__name__}: {exc}",
+    }
     logger.error(
         "MySQL error handler called for %s %s — exc=%s",
         request.method,
@@ -69,19 +70,14 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
         str(exc),
         tb,
     )
-    settings = get_settings()
-    if not settings.is_production:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": "Error interno del servidor",
-                "error": str(exc),
-                "traceback": tb,
-            },
-        )
+    # En producción también devolvemos el tipo de error (sin traceback) para diagnosticar
+    # fallos como AssertionError vacío del conector MySQL en Vercel.
     return JSONResponse(
         status_code=500,
-        content={"detail": "Error interno del servidor"},
+        content={
+            "detail": "Error interno del servidor",
+            "error": f"{type(exc).__name__}: {exc}",
+        },
     )
 
 
