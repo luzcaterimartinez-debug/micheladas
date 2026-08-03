@@ -5,7 +5,8 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
-from app.cache import cache_invalidate
+from app.cache import cache_invalidate, query_cache
+from app.config import get_settings
 from app.database import fetch_all, fetch_one, get_db
 from app.models.inventario import InventarioOut, InventarioUpdate
 from app.models.pos import OrderItemIn
@@ -71,8 +72,8 @@ def invalidate_inventario_cache() -> None:
 
 
 def list_inventario() -> list[InventarioOut]:
-    # Sin caché: tras editar stock el listado debe reflejar el valor real de inmediato.
-    return _list_inventario_db()
+    ttl = float(get_settings().query_cache_inventario_ttl_seconds)
+    return query_cache("inventario:list", _list_inventario_db, ttl_seconds=ttl)
 
 
 def _list_inventario_db() -> list[InventarioOut]:

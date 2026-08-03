@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth.dependencies import require_roles
+from app.auth.dependencies import invalidate_auth_user_cache, require_roles
 from app.auth.password import hash_password
 from app.cache import cache_invalidate, query_cache
 from app.database import fetch_all, fetch_one, get_db
@@ -16,8 +16,9 @@ AdminUser = Annotated[UserPublic, Depends(require_roles(Rol.ADMIN))]
 USERS_CACHE_KEY = "usuarios:list"
 
 
-def invalidate_users_cache() -> None:
+def invalidate_users_cache(user_id: int | None = None) -> None:
     cache_invalidate("usuarios:")
+    invalidate_auth_user_cache(user_id)
 
 
 def _list_users_db() -> list[UserAdmin]:
@@ -133,7 +134,7 @@ def update_user(user_id: int, body: UserUpdate, admin: AdminUser) -> UserAdmin:
             (user_id,),
         )
 
-    invalidate_users_cache()
+    invalidate_users_cache(user_id)
     return UserAdmin(
         id=updated["id"],
         nombre=updated["nombre"],

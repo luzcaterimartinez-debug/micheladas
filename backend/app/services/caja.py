@@ -6,6 +6,8 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from app.cache import cache_invalidate, query_cache
+from app.config import get_settings
 from app.database import fetch_all, fetch_one, get_db
 from app.models.caja import (
     CajaResumenOut,
@@ -17,6 +19,16 @@ from app.models.caja import (
 from app.models.pos import ComandaOut
 from app.services.pos import COMANDAS_SELECT, _row_to_comanda, invalidate_pos_cache
 from app.tz import day_bounds, today_co, to_ms_optional
+
+CAJA_CACHE_PREFIX = "caja:"
+
+
+def invalidate_caja_cache() -> None:
+    cache_invalidate(CAJA_CACHE_PREFIX)
+
+
+def _caja_ttl() -> float:
+    return float(get_settings().query_cache_caja_ttl_seconds)
 
 
 def _day_bounds(fecha: date) -> tuple[datetime, datetime]:
@@ -84,6 +96,7 @@ def registrar_pago(comanda_id: str, body: PagoCreate, cobrador_id: int) -> Coman
             (comanda_id,),
         )
     invalidate_pos_cache()
+    invalidate_caja_cache()
     assert updated is not None
     with get_db() as (_, cursor):
         return _row_to_comanda(cursor, updated)
@@ -120,12 +133,22 @@ def anular_pago(comanda_id: str) -> ComandaOut:
             (comanda_id,),
         )
     invalidate_pos_cache()
+    invalidate_caja_cache()
     assert updated is not None
     with get_db() as (_, cursor):
         return _row_to_comanda(cursor, updated)
 
 
 def list_comandas_caja(*, fecha: date, pagado: bool | None = None) -> list[ComandaOut]:
+    key = f"{CAJA_CACHE_PREFIX}comandas:{fecha.isoformat()}:{pagado}"
+    return query_cache(
+        key,
+        lambda: _list_comandas_caja_db(fecha=fecha, pagado=pagado),
+        ttl_seconds=_caja_ttl(),
+    )
+
+
+def _list_comandas_caja_db(*, fecha: date, pagado: bool | None = None) -> list[ComandaOut]:
     start, end = _day_bounds(fecha)
     with get_db() as (_, cursor):
         if pagado is True:
@@ -174,6 +197,11 @@ def list_comandas_caja(*, fecha: date, pagado: bool | None = None) -> list[Coman
 
 
 def resumen_dia(fecha: date) -> CajaResumenOut:
+    key = f"{CAJA_CACHE_PREFIX}resumen:{fecha.isoformat()}"
+    return query_cache(key, lambda: _resumen_dia_db(fecha), ttl_seconds=_caja_ttl())
+
+
+def _resumen_dia_db(fecha: date) -> CajaResumenOut:
     start, end = _day_bounds(fecha)
     with get_db() as (_, cursor):
         pagadas = fetch_one(
@@ -308,10 +336,16 @@ def crear_corte(body: CorteCreate, usuario_id: int) -> CorteOut:
             (corte_id,),
         )
     assert row is not None
+    invalidate_caja_cache()
     return _corte_out(row)
 
 
 def list_cortes(limit: int = 30) -> list[CorteOut]:
+    key = f"{CAJA_CACHE_PREFIX}cortes:{limit}"
+    return query_cache(key, lambda: _list_cortes_db(limit), ttl_seconds=_caja_ttl())
+
+
+def _list_cortes_db(limit: int = 30) -> list[CorteOut]:
     with get_db() as (_, cursor):
         rows = fetch_all(
             cursor,

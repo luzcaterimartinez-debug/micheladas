@@ -58,6 +58,8 @@ def invalidate_comandas_cache() -> None:
 def invalidate_pos_cache() -> None:
     invalidate_mesas_cache()
     invalidate_comandas_cache()
+    # Caja resume/lista dependen de comandas pagadas.
+    cache_invalidate("caja:")
 
 
 def _comandas_cache_ttl() -> float:
@@ -435,12 +437,19 @@ def list_comandas(
     pagado: bool | None = None,
     limit: int = 500,
 ) -> list[ComandaOut]:
-    # Sin caché: barra/mesero necesitan el status al instante (multi-instancia / Vercel).
-    return _list_comandas_db(
-        status_filter=status_filter,
-        mesa_id=mesa_id,
-        pagado=pagado,
-        limit=limit,
+    key = (
+        f"{COMANDAS_CACHE_PREFIX}list:"
+        f"{status_filter or ''}:{mesa_id or ''}:{pagado}:{limit}"
+    )
+    return query_cache(
+        key,
+        lambda: _list_comandas_db(
+            status_filter=status_filter,
+            mesa_id=mesa_id,
+            pagado=pagado,
+            limit=limit,
+        ),
+        ttl_seconds=_comandas_cache_ttl(),
     )
 
 

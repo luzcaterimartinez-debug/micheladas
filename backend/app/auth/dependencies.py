@@ -4,10 +4,44 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.jwt import decode_access_token
+from app.cache import cache_invalidate, query_cache
+from app.config import get_settings
 from app.database import fetch_one, get_db
 from app.models.user import Rol, UserPublic
 
 security = HTTPBearer(auto_error=False)
+
+AUTH_USER_CACHE_PREFIX = "auth:user:"
+
+
+def invalidate_auth_user_cache(user_id: int | None = None) -> None:
+    if user_id is None:
+        cache_invalidate(AUTH_USER_CACHE_PREFIX)
+    else:
+        cache_invalidate(f"{AUTH_USER_CACHE_PREFIX}{user_id}")
+
+
+def _load_user_public(user_id: int) -> UserPublic:
+    with get_db() as (_, cursor):
+        row = fetch_one(
+            cursor,
+            """
+            SELECT id, nombre, email, rol
+            FROM usuarios
+            WHERE id = %s AND activo = 1
+            """,
+            (user_id,),
+        )
+
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado")
+
+    return UserPublic(
+        id=row["id"],
+        nombre=row["nombre"],
+        email=row["email"],
+        rol=row["rol"],
+    )
 
 
 def get_current_user(
@@ -29,25 +63,11 @@ def get_current_user(
         )
 
     user_id = int(payload.sub)
-    with get_db() as (_, cursor):
-        row = fetch_one(
-            cursor,
-            """
-            SELECT id, nombre, email, rol
-            FROM usuarios
-            WHERE id = %s AND activo = 1
-            """,
-            (user_id,),
-        )
-
-    if row is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado")
-
-    return UserPublic(
-        id=row["id"],
-        nombre=row["nombre"],
-        email=row["email"],
-        rol=row["rol"],
+    ttl = float(get_settings().query_cache_auth_ttl_seconds)
+    return query_cache(
+        f"{AUTH_USER_CACHE_PREFIX}{user_id}",
+        lambda: _load_user_public(user_id),
+        ttl_seconds=ttl,
     )
 
 

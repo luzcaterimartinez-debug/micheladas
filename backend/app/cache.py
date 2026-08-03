@@ -1,22 +1,28 @@
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any, Callable, TypeVar
 
 T = TypeVar("T")
 
 _store: dict[str, tuple[float, Any]] = {}
+_lock = threading.Lock()
 
 
 def cache_get(key: str, ttl_seconds: float, loader: Callable[[], T]) -> T:
     now = time.monotonic()
-    hit = _store.get(key)
-    if hit is not None:
-        expires, value = hit
-        if now < expires:
-            return value
+    with _lock:
+        hit = _store.get(key)
+        if hit is not None:
+            expires, value = hit
+            if now < expires:
+                return value
+
     value = loader()
-    _store[key] = (now + ttl_seconds, value)
+
+    with _lock:
+        _store[key] = (now + max(0.1, ttl_seconds), value)
     return value
 
 
@@ -30,10 +36,17 @@ def query_cache(key: str, loader: Callable[[], T], *, ttl_seconds: float | None 
 
 
 def cache_invalidate(prefix: str) -> None:
-    for key in list(_store):
-        if key.startswith(prefix):
-            del _store[key]
+    with _lock:
+        for key in list(_store):
+            if key.startswith(prefix):
+                del _store[key]
 
 
 def cache_clear() -> None:
-    _store.clear()
+    with _lock:
+        _store.clear()
+
+
+def cache_stats() -> dict[str, int]:
+    with _lock:
+        return {"entries": len(_store)}
