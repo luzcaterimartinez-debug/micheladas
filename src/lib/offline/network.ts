@@ -48,7 +48,19 @@ if (typeof window !== "undefined") {
 }
 
 export function isAppOnline(): boolean {
-  return typeof navigator === "undefined" ? true : navigator.onLine;
+  // navigator.onLine es poco confiable (a menudo false con Wi‑Fi OK en PWA/Android).
+  if (typeof navigator === "undefined") return true;
+  return navigator.onLine !== false;
+}
+
+/**
+ * Conexión real útil: si la API respondió o no hay marca de caída local.
+ * No usar solo navigator.onLine para bloquear el POS.
+ */
+export function isNetworkUsable(): boolean {
+  // Si el API está marcado reachable (ping OK / response OK), hay "internet" real.
+  if (apiReachable && !isMysqlQuotaBackoff()) return true;
+  return isAppOnline();
 }
 
 /** navigator.onLine puede ser true sin DNS/internet; usar para evitar fetch innecesarios. */
@@ -72,7 +84,8 @@ export function mysqlQuotaBackoffRemainingMs(): number {
 }
 
 export function shouldSyncWithServer(): boolean {
-  return isAppOnline() && apiReachable && !isMysqlQuotaBackoff();
+  // No exigir navigator.onLine: si está mal en false bloqueaba sync y el banner decía "sin internet".
+  return apiReachable && !isMysqlQuotaBackoff();
 }
 
 function isQuotaErrorText(text: string | undefined | null): boolean {
@@ -153,18 +166,15 @@ export function markApiFailureFromStatus(status: number, bodyText?: string): voi
 }
 
 export async function checkServerReachable(opts?: { force?: boolean }): Promise<boolean> {
-  if (!isAppOnline()) {
-    markApiUnreachable();
-    return false;
-  }
-  // Durante cuota Hostinger no llamar ni ping de recuperación con MySQL detrás.
+  // Durante cuota Hostinger no llamar (evita reabrir MySQL). Con force=true el usuario reintenta.
   if (!opts?.force && isMysqlQuotaBackoff()) {
     markApiUnreachable();
     return false;
   }
 
   const base = getApiUrl();
-  // Solo /api/ping — nunca /api/health (health diagnosticaba MySQL y quemaba cuota).
+  // Solo /api/ping — nunca /api/health (health abría MySQL y quemaba cuota).
+  // No bloquear por navigator.onLine (falsa alarma frecuente en PWA/móviles).
   const pingUrl = base ? `${base}/api/ping` : "/api/ping";
   try {
     const res = await fetch(pingUrl, {
@@ -173,9 +183,15 @@ export async function checkServerReachable(opts?: { force?: boolean }): Promise<
       signal: AbortSignal.timeout(10_000),
     });
     if (res.ok) {
-      if (isMysqlQuotaBackoff()) {
+      if (isMysqlQuotaBackoff() && !opts?.force) {
         markApiUnreachable();
         return false;
+      }
+      // Ping OK: limpia soft backoff corto; no toca 1226 largo salvo force.
+      if (opts?.force && isMysqlQuotaBackoff()) {
+        // El usuario pidió reintentar: solo limpia soft/local; si Hostinger sigue caído, fallará al usar MySQL.
+        writeStoredQuotaUntil(0);
+        quotaBackoffUntil = 0;
       }
       markApiReachable();
       return true;
@@ -206,7 +222,7 @@ export function isApiRecoveryCooldown(): boolean {
 }
 
 export function isNetworkFailure(err: unknown): boolean {
-  if (!isAppOnline()) return true;
+  // No tratar navigator.onLine false solo como fallo de red.
   if (err instanceof TypeError) {
     markApiUnreachable();
     return true;

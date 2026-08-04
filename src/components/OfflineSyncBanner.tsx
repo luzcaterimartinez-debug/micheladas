@@ -33,8 +33,9 @@ function opLabel(op: OutboxOp): string {
 }
 
 /**
- * Banner solo si hay cambios locales pendientes o no hay internet.
- * No mostramos "base de datos caída": el POS sigue con caché/local.
+ * Banner solo con cambios pendientes de sync, o sin conexión REAL
+ * (navegador offline Y el API no responde a ping).
+ * Nunca confundir error de MySQL/Hostinger con "sin internet".
  */
 export function OfflineSyncBanner() {
   const { online, serverReachable, pending, syncing, syncNow } = useOfflineSync();
@@ -46,10 +47,12 @@ export function OfflineSyncBanner() {
 
   if (!hasSession && PUBLIC_ROUTES.has(pathname)) return null;
 
-  // Solo internet real o cola de sync. Nunca mensajes de "BD no disponible".
-  if (online && pending === 0) return null;
+  // Hay red útil si el browser o un ping reciente lo confirman.
+  const hasNet = online || serverReachable;
+  if (hasNet && pending === 0) return null;
 
-  const offline = !online;
+  // Solo "sin internet" si no hay señal de red util Ni ping al API.
+  const offline = !hasNet;
 
   return (
     <div
@@ -65,7 +68,7 @@ export function OfflineSyncBanner() {
             {offline ? (
               <>
                 <CloudOff className="h-4 w-4 shrink-0" />
-                <span className="truncate">Sin internet — los cambios se guardan localmente</span>
+                <span className="truncate">Sin conexión al servidor — trabajando en local</span>
               </>
             ) : (
               <>
@@ -88,7 +91,7 @@ export function OfflineSyncBanner() {
                 Ver
               </button>
             )}
-            {online && pending > 0 && (
+            {(hasNet || pending > 0) && (
               <button
                 type="button"
                 onClick={() => void syncNow()}
@@ -96,7 +99,7 @@ export function OfflineSyncBanner() {
                 className="inline-flex items-center gap-1 rounded-full bg-slate-900 text-white px-3 py-1 text-xs font-bold disabled:opacity-60"
               >
                 {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
-                {syncing ? "Sync…" : "Sincronizar"}
+                {syncing ? "Sync…" : offline ? "Reintentar" : "Sincronizar"}
               </button>
             )}
           </div>

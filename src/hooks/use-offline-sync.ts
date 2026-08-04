@@ -7,6 +7,7 @@ import {
   isApiReachable,
   isAppOnline,
   isMysqlQuotaBackoff,
+  isNetworkUsable,
   mysqlQuotaBackoffRemainingMs,
   notifySyncChange,
 } from "@/lib/offline/network";
@@ -17,7 +18,7 @@ const HEALTH_DOWN_MS = 5 * 60_000;
 const HEALTH_QUOTA_MS = 20 * 60_000;
 
 export function useOfflineSync() {
-  const [online, setOnline] = useState(() => isAppOnline());
+  const [online, setOnline] = useState(() => isNetworkUsable());
   const [serverReachable, setServerReachable] = useState(() => isApiReachable());
   const [quotaBackoff, setQuotaBackoff] = useState(() => isMysqlQuotaBackoff());
   const [pending, setPending] = useState(() => getPendingCount());
@@ -26,7 +27,8 @@ export function useOfflineSync() {
   const intervalRef = useRef<number | null>(null);
 
   const refresh = useCallback(() => {
-    setOnline(isAppOnline());
+    // Online de UI = API usable o, en su defecto, la señal del browser.
+    setOnline(isApiReachable() || isAppOnline());
     setServerReachable(isApiReachable());
     setQuotaBackoff(isMysqlQuotaBackoff());
     setPending(getPendingCount());
@@ -47,6 +49,9 @@ export function useOfflineSync() {
     const ok = await checkServerReachable();
     wasReachableRef.current = ok;
     setServerReachable(ok);
+    // Si ping responde, tenemos internet real aunque navigator diga offline.
+    if (ok) setOnline(true);
+    else setOnline(isAppOnline());
     setQuotaBackoff(isMysqlQuotaBackoff());
     scheduleNext(ok);
     if (ok && !wasReachable) {
@@ -60,10 +65,10 @@ export function useOfflineSync() {
   const syncNow = useCallback(async () => {
     setSyncing(true);
     try {
-      // Reintentar forzado aunque estemos en backoff de cuota (el usuario lo pide).
       const reachable = await checkServerReachable({ force: true });
       wasReachableRef.current = reachable;
       setServerReachable(reachable);
+      if (reachable) setOnline(true);
       setQuotaBackoff(isMysqlQuotaBackoff());
       scheduleNext(reachable);
       if (!reachable) return;
@@ -83,22 +88,33 @@ export function useOfflineSync() {
       wasReachableRef.current = false;
       setServerReachable(false);
       setQuotaBackoff(isMysqlQuotaBackoff());
+      // API/MySQL caído ≠ sin Wi‑Fi: no mostrar "sin internet".
+      setOnline(true);
       scheduleNext(false);
     };
     const onRecovered = () => {
       wasReachableRef.current = true;
       setServerReachable(true);
+      setOnline(true);
       setQuotaBackoff(false);
       refresh();
       scheduleNext(true);
       void runAutoSync();
     };
-    const onOnline = () => {
-      refresh();
+    const onBrowserOnline = () => {
+      setOnline(true);
       void pingServer();
     };
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOnline);
+    const onBrowserOffline = () => {
+      // No confiar en el evento offline de inmediato: muchos Android lo disparan con Wi‑Fi OK.
+      void checkServerReachable({ force: true }).then((ok) => {
+        setOnline(ok);
+        setServerReachable(ok);
+        wasReachableRef.current = ok;
+      });
+    };
+    window.addEventListener("online", onBrowserOnline);
+    window.addEventListener("offline", onBrowserOffline);
     window.addEventListener("michelada-sync-change", onChange);
     window.addEventListener("michelada-api-down", onDown);
     window.addEventListener("michelada-api-recovered", onRecovered);
@@ -107,8 +123,8 @@ export function useOfflineSync() {
     return () => {
       teardown();
       if (intervalRef.current != null) window.clearInterval(intervalRef.current);
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOnline);
+      window.removeEventListener("online", onBrowserOnline);
+      window.removeEventListener("offline", onBrowserOffline);
       window.removeEventListener("michelada-sync-change", onChange);
       window.removeEventListener("michelada-api-down", onDown);
       window.removeEventListener("michelada-api-recovered", onRecovered);

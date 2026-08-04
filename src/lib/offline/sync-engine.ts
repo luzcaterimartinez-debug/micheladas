@@ -287,7 +287,8 @@ export function initOfflineSync(): () => void {
   };
 
   const onOffline = () => {
-    markApiUnreachable();
+    // No marcar API caída con el evento offline del browser (falsa alarma en móviles).
+    // Solo el ping/errores de fetch deben marcarlo.
   };
 
   window.addEventListener("michelada-api-recovered", onRecovered);
