@@ -1,6 +1,11 @@
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
 import { fetchWithTimeout } from "@/lib/api-fetch";
 import { markApiFailureFromStatus, markApiReachable } from "@/lib/offline/network";
+import {
+  RESPONSE_TTL,
+  cachedGetJson,
+  responseCacheInvalidate,
+} from "@/lib/offline/response-cache";
 import type { Comanda, Mesa, OrderItem } from "@/lib/micheladas-store";
 import { LLEVAR_EXTRA, MESA_LLEVAR_ID } from "@/lib/micheladas-store";
 
@@ -25,6 +30,12 @@ function authHeaders(): HeadersInit {
     Authorization: `Bearer ${session.accessToken}`,
     "Content-Type": "application/json",
   };
+}
+
+function invalidatePosReads(): void {
+  responseCacheInvalidate("/api/comandas");
+  responseCacheInvalidate("/api/mesas");
+  responseCacheInvalidate("/api/caja");
 }
 
 function mapMesa(raw: Record<string, unknown>): Mesa {
@@ -95,10 +106,14 @@ export function mapComanda(raw: Record<string, unknown>): Comanda {
 }
 
 export async function fetchMesas(): Promise<Mesa[]> {
-  const res = await fetch(`${getApiUrl()}/api/mesas`, { headers: authHeaders() });
-  const data = await res.json().catch(() => ({}));
-  assertOk(res, data);
-  return (data as Record<string, unknown>[]).map(mapMesa);
+  const url = `${getApiUrl()}/api/mesas`;
+  const data = await cachedGetJson<Record<string, unknown>[]>({
+    url,
+    headers: authHeaders(),
+    ttlMs: RESPONSE_TTL.mesas,
+    cacheKey: url,
+  });
+  return data.map(mapMesa);
 }
 
 export async function marcarMesaAtendidaApi(mesaId: string): Promise<Mesa> {
@@ -108,6 +123,7 @@ export async function marcarMesaAtendidaApi(mesaId: string): Promise<Mesa> {
   });
   const data = await res.json().catch(() => ({}));
   assertOk(res, data);
+  invalidatePosReads();
   return mapMesa(data as Record<string, unknown>);
 }
 
@@ -125,6 +141,7 @@ export async function patchMesaApi(id: string, patch: Partial<Mesa>): Promise<Me
   });
   const data = await res.json().catch(() => ({}));
   assertOk(res, data);
+  invalidatePosReads();
   return mapMesa(data as Record<string, unknown>);
 }
 
@@ -136,6 +153,7 @@ export async function createMesaApi(nombre: string, capacidad: number): Promise<
   });
   const data = await res.json().catch(() => ({}));
   assertOk(res, data);
+  invalidatePosReads();
   return mapMesa(data as Record<string, unknown>);
 }
 
@@ -149,6 +167,7 @@ export async function deleteMesaApi(id: string): Promise<void> {
     markApiFailureFromStatus(res.status);
     throw new Error(parseApiError(data, res.status));
   }
+  invalidatePosReads();
 }
 
 export async function fetchComandas(opts?: {
@@ -161,13 +180,14 @@ export async function fetchComandas(opts?: {
   if (opts?.mesaId) params.set("mesa_id", opts.mesaId);
   if (opts?.limit != null) params.set("limit", String(opts.limit));
   const q = params.toString() ? `?${params.toString()}` : "";
-  const res = await fetchWithTimeout(`${getApiUrl()}/api/comandas${q}`, {
+  const url = `${getApiUrl()}/api/comandas${q}`;
+  const data = await cachedGetJson<Record<string, unknown>[]>({
+    url,
     headers: authHeaders(),
-    cache: "no-store",
+    ttlMs: RESPONSE_TTL.comandas,
+    cacheKey: url,
   });
-  const data = await res.json().catch(() => ({}));
-  assertOk(res, data);
-  return (data as Record<string, unknown>[]).map(mapComanda);
+  return data.map(mapComanda);
 }
 
 export async function createComandaApi(
@@ -188,6 +208,7 @@ export async function createComandaApi(
   });
   const data = await res.json().catch(() => ({}));
   assertOk(res, data);
+  invalidatePosReads();
   return mapComanda(data as Record<string, unknown>);
 }
 
@@ -209,6 +230,7 @@ export async function patchComandaApi(
   });
   const data = await res.json().catch(() => ({}));
   assertOk(res, data);
+  invalidatePosReads();
   return mapComanda(data as Record<string, unknown>);
 }
 
@@ -222,4 +244,5 @@ export async function deleteComandaApi(id: string): Promise<void> {
     markApiFailureFromStatus(res.status);
     throw new Error(parseApiError(data, res.status));
   }
+  invalidatePosReads();
 }

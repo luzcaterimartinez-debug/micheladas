@@ -1,6 +1,11 @@
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
 import { fetchWithTimeout } from "@/lib/api-fetch";
 import { markApiFailureFromStatus, markApiReachable } from "@/lib/offline/network";
+import {
+  RESPONSE_TTL,
+  cachedGetJson,
+  responseCacheInvalidate,
+} from "@/lib/offline/response-cache";
 import type { Comanda } from "@/lib/micheladas-store";
 import { mapComanda } from "@/lib/pos-api";
 
@@ -122,12 +127,21 @@ function assertCajaOk(res: Response, data: unknown): asserts res is Response & {
   markApiReachable();
 }
 
+function invalidateCajaReads(): void {
+  responseCacheInvalidate("/api/caja");
+  responseCacheInvalidate("/api/comandas");
+}
+
 export async function fetchCajaResumen(fecha?: string): Promise<CajaResumen> {
   const q = fecha ? `?fecha=${encodeURIComponent(fecha)}` : "";
-  const res = await fetchWithTimeout(`${getApiUrl()}/api/caja/resumen${q}`, { headers: authHeaders() });
-  const data = await res.json().catch(() => ({}));
-  assertCajaOk(res, data);
-  return mapResumen(data as Record<string, unknown>);
+  const url = `${getApiUrl()}/api/caja/resumen${q}`;
+  const data = await cachedGetJson<Record<string, unknown>>({
+    url,
+    headers: authHeaders(),
+    ttlMs: RESPONSE_TTL.caja,
+    cacheKey: url,
+  });
+  return mapResumen(data);
 }
 
 export async function fetchCajaComandas(opts?: {
@@ -138,10 +152,14 @@ export async function fetchCajaComandas(opts?: {
   if (opts?.fecha) params.set("fecha", opts.fecha);
   if (opts?.pagado != null) params.set("pagado", String(opts.pagado));
   const q = params.toString() ? `?${params.toString()}` : "";
-  const res = await fetchWithTimeout(`${getApiUrl()}/api/caja/comandas${q}`, { headers: authHeaders() });
-  const data = await res.json().catch(() => ({}));
-  assertCajaOk(res, data);
-  return (data as Record<string, unknown>[]).map(mapComanda);
+  const url = `${getApiUrl()}/api/caja/comandas${q}`;
+  const data = await cachedGetJson<Record<string, unknown>[]>({
+    url,
+    headers: authHeaders(),
+    ttlMs: RESPONSE_TTL.caja,
+    cacheKey: url,
+  });
+  return data.map(mapComanda);
 }
 
 export async function registrarPagoApi(comandaId: string, input: PagoInput): Promise<Comanda> {
@@ -152,6 +170,7 @@ export async function registrarPagoApi(comandaId: string, input: PagoInput): Pro
   });
   const data = await res.json().catch(() => ({}));
   assertCajaOk(res, data);
+  invalidateCajaReads();
   return mapComanda(data as Record<string, unknown>);
 }
 
@@ -162,6 +181,7 @@ export async function anularPagoApi(comandaId: string): Promise<Comanda> {
   });
   const data = await res.json().catch(() => ({}));
   assertCajaOk(res, data);
+  invalidateCajaReads();
   return mapComanda(data as Record<string, unknown>);
 }
 
@@ -177,14 +197,17 @@ export async function crearCorteApi(input: {
   });
   const data = await res.json().catch(() => ({}));
   assertCajaOk(res, data);
+  invalidateCajaReads();
   return mapCorte(data as Record<string, unknown>);
 }
 
 export async function fetchCortes(limit = 30): Promise<CorteCaja[]> {
-  const res = await fetchWithTimeout(`${getApiUrl()}/api/caja/cortes?limit=${limit}`, {
+  const url = `${getApiUrl()}/api/caja/cortes?limit=${limit}`;
+  const data = await cachedGetJson<Record<string, unknown>[]>({
+    url,
     headers: authHeaders(),
+    ttlMs: RESPONSE_TTL.caja,
+    cacheKey: url,
   });
-  const data = await res.json().catch(() => ({}));
-  assertCajaOk(res, data);
-  return (data as Record<string, unknown>[]).map(mapCorte);
+  return data.map(mapCorte);
 }

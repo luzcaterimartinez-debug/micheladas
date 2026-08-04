@@ -60,7 +60,7 @@ def cache_get(key: str, ttl_seconds: float, loader: Callable[[], T]) -> T:
     except Exception as exc:
         if stale is not None:
             # Reintentar MySQL más tarde sin spamear; seguir sirviendo datos viejos.
-            soft_ttl = min(max(ttl_seconds, 30.0), 120.0)
+            soft_ttl = min(max(ttl_seconds, 60.0), 300.0)
             with _lock:
                 _store[key] = (time.monotonic() + soft_ttl, stale)
             logger.warning(

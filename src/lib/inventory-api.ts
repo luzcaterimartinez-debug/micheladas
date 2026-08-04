@@ -1,5 +1,10 @@
 import { getApiUrl, getStoredSession, parseApiError } from "@/lib/auth";
 import { markApiFailureFromStatus } from "@/lib/offline/network";
+import {
+  RESPONSE_TTL,
+  cachedGetJson,
+  responseCacheInvalidate,
+} from "@/lib/offline/response-cache";
 import type { InventoryItem } from "@/lib/micheladas-store";
 
 function assertOk(res: Response, data: unknown): asserts res is Response & { ok: true } {
@@ -34,11 +39,19 @@ function mapItem(raw: Record<string, unknown>): InventoryItem {
   };
 }
 
+function invalidateInv(): void {
+  responseCacheInvalidate("/api/inventario");
+}
+
 export async function fetchInventario(): Promise<InventoryItem[]> {
-  const res = await fetch(`${getApiUrl()}/api/inventario`, { headers: authHeaders() });
-  const data = await res.json().catch(() => []);
-  assertOk(res, data);
-  return (data as Record<string, unknown>[]).map(mapItem);
+  const url = `${getApiUrl()}/api/inventario`;
+  const data = await cachedGetJson<Record<string, unknown>[]>({
+    url,
+    headers: authHeaders(),
+    ttlMs: RESPONSE_TTL.inventario,
+    cacheKey: url,
+  });
+  return data.map(mapItem);
 }
 
 export async function patchInventarioStock(key: string, stock: number): Promise<InventoryItem> {
@@ -49,6 +62,7 @@ export async function patchInventarioStock(key: string, stock: number): Promise<
   });
   const data = await res.json().catch(() => ({}));
   assertOk(res, data);
+  invalidateInv();
   return mapItem(data as Record<string, unknown>);
 }
 
@@ -59,6 +73,7 @@ export async function resetInventarioApi(): Promise<InventoryItem[]> {
   });
   const data = await res.json().catch(() => []);
   assertOk(res, data);
+  invalidateInv();
   return (data as Record<string, unknown>[]).map(mapItem);
 }
 
@@ -72,4 +87,5 @@ export async function deleteInventarioItem(key: string): Promise<void> {
     markApiFailureFromStatus(res.status);
     throw new Error(parseApiError(data, res.status));
   }
+  invalidateInv();
 }
