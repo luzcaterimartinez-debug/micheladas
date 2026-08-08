@@ -104,6 +104,13 @@ export function MeseroOrderWizard() {
   const [cart, setCart] = useState<OrderItem[]>([]);
   /** Si hay valor, el flujo de lote está editando ese ítem del carrito. */
   const [editingCartItemId, setEditingCartItemId] = useState<string | null>(null);
+  /** Datos del ítem en edición para reaplicar tras reelegir sabor/producto. */
+  const editPrefillRef = useRef<{
+    productId: string;
+    toppings: string[];
+    additions: { id: string; quantity: number }[];
+    notes: string;
+  } | null>(null);
   const [sending, setSending] = useState(false);
   /** clientId estable mientras el envío no termine (evita doble comanda). */
   const sendClientIdRef = useRef<string | null>(null);
@@ -127,6 +134,7 @@ export function MeseroOrderWizard() {
     setEditingCartItemId(null);
     setSending(false);
     sendClientIdRef.current = null;
+    editPrefillRef.current = null;
     setCurrentStep("mesa");
   }
 
@@ -493,18 +501,39 @@ export function MeseroOrderWizard() {
     const picks = productPicks.filter((p) => p.quantity > 0);
     if (picks.length === 0) return;
 
+    const prefill = editingCartItemId ? editPrefillRef.current : null;
     const initialTops: Record<string, string[]> = {};
     for (const pick of picks) {
+      const p = productos.find((x) => x.id === pick.id);
+      const cervIds = new Set(
+        cervezaOpcionesForProduct(p, fases).map((o) => o.id),
+      );
       const cerv = draftCervezaById[pick.id];
-      if (cerv) initialTops[pick.id] = [cerv];
+      const prefillTops =
+        prefill && pick.id === prefill.productId ? prefill.toppings : [];
+      const otherTops = prefillTops.filter((id) => !cervIds.has(id));
+      if (cerv) {
+        initialTops[pick.id] = [...otherTops, cerv];
+      } else if (prefillTops.length > 0) {
+        initialTops[pick.id] = [...prefillTops];
+      }
+    }
+
+    const initialAdds: Record<string, { id: string; quantity: number }[]> = {};
+    if (prefill) {
+      for (const pick of picks) {
+        if (pick.id === prefill.productId && prefill.additions.length > 0) {
+          initialAdds[pick.id] = prefill.additions.map((a) => ({ ...a }));
+        }
+      }
     }
 
     setProductPicks([]);
     setDraftCervezaById({});
     setBatchPicks(picks);
     setBatchToppingsById(initialTops);
-    setBatchAdditionsById({});
-    setNotes("");
+    setBatchAdditionsById(initialAdds);
+    setNotes(prefill?.notes ?? "");
     setFaseQueue([]);
 
     const needingFases = picks.filter((pick) => {
@@ -550,6 +579,7 @@ export function MeseroOrderWizard() {
 
   function startNewItem() {
     setEditingCartItemId(null);
+    editPrefillRef.current = null;
     resetItemBuilder();
     clearBatch();
     setSelectedCategoriaIds([]);
@@ -559,8 +589,12 @@ export function MeseroOrderWizard() {
 
   function cancelEditCartItem() {
     setEditingCartItemId(null);
+    editPrefillRef.current = null;
     clearBatch();
     resetItemBuilder();
+    setProductPicks([]);
+    setDraftCervezaById({});
+    setSelectedCategoriaIds([]);
     setCurrentStep("carrito");
   }
 
@@ -574,32 +608,39 @@ export function MeseroOrderWizard() {
     }
 
     const qty = orderItemQuantity(item);
-    const pick = { id: item.micheladaId, quantity: qty };
     const tops = [...(item.selectedToppings ?? [])];
     const addPicks = (item.additions ?? []).map((a) => ({
       id: a.id,
       quantity: Math.max(1, a.quantity ?? 1),
     }));
 
+    const catId =
+      p.categoriaId ??
+      categoriasActivas.find((c) => c.productos.some((x) => x.id === p.id))?.id;
+
+    const cervOp = cervezaOpcionesForProduct(p, fases).find((o) => tops.includes(o.id));
+
     setEditingCartItemId(item.id);
+    editPrefillRef.current = {
+      productId: item.micheladaId,
+      toppings: tops,
+      additions: addPicks,
+      notes: item.notes?.trim() ?? "",
+    };
+
+    clearBatch();
     resetItemBuilder();
-    setProductPicks([]);
-    setDraftCervezaById({});
     setFaseQueue([]);
-    setBatchPicks([pick]);
-    setBatchToppingsById({ [item.micheladaId]: tops });
-    setBatchAdditionsById({ [item.micheladaId]: addPicks });
-    setSelectedId(item.micheladaId);
-    setToppings(tops);
+    setSelectedCategoriaIds(catId ? [catId] : []);
+    setProductPicks([{ id: item.micheladaId, quantity: qty }]);
+    setDraftCervezaById(cervOp ? { [item.micheladaId]: cervOp.id } : {});
+    setSelectedId("");
     setNotes(item.notes ?? "");
     setItemQuantity(qty);
-    if (p.categoriaId) setSelectedCategoriaIds([p.categoriaId]);
-    else setSelectedCategoriaIds([]);
-
-    const faseSteps = buildMeseroSteps(p.pasos, p, faseIds).filter(isFasePaso);
-    setCurrentStep(faseSteps[0] ?? "adiciones");
+    // Paso 3: elegir sabores (categoría), con el sabor actual precargado.
+    setCurrentStep("categoria");
     toast.message("Editando producto", {
-      description: "Ajusta opciones y guarda al final.",
+      description: "Empieza por el sabor y sigue hasta guardar los cambios.",
     });
   }
 
@@ -633,6 +674,7 @@ export function MeseroOrderWizard() {
         ),
       );
       setEditingCartItemId(null);
+      editPrefillRef.current = null;
       toast.success("Producto actualizado");
     } else {
       setCart((c) => [...c, ...items]);
@@ -663,13 +705,56 @@ export function MeseroOrderWizard() {
 
   function handleBack() {
     if (editingCartItemId) {
-      const editStartIdx = steps.findIndex((s) => isFasePaso(s) || s === "adiciones");
-      const idx = steps.indexOf(currentStep);
-      if (editStartIdx < 0 || idx <= editStartIdx) {
+      // Paso 3 (sabores): cancelar edición y volver al resumen.
+      if (step === "categoria") {
         cancelEditCartItem();
         return;
       }
-      goBack();
+      if (step === "producto") {
+        goBack();
+        return;
+      }
+      // En fases/adiciones/notas del lote: atrás normal; al salir del lote vuelve a producto.
+      if (step === "adiciones" && inBatch) {
+        setProductPicks(batchPicks);
+        // Restaurar cerveza draft desde toppings del lote para el paso producto.
+        const cervDraft: Record<string, string> = {};
+        for (const pick of batchPicks) {
+          const p = productos.find((x) => x.id === pick.id);
+          const tops = batchToppingsById[pick.id] ?? [];
+          const cerv = cervezaOpcionesForProduct(p, fases).find((o) => tops.includes(o.id));
+          if (cerv) cervDraft[pick.id] = cerv.id;
+        }
+        setDraftCervezaById(cervDraft);
+        clearBatch();
+        setCurrentStep("producto");
+        return;
+      }
+      if (isFasePaso(step) && inBatch) {
+        const editStartIdx = steps.findIndex((s) => isFasePaso(s) || s === "adiciones");
+        const idx = steps.indexOf(currentStep);
+        if (editStartIdx >= 0 && idx <= editStartIdx) {
+          setProductPicks(batchPicks);
+          const cervDraft: Record<string, string> = {};
+          for (const pick of batchPicks) {
+            const p = productos.find((x) => x.id === pick.id);
+            const tops = batchToppingsById[pick.id] ?? [];
+            const cerv = cervezaOpcionesForProduct(p, fases).find((o) => tops.includes(o.id));
+            if (cerv) cervDraft[pick.id] = cerv.id;
+          }
+          setDraftCervezaById(cervDraft);
+          clearBatch();
+          setCurrentStep("producto");
+          return;
+        }
+        goBack();
+        return;
+      }
+      if (step === "notas" && inBatch) {
+        goBack();
+        return;
+      }
+      cancelEditCartItem();
       return;
     }
     if (step === "adiciones" && inBatch) {
