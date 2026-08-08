@@ -1,4 +1,4 @@
-import { MapPin, ShoppingBag, ShoppingCart, Trash2, User, Zap } from "lucide-react";
+import { MapPin, Pencil, ShoppingBag, ShoppingCart, Trash2, User, Zap } from "lucide-react";
 
 import { QuantityStepper } from "@/components/QuantityStepper";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ type Props = {
   onParaLlevarChange?: (enabled: boolean) => void;
   onRemoveItem: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
+  onEditItem?: (id: string) => void;
   atajos?: PedidoAtajo[];
   onAtajo?: (atajo: PedidoAtajo) => void;
 };
@@ -32,11 +33,13 @@ function CartItemRow({
   productos,
   onRemove,
   onUpdateQuantity,
+  onEdit,
 }: {
   item: OrderItem;
   productos: MicheladaType[];
   onRemove: () => void;
   onUpdateQuantity: (quantity: number) => void;
+  onEdit?: () => void;
 }) {
   const tops = faseOpcionNames(item.micheladaId, item.selectedToppings, productos, {
     excludeCervezaTipo: true,
@@ -77,12 +80,24 @@ function CartItemRow({
             {item.notes}
           </p>
         )}
-        <div className="mt-3">
-          <QuantityStepper
-            size="sm"
-            value={qty}
-            onChange={onUpdateQuantity}
-          />
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <QuantityStepper size="sm" value={qty} onChange={onUpdateQuantity} />
+          {onEdit && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={cn(
+                TOUCH,
+                "h-9 gap-1.5 rounded-xl border-slate-300 font-bold text-slate-800",
+              )}
+              onClick={onEdit}
+              aria-label={`Editar ${item.micheladaName}`}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Editar
+            </Button>
+          )}
         </div>
       </div>
       <Button
@@ -109,6 +124,7 @@ export function MeseroPasoCarrito({
   onParaLlevarChange,
   onRemoveItem,
   onUpdateQuantity,
+  onEditItem,
   atajos,
   onAtajo,
 }: Props) {
@@ -212,7 +228,11 @@ export function MeseroPasoCarrito({
         </div>
       ) : (
         <ThemedPanel themeId="adiciones">
-          <ThemedPanelHeader themeId="adiciones" title="Resumen" subtitle={`${count} bebida${count === 1 ? "" : "s"}`} />
+          <ThemedPanelHeader
+            themeId="adiciones"
+            title="Resumen"
+            subtitle={`${count} bebida${count === 1 ? "" : "s"}`}
+          />
           <div className="divide-y divide-slate-100">
             {cart.map((it) => (
               <CartItemRow
@@ -221,6 +241,7 @@ export function MeseroPasoCarrito({
                 productos={productos}
                 onRemove={() => onRemoveItem(it.id)}
                 onUpdateQuantity={(quantity) => onUpdateQuantity(it.id, quantity)}
+                onEdit={onEditItem ? () => onEditItem(it.id) : undefined}
               />
             ))}
             <div className="bg-amber-50 px-4 py-3.5 flex items-center justify-between gap-3">

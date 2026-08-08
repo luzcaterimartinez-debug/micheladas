@@ -102,6 +102,8 @@ export function MeseroOrderWizard() {
   const [notes, setNotes] = useState("");
   const [itemQuantity, setItemQuantity] = useState(1);
   const [cart, setCart] = useState<OrderItem[]>([]);
+  /** Si hay valor, el flujo de lote está editando ese ítem del carrito. */
+  const [editingCartItemId, setEditingCartItemId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   /** clientId estable mientras el envío no termine (evita doble comanda). */
   const sendClientIdRef = useRef<string | null>(null);
@@ -122,6 +124,7 @@ export function MeseroOrderWizard() {
     setToppings([]);
     setNotes("");
     setItemQuantity(1);
+    setEditingCartItemId(null);
     setSending(false);
     sendClientIdRef.current = null;
     setCurrentStep("mesa");
@@ -546,11 +549,58 @@ export function MeseroOrderWizard() {
   }
 
   function startNewItem() {
+    setEditingCartItemId(null);
     resetItemBuilder();
     clearBatch();
     setSelectedCategoriaIds([]);
     setProductPicks([]);
     setCurrentStep("categoria");
+  }
+
+  function cancelEditCartItem() {
+    setEditingCartItemId(null);
+    clearBatch();
+    resetItemBuilder();
+    setCurrentStep("carrito");
+  }
+
+  function startEditCartItem(itemId: string) {
+    const item = cart.find((x) => x.id === itemId);
+    if (!item) return;
+    const p = productos.find((x) => x.id === item.micheladaId);
+    if (!p) {
+      toast.error("Ese producto ya no está en el menú");
+      return;
+    }
+
+    const qty = orderItemQuantity(item);
+    const pick = { id: item.micheladaId, quantity: qty };
+    const tops = [...(item.selectedToppings ?? [])];
+    const addPicks = (item.additions ?? []).map((a) => ({
+      id: a.id,
+      quantity: Math.max(1, a.quantity ?? 1),
+    }));
+
+    setEditingCartItemId(item.id);
+    resetItemBuilder();
+    setProductPicks([]);
+    setDraftCervezaById({});
+    setFaseQueue([]);
+    setBatchPicks([pick]);
+    setBatchToppingsById({ [item.micheladaId]: tops });
+    setBatchAdditionsById({ [item.micheladaId]: addPicks });
+    setSelectedId(item.micheladaId);
+    setToppings(tops);
+    setNotes(item.notes ?? "");
+    setItemQuantity(qty);
+    if (p.categoriaId) setSelectedCategoriaIds([p.categoriaId]);
+    else setSelectedCategoriaIds([]);
+
+    const faseSteps = buildMeseroSteps(p.pasos, p, faseIds).filter(isFasePaso);
+    setCurrentStep(faseSteps[0] ?? "adiciones");
+    toast.message("Editando producto", {
+      description: "Ajusta opciones y guarda al final.",
+    });
   }
 
   function addBatchToCart() {
@@ -569,9 +619,26 @@ export function MeseroOrderWizard() {
       );
     }
     if (items.length === 0) return;
-    setCart((c) => [...c, ...items]);
-    const units = items.reduce((s, i) => s + (i.quantity ?? 1), 0);
-    toast.success(units === 1 ? "1 producto agregado" : `${units} productos agregados`);
+
+    if (editingCartItemId) {
+      const edited = items[0];
+      setCart((c) =>
+        c.map((x) =>
+          x.id === editingCartItemId
+            ? {
+                ...edited,
+                id: editingCartItemId,
+              }
+            : x,
+        ),
+      );
+      setEditingCartItemId(null);
+      toast.success("Producto actualizado");
+    } else {
+      setCart((c) => [...c, ...items]);
+      const units = items.reduce((s, i) => s + (i.quantity ?? 1), 0);
+      toast.success(units === 1 ? "1 producto agregado" : `${units} productos agregados`);
+    }
     clearBatch();
     setCurrentStep("carrito");
   }
@@ -595,6 +662,16 @@ export function MeseroOrderWizard() {
   }
 
   function handleBack() {
+    if (editingCartItemId) {
+      const editStartIdx = steps.findIndex((s) => isFasePaso(s) || s === "adiciones");
+      const idx = steps.indexOf(currentStep);
+      if (editStartIdx < 0 || idx <= editStartIdx) {
+        cancelEditCartItem();
+        return;
+      }
+      goBack();
+      return;
+    }
     if (step === "adiciones" && inBatch) {
       setProductPicks(batchPicks);
       clearBatch();
@@ -986,6 +1063,7 @@ export function MeseroOrderWizard() {
           atajos={PEDIDOS_ATAJO}
           onAtajo={addAtajoToCart}
           onRemoveItem={(id) => setCart((c) => c.filter((x) => x.id !== id))}
+          onEditItem={startEditCartItem}
           onUpdateQuantity={(id, quantity) =>
             setCart((c) =>
               c.map((it) =>
@@ -1039,9 +1117,11 @@ export function MeseroOrderWizard() {
                 disabled={!canContinue()}
               >
                 {step === "notas" && inBatch
-                  ? batchUnits > 1
-                    ? `Agregar ${batchUnits} al pedido`
-                    : "Agregar al pedido"
+                  ? editingCartItemId
+                    ? "Guardar cambios"
+                    : batchUnits > 1
+                      ? `Agregar ${batchUnits} al pedido`
+                      : "Agregar al pedido"
                   : isFasePaso(step)
                     ? "Continuar"
                     : "Siguiente"}
