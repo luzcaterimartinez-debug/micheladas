@@ -58,7 +58,9 @@ function OrderItemRow({
   item: Comanda["items"][number];
   productos: MicheladaType[];
 }) {
-  const tops = faseOpcionNames(item.micheladaId, item.selectedToppings, productos);
+  const tops = faseOpcionNames(item.micheladaId, item.selectedToppings, productos, {
+    excludeCervezaTipo: true,
+  });
   const subtitle = orderItemSubtitle(item);
   const extras: string[] = [
     ...tops,
@@ -69,7 +71,7 @@ function OrderItemRow({
     <li className="py-3.5 first:pt-0">
       <div className="flex justify-between gap-4 items-baseline">
         <div className="min-w-0">
-          <p className="font-medium text-[15px] leading-snug">{orderItemLabel(item)}</p>
+          <p className="font-medium text-[15px] leading-snug">{orderItemLabel(item, productos)}</p>
           {subtitle && (
             <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
           )}

@@ -103,7 +103,9 @@ export function BarraComandaCard({ comanda: c, onMarkLista, onMarkEntregada, com
       <CardContent className={compact ? "px-4 pb-4 space-y-3" : "space-y-4"}>
         <ul className="space-y-3">
           {c.items.map((it) => {
-            const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos);
+            const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos, {
+              excludeCervezaTipo: true,
+            });
             const subtitle = orderItemSubtitle(it);
             return (
               <li
@@ -111,7 +113,7 @@ export function BarraComandaCard({ comanda: c, onMarkLista, onMarkEntregada, com
                 className="rounded-lg bg-muted/50 p-3 border-l-4 border-primary"
               >
                 <p className={`font-bold ${compact ? "text-base" : "text-lg"}`}>
-                  {orderItemLabel(it)}
+                  {orderItemLabel(it, productos)}
                 </p>
                 {subtitle && (
                   <p className="text-sm text-muted-foreground">{subtitle}</p>

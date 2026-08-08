@@ -4,6 +4,11 @@ import { enqueuePrint } from "@/lib/print-queue";
 import { DEFAULT_PRINTER, isRawBtPreferred } from "@/lib/printer-config";
 import { tryPrintRawBt, tryPrintRawBtFromUserGesture } from "@/lib/rawbt-print";
 import { openComandaTicketPage } from "@/lib/ticket-print-session";
+import {
+  CERVEZA_FASE_ID,
+  FALLBACK_CERVEZA_OPCIONES,
+  isCervezaProduct,
+} from "@/lib/product-steps";
 import { MICHELADAS, orderItemQuantity, type Comanda, type MicheladaType, type OrderItem } from "@/lib/micheladas-store";
 
 /** Subtítulo bajo el nombre (tamaño legacy o cantidad). */
@@ -14,19 +19,78 @@ export function orderItemSubtitle(item: OrderItem): string | null {
   return size || null;
 }
 
-export function orderItemLabel(item: OrderItem): string {
+function resolveOpcionName(
+  micheladaId: string,
+  opcionId: string,
+  productos: MicheladaType[],
+): string | undefined {
+  const m = productos.find((x) => x.id === micheladaId);
+  const fromProduct = m?.faseOpciones.find((o) => o.id === opcionId)?.name;
+  if (fromProduct) return fromProduct;
+  return FALLBACK_CERVEZA_OPCIONES.find((o) => o.id === opcionId)?.name;
+}
+
+function isCervezaOpcionId(micheladaId: string, opcionId: string, productos: MicheladaType[]): boolean {
+  if (FALLBACK_CERVEZA_OPCIONES.some((o) => o.id === opcionId)) return true;
+  const m = productos.find((x) => x.id === micheladaId);
+  return m?.faseOpciones.some((o) => o.id === opcionId && o.faseId === CERVEZA_FASE_ID) ?? false;
+}
+
+/** Marca elegida (Águila, Poker, Light, Budweiser) si el ítem es michelada con cerveza. */
+export function cervezaTipoName(
+  item: Pick<OrderItem, "micheladaId" | "selectedToppings" | "micheladaName">,
+  productos: MicheladaType[] = MICHELADAS,
+): string | undefined {
+  const ids = item.selectedToppings ?? [];
+  for (const id of ids) {
+    if (!isCervezaOpcionId(item.micheladaId, id, productos)) continue;
+    const name = resolveOpcionName(item.micheladaId, id, productos);
+    if (name) return name;
+  }
+  return undefined;
+}
+
+/**
+ * Nombre para ticket/UI: "Tradicional · Cerveza" + Light → "Tradicional · Light".
+ */
+export function orderItemDisplayName(
+  item: OrderItem,
+  productos: MicheladaType[] = MICHELADAS,
+): string {
+  const marca = cervezaTipoName(item, productos);
+  if (!marca) return item.micheladaName;
+
+  const replaced = item.micheladaName
+    .replace(/\s*[·•\-–]\s*Cerveza\b/i, ` · ${marca}`)
+    .replace(/\bCerveza\b/i, marca);
+
+  if (replaced !== item.micheladaName) return replaced;
+
+  // Producto *_cerveza sin la palabra "Cerveza" en el nombre guardado.
+  if (isCervezaProduct({ id: item.micheladaId }) || /cerveza/i.test(item.micheladaId)) {
+    return `${item.micheladaName} · ${marca}`;
+  }
+  return item.micheladaName;
+}
+
+export function orderItemLabel(
+  item: OrderItem,
+  productos: MicheladaType[] = MICHELADAS,
+): string {
   const qty = orderItemQuantity(item);
-  return qty > 1 ? `${qty}× ${item.micheladaName}` : item.micheladaName;
+  const name = orderItemDisplayName(item, productos);
+  return qty > 1 ? `${qty}× ${name}` : name;
 }
 
 export function faseOpcionNames(
   micheladaId: string,
   ids: string[],
   productos: MicheladaType[] = MICHELADAS,
+  opts?: { excludeCervezaTipo?: boolean },
 ): string[] {
-  const m = productos.find((x) => x.id === micheladaId);
   return ids
-    .map((id) => m?.faseOpciones.find((o) => o.id === id)?.name)
+    .filter((id) => !(opts?.excludeCervezaTipo && isCervezaOpcionId(micheladaId, id, productos)))
+    .map((id) => resolveOpcionName(micheladaId, id, productos))
     .filter(Boolean) as string[];
 }
 
@@ -213,12 +277,15 @@ export function renderComandaTicket(
   const turno = c.queueOrder > 0 ? c.queueOrder : c.folio;
   const rows = c.items
     .map((it) => {
-      const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos);
+      // Marca de cerveza va en el nombre (Light), no como topping extra.
+      const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos, {
+        excludeCervezaTipo: true,
+      });
       const adds = it.additions.map((a) => {
         const q = Math.max(1, a.quantity ?? 1);
         return q > 1 ? `${q}× ${a.name}` : a.name;
       });
-      const label = orderItemLabel(it);
+      const label = orderItemLabel(it, productos);
       const extras: string[] = [];
       if (tops.length) extras.push(`+ ${tops.join(", ")}`);
       if (adds.length) extras.push(`Adic: ${adds.join(", ")}`);
@@ -324,9 +391,11 @@ export function renderComandaTicketPlainText(
   lines.push(`Hora: ${hora}`, LINE);
 
   for (const it of c.items) {
-    const label = orderItemLabel(it);
+    const label = orderItemLabel(it, productos);
     lines.push(`${label}  ${formatAppMoney(it.total)}`);
-    const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos);
+    const tops = faseOpcionNames(it.micheladaId, it.selectedToppings, productos, {
+      excludeCervezaTipo: true,
+    });
     if (tops.length) lines.push(`  + ${tops.join(", ")}`);
     const adds = it.additions.map((a) => {
       const q = Math.max(1, a.quantity ?? 1);

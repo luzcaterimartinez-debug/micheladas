@@ -38,7 +38,9 @@ function CartItemRow({
   onRemove: () => void;
   onUpdateQuantity: (quantity: number) => void;
 }) {
-  const tops = faseOpcionNames(item.micheladaId, item.selectedToppings, productos);
+  const tops = faseOpcionNames(item.micheladaId, item.selectedToppings, productos, {
+    excludeCervezaTipo: true,
+  });
   const subtitle = orderItemSubtitle(item);
   const extras: string[] = [
     ...tops,
@@ -55,7 +57,7 @@ function CartItemRow({
         <div className="flex justify-between gap-3 items-baseline">
           <div className="min-w-0">
             <p className="font-bold text-[15px] leading-snug tracking-tight truncate text-slate-900">
-              {orderItemLabel(item)}
+              {orderItemLabel(item, productos)}
             </p>
             {subtitle && qty === 1 && item.size && (
               <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>

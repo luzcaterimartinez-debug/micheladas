@@ -437,13 +437,15 @@ export function OrderBuilder() {
                   <li key={it.id} className="rounded-lg border p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium text-sm">{orderItemLabel(it)}</p>
-                        {it.selectedToppings.length > 0 && (
+                        <p className="font-medium text-sm">{orderItemLabel(it, productos)}</p>
+                        {faseOpcionNames(it.micheladaId, it.selectedToppings, productos, {
+                          excludeCervezaTipo: true,
+                        }).length > 0 && (
                           <p className="text-xs text-muted-foreground mt-1">
                             Fases:{" "}
-                            {faseOpcionNames(it.micheladaId, it.selectedToppings, productos).join(
-                              ", ",
-                            )}
+                            {faseOpcionNames(it.micheladaId, it.selectedToppings, productos, {
+                              excludeCervezaTipo: true,
+                            }).join(", ")}
                           </p>
                         )}
                         {it.additions.length > 0 && (

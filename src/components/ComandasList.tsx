@@ -63,13 +63,17 @@ export function ComandasList() {
                 {c.items.map((it) => (
                   <li key={it.id} className="border-l-2 border-primary/40 pl-3">
                     <div className="flex justify-between font-medium">
-                      <span>{orderItemLabel(it)}</span>
+                      <span>{orderItemLabel(it, productos)}</span>
                       <span>{formatAppMoney(it.total)}</span>
                     </div>
-                    {it.selectedToppings.length > 0 && (
+                    {faseOpcionNames(it.micheladaId, it.selectedToppings, productos, {
+                      excludeCervezaTipo: true,
+                    }).length > 0 && (
                       <p className="text-xs text-muted-foreground">
                         +{" "}
-                        {faseOpcionNames(it.micheladaId, it.selectedToppings, productos).join(", ")}
+                        {faseOpcionNames(it.micheladaId, it.selectedToppings, productos, {
+                          excludeCervezaTipo: true,
+                        }).join(", ")}
                       </p>
                     )}
                     {it.additions.length > 0 && (
