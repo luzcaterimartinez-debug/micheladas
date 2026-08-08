@@ -254,7 +254,6 @@ export function MeseroOrderWizard() {
       }
       setMesaId(MESA_LLEVAR_ID);
       setCart((c) => applyParaLlevarToCart(c, LLEVAR_EXTRA));
-      setCliente((c) => c.trim() || "Para llevar");
       return;
     }
     const restore = mesaAntesDeLlevarRef.current || "barra";
@@ -306,8 +305,10 @@ export function MeseroOrderWizard() {
     clearMeseroFreshStart();
     setMesaId(id);
     setMesaDetalleId(null);
-    if (id === MESA_LLEVAR_ID) setCliente((c) => c || "Para llevar");
-    else if (!isMesaVirtual(id)) {
+    // Para llevar: campo cliente vacío (no autofill "Para llevar").
+    if (id === MESA_LLEVAR_ID) {
+      setCliente((c) => (c.trim().toLowerCase() === "para llevar" ? "" : c));
+    } else if (!isMesaVirtual(id)) {
       const mesa = mesas.find((m) => m.id === id);
       if (mesa?.cliente) setCliente(mesa.cliente);
     }
