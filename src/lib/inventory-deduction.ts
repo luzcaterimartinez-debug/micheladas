@@ -99,7 +99,8 @@ export function buildOrderDeductions(
       const key = def?.stockKey ?? a.id;
       const unitQty = def?.cantidad ?? 1;
       const addUnits = Math.max(1, a.quantity ?? 1);
-      add(totals, key, unitQty * addUnits * itemQty);
+      // Adiciones: una vez por línea (no × cantidad de micheladas).
+      add(totals, key, unitQty * addUnits);
     }
   }
 

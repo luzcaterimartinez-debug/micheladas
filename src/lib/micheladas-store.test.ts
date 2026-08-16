@@ -25,4 +25,20 @@ describe("calcItemTotal", () => {
       calcItemTotal(10000, [{ id: "cereza", name: "Cereza", price: 3000, quantity: 2 }]),
     ).toBe(16000);
   });
+
+  it("no multiplica adiciones por la cantidad de bebidas", () => {
+    const sevenAdds = Array.from({ length: 7 }, (_, i) => ({
+      id: `a${i}`,
+      name: `Ad ${i}`,
+      price: 3000,
+    }));
+    // 4 × $14.000 + 7 × $3.000 = $77.000 (no $140.000)
+    expect(calcItemLineTotal(14000, sevenAdds, 4)).toBe(77000);
+  });
+
+  it("para llevar sí se cobra por unidad; adiciones no", () => {
+    expect(
+      calcItemLineTotal(14000, [{ id: "fresa", name: "Fresa", price: 3000 }], 2, LLEVAR_EXTRA),
+    ).toBe(14000 * 2 + LLEVAR_EXTRA * 2 + 3000);
+  });
 });

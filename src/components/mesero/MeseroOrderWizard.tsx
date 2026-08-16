@@ -1012,7 +1012,7 @@ export function MeseroOrderWizard() {
         <div className="space-y-4">
           <MeseroStepHeader
             title="Adiciones"
-            description="Marca las adiciones de cada producto. Solo se cargan al producto de esa tarjeta."
+            description="Las adiciones se cobran una sola vez por producto, no por cada unidad."
           />
 
           {batchCards.map((card) => (

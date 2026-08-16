@@ -272,7 +272,8 @@ def _order_consumption_totals(cursor: Any, items: list[OrderItemIn]) -> dict[str
                     cursor, "SELECT clave FROM inventario WHERE clave = %s", (stock_key,)
                 )
                 if inv:
-                    totals[str(stock_key)] += ad_qty * item_qty
+                    # Adiciones: una vez por línea, no × cantidad de bebidas.
+                    totals[str(stock_key)] += ad_qty
 
     return totals
 

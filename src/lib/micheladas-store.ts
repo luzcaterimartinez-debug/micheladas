@@ -996,11 +996,17 @@ export function calcItemTotal(
   return basePrice + adds + Math.max(0, llevarExtra);
 }
 
+/**
+ * Total de la línea: (michelada + para llevar) × cantidad + adiciones una sola vez.
+ * Las adiciones no se multiplican por la cantidad de bebidas.
+ */
 export function calcItemLineTotal(
   basePrice: number,
   additions: OrderItem["additions"],
   quantity = 1,
   llevarExtra = 0,
 ): number {
-  return calcItemTotal(basePrice, additions, llevarExtra) * Math.max(1, quantity);
+  const qty = Math.max(1, quantity);
+  const adds = additions.reduce((sum, a) => sum + a.price * additionQuantity(a), 0);
+  return (basePrice + Math.max(0, llevarExtra)) * qty + adds;
 }

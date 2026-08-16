@@ -83,6 +83,24 @@ describe("buildOrderDeductions", () => {
     expect(totals.fresa).toBe(2);
   });
 
+  it("no multiplica adiciones por la cantidad de bebidas", () => {
+    const cart: OrderItem[] = [
+      {
+        id: "1",
+        micheladaId: "clasica_chica",
+        micheladaName: "Clásica",
+        basePrice: 48,
+        quantity: 4,
+        selectedToppings: [],
+        additions: [{ id: "fresa", name: "Fresa", price: 3000 }],
+        total: 21048,
+      },
+    ];
+    const totals = buildOrderDeductions(cart, adiciones, productos, faseCatalog);
+    expect(totals.fresa).toBe(2);
+    expect(totals.cerveza).toBe(4);
+  });
+
   it("usa reglas por defecto para cubana sin consumo configurado", () => {
     const cart: OrderItem[] = [
       {
