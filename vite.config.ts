@@ -24,8 +24,10 @@ export default defineConfig({
         ],
         manifest: pwaManifest,
         workbox: {
-          // App SSR/Nitro: no hay "/" en precache; navigateFallback:"/" provoca
-          // non-precached-url en Workbox. Offline de datos va por localStorage.
+          // TanStack Start/Nitro no genera index.html en precache.
+          // El default de vite-plugin-pwa (navigateFallback: "index.html")
+          // lanza non-precached-url y rompe el service worker.
+          navigateFallback: "",
           navigateFallbackDenylist: [/^\/api/, /^\/ticket/],
           globPatterns: ["**/*.{js,css,ico,png,svg,woff2,webmanifest}"],
           runtimeCaching: [
