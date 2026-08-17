@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
 import { Toaster } from "@/components/ui/sonner";
-import { getStoredSession, hostingerQuotaMessage, login } from "@/lib/auth";
+import { getStoredSession, login, queryLimitMessage } from "@/lib/auth";
 import { homePathForRole } from "@/lib/auth-routes";
 import { isMysqlQuotaBackoff } from "@/lib/offline/network";
 import { cn } from "@/lib/utils";
@@ -142,7 +142,7 @@ function LoginPage() {
                 </div>
                 {isMysqlQuotaBackoff() && (
                   <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 leading-relaxed">
-                    {hostingerQuotaMessage()}
+                    {queryLimitMessage()}
                   </p>
                 )}
                 <Button

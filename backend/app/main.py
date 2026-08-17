@@ -56,10 +56,11 @@ async def mysql_error_handler(request: Request, exc: mysql.connector.Error) -> J
     }
     if _is_hourly_quota_error(err_text):
         payload["detail"] = (
-            "Hostinger agotó las 500 conexiones de esta hora. "
-            "Cierra las demás pestañas del POS y espera a que recargue el cupo (~1 hora). "
-            "Reintentar ahora no deja entrar y retrasa la recuperación."
+            "Has llegado al límite de consultas de esta hora. "
+            "Cierra las demás pestañas y espera unos minutos. "
+            "Reintentar ahora no deja entrar."
         )
+        payload["code"] = "query_limit"
         payload["hint"] = payload["detail"]
     return JSONResponse(status_code=503, content=payload)
 
@@ -214,9 +215,8 @@ def health(response: Response, deep: bool = False) -> dict[str, str | list[str]]
         payload["database_error"] = db_error
         if "max_connections_per_hour" in db_error.lower() or "1226" in db_error:
             payload["hint"] = (
-                "Hostinger: se agotó max_connections_per_hour. "
-                "Cierra pestañas del POS y espera ~1 hora. "
-                "No reintentes health: cada intento consume la cuota."
+                "Has llegado al límite de consultas de esta hora. "
+                "Cierra pestañas extra y espera unos minutos."
             )
         elif "pool exhausted" in db_error.lower():
             payload["hint"] = (
