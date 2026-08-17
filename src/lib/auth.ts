@@ -1,4 +1,8 @@
-import { markApiFailureFromStatus } from "@/lib/offline/network";
+import {
+  isMysqlQuotaBackoff,
+  markApiFailureFromStatus,
+  mysqlQuotaBackoffRemainingMs,
+} from "@/lib/offline/network";
 
 export type Rol = "admin" | "mesero" | "cocinero";
 
@@ -52,7 +56,21 @@ export function clearSession(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+export function hostingerQuotaMessage(): string {
+  const ms = mysqlQuotaBackoffRemainingMs();
+  const mins = Math.max(1, Math.ceil(ms / 60_000));
+  return (
+    `Hostinger agotó las 500 conexiones de esta hora. ` +
+    `Cierra las demás pestañas del POS y espera unos ${mins} min. ` +
+    `Reintentar ahora no deja entrar.`
+  );
+}
+
 export async function login(email: string, password: string): Promise<AuthSession> {
+  if (isMysqlQuotaBackoff()) {
+    throw new Error(hostingerQuotaMessage());
+  }
+
   let res: Response;
   try {
     res = await fetch(apiUrl("/api/auth/login"), {
@@ -99,6 +117,8 @@ export async function fetchCurrentUser(token: string): Promise<AuthUser | null> 
 export async function validateSession(): Promise<AuthSession | null> {
   const stored = getStoredSession();
   if (!stored) return null;
+  // Sin MySQL no hay forma de renovar sesión: conservar la local para no echar al turno.
+  if (isMysqlQuotaBackoff()) return stored;
 
   let user: AuthUser | null;
   try {
@@ -130,7 +150,19 @@ export async function validateSession(): Promise<AuthSession | null> {
   return session;
 }
 
+function errorBlob(data: unknown): string {
+  if (!data || typeof data !== "object") return "";
+  const obj = data as Record<string, unknown>;
+  return [obj.detail, obj.database_error, obj.hint, obj.error]
+    .filter((v): v is string => typeof v === "string")
+    .join(" ");
+}
+
 export function parseApiError(data: unknown, status: number): string {
+  const blob = errorBlob(data);
+  if (/1226|max_connections_per_hour/i.test(blob) || (status === 503 && /1226|max_connections/i.test(blob))) {
+    return hostingerQuotaMessage();
+  }
   if (data && typeof data === "object" && "detail" in data) {
     const detail = (data as { detail: unknown }).detail;
     if (typeof detail === "string") return detail;
@@ -143,7 +175,7 @@ export function parseApiError(data: unknown, status: number): string {
     }
   }
   if (status === 422) return "Datos inválidos. Revisa el correo y la contraseña.";
-  if (status === 503) return "No se pudo guardar ahora. El cambio quedó en cola y se reintentará.";
+  if (status === 503) return "No se pudo completar ahora. Cierra pestañas extra del POS y reintenta en unos minutos.";
   if (status >= 500) return "Error del servidor. Se reintentará automáticamente.";
   if (status === 401) return "Sesión expirada. Vuelve a iniciar sesión.";
   return "No se pudo completar la solicitud";

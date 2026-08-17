@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import logging
 
 from app.config import get_settings, production_config_errors
-from app.database import check_database, peek_database_status
+from app.database import _is_hourly_quota_error, check_database, peek_database_status
 from app.routers import admin, admin_menu, auth, caja, comandas, gastos, inventario, menu, mesas, nomina, reportes
 from app.tz import APP_TZ_NAME, ensure_process_timezone
 
@@ -43,18 +43,24 @@ app.add_middleware(
 
 @app.exception_handler(mysql.connector.Error)
 async def mysql_error_handler(request: Request, exc: mysql.connector.Error) -> JSONResponse:
-    settings = get_settings()
-    logger.error("MySQL error: %s", exc)
-    payload: dict[str, str] = {
-        "detail": "No se pudo completar ahora. El POS conserva la última copia y reintentará.",
-        "database_error": f"{type(exc).__name__}: {exc}",
-    }
+    err_text = f"{type(exc).__name__}: {exc}"
     logger.error(
         "MySQL error handler called for %s %s — exc=%s",
         request.method,
         request.url.path,
-        str(exc),
+        err_text,
     )
+    payload: dict[str, str] = {
+        "detail": "No se pudo completar ahora. El POS conserva la última copia y reintentará.",
+        "database_error": err_text,
+    }
+    if _is_hourly_quota_error(err_text):
+        payload["detail"] = (
+            "Hostinger agotó las 500 conexiones de esta hora. "
+            "Cierra las demás pestañas del POS y espera a que recargue el cupo (~1 hora). "
+            "Reintentar ahora no deja entrar y retrasa la recuperación."
+        )
+        payload["hint"] = payload["detail"]
     return JSONResponse(status_code=503, content=payload)
 
 
