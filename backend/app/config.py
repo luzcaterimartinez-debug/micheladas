@@ -45,19 +45,19 @@ class Settings(BaseSettings):
 
     # Caché en memoria (por instancia serverless). TTLs altos = menos conexiones Hostinger.
     # Si MySQL falla, se sigue sirviendo el valor vencido (stale-on-error).
-    query_cache_ttl_seconds: int = 120
-    query_cache_comandas_ttl_seconds: int = 45
-    query_cache_auth_ttl_seconds: int = 900
-    query_cache_caja_ttl_seconds: int = 40
-    query_cache_inventario_ttl_seconds: int = 90
-    query_cache_mesas_ttl_seconds: int = 45
-    query_cache_reportes_ttl_seconds: int = 180
-    query_cache_gastos_ttl_seconds: int = 90
-    query_cache_menu_ttl_seconds: int = 600
-    query_cache_nomina_ttl_seconds: int = 120
+    query_cache_ttl_seconds: int = 180
+    query_cache_comandas_ttl_seconds: int = 90
+    query_cache_auth_ttl_seconds: int = 1800
+    query_cache_caja_ttl_seconds: int = 90
+    query_cache_inventario_ttl_seconds: int = 180
+    query_cache_mesas_ttl_seconds: int = 90
+    query_cache_reportes_ttl_seconds: int = 300
+    query_cache_gastos_ttl_seconds: int = 180
+    query_cache_menu_ttl_seconds: int = 900
+    query_cache_nomina_ttl_seconds: int = 180
 
     jwt_secret: str = _DEV_JWT_SECRET
-    jwt_expire_minutes: int = 480
+    jwt_expire_minutes: int = 10080
     jwt_algorithm: str = "HS256"
 
     cors_origins: str = (

@@ -5,7 +5,7 @@
  */
 
 import { fetchWithTimeout } from "@/lib/api-fetch";
-import { markApiFailureFromStatus, markApiReachable, shouldSyncWithServer } from "@/lib/offline/network";
+import { markApiFailureFromStatus, markApiReachable, noteApiGet, shouldSyncWithServer } from "@/lib/offline/network";
 import { parseApiError } from "@/lib/auth";
 
 type CacheEntry = {
@@ -18,12 +18,12 @@ const store = new Map<string, CacheEntry>();
 
 /** TTLs por familia de endpoint (ms). */
 export const RESPONSE_TTL = {
-  comandas: 15_000,
-  mesas: 20_000,
-  caja: 15_000,
-  inventario: 30_000,
-  menu: 60_000,
-  default: 12_000,
+  comandas: 45_000,
+  mesas: 60_000,
+  caja: 60_000,
+  inventario: 90_000,
+  menu: 5 * 60_000,
+  default: 40_000,
 } as const;
 
 function cloneJson<T>(value: T): T {
@@ -118,6 +118,19 @@ export async function cachedGetJson<T = unknown>(opts: CachedGetOpts): Promise<T
     }
 
     markApiReachable();
+    const path = opts.url;
+    const resource = path.includes("/comandas")
+      ? "comandas"
+      : path.includes("/mesas")
+        ? "mesas"
+        : path.includes("/inventario")
+          ? "inventario"
+          : path.includes("/caja")
+            ? "caja"
+            : path.includes("/menu")
+              ? "menu"
+              : "comandas";
+    noteApiGet(resource);
     responseCachePut(key, data, ttlMs);
     return cloneJson(data) as T;
   } catch (err) {

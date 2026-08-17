@@ -22,6 +22,7 @@ import {
   isNetworkFailure,
   isRetryableSyncError,
   notifySyncChange,
+  shouldPollServer,
   shouldSyncWithServer,
 } from "@/lib/offline/network";
 import {
@@ -293,9 +294,8 @@ export function useComandas() {
         setComandas(foldOutboxIntoComandas([...cached]).sort(sortComandasByQueue));
       }
 
-      if (!shouldSyncWithServer()) {
-        // No llamar /api/health aquí: el poll de 2s agotaba max_connections_per_hour en Hostinger.
-        // La recuperación la hace useOfflineSync + evento michelada-api-recovered.
+      if (!shouldSyncWithServer() || !shouldPollServer("comandas")) {
+        // No llamar /api/health aquí: el poll frecuente agotaba el cupo de consultas.
         applyFromCache();
         setLoading(false);
         return;
@@ -332,8 +332,8 @@ export function useComandas() {
     if (!getStoredSession()) return;
 
     const onSync = () => {
-      if (shouldSyncWithServer()) void reload();
-      else applyFromCache();
+      applyFromCache();
+      if (shouldPollServer("comandas")) void reload();
     };
 
     const onStore = (e: Event) => {
@@ -349,8 +349,7 @@ export function useComandas() {
     try {
       bc = new BroadcastChannel("michelada-sync");
       bc.onmessage = () => {
-        if (shouldSyncWithServer()) void reload();
-        else applyFromCache();
+        applyFromCache();
       };
     } catch {
       bc = null;
@@ -360,17 +359,16 @@ export function useComandas() {
     window.addEventListener("michelada-api-recovered", onSync);
     window.addEventListener("michelada-store-change", onStore);
     window.addEventListener("storage", onStorage);
-    window.addEventListener("focus", onSync);
     const onVisible = () => {
-      if (document.visibilityState === "visible") onSync();
+      if (document.visibilityState === "visible") applyFromCache();
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    // Polling en tiempo real; si la API/MySQL está caída, no martillar (cuota Hostinger).
     const interval = window.setInterval(() => {
       if (document.visibilityState === "hidden") return;
-      if (shouldSyncWithServer()) void reload();
-    }, 20_000);
+      if (shouldPollServer("comandas")) void reload();
+      else applyFromCache();
+    }, 45_000);
 
     return () => {
       window.clearInterval(interval);
@@ -378,7 +376,6 @@ export function useComandas() {
       window.removeEventListener("michelada-api-recovered", onSync);
       window.removeEventListener("michelada-store-change", onStore);
       window.removeEventListener("storage", onStorage);
-      window.removeEventListener("focus", onSync);
       document.removeEventListener("visibilitychange", onVisible);
       bc?.close();
     };
@@ -663,7 +660,7 @@ export function useMesas() {
     }
 
     const cached = getCachedMesas(DEFAULT_MESAS);
-    if (!shouldSyncWithServer()) {
+    if (!shouldSyncWithServer() || !shouldPollServer("mesas")) {
       setMesas(cached);
       setLoading(false);
       return;
@@ -686,7 +683,8 @@ export function useMesas() {
     if (!getStoredSession()) return;
 
     const onSync = () => {
-      if (shouldSyncWithServer()) void reload();
+      if (shouldPollServer("mesas")) void reload();
+      else setMesas(getCachedMesas(DEFAULT_MESAS));
     };
     const onMesasLocal = () => {
       setMesas(getCachedMesas(DEFAULT_MESAS));
@@ -696,8 +694,8 @@ export function useMesas() {
 
     const interval = window.setInterval(() => {
       if (document.visibilityState === "hidden") return;
-      if (shouldSyncWithServer()) void reload();
-    }, 45_000);
+      if (shouldPollServer("mesas")) void reload();
+    }, 60_000);
 
     return () => {
       window.clearInterval(interval);
@@ -823,7 +821,7 @@ export function useInventory(opts?: { pauseAutoReload?: boolean }) {
     }
 
     const cached = getCachedInventario(DEFAULT_INVENTORY);
-    if (!shouldSyncWithServer()) {
+    if (!shouldSyncWithServer() || !shouldPollServer("inventario")) {
       setItems(cached);
       setLoading(false);
       return;
@@ -856,8 +854,8 @@ export function useInventory(opts?: { pauseAutoReload?: boolean }) {
     if (pauseAutoReload) return;
     const interval = window.setInterval(() => {
       if (document.visibilityState === "hidden") return;
-      if (shouldSyncWithServer()) void reload();
-    }, 60_000);
+      if (shouldPollServer("inventario")) void reload();
+    }, 90_000);
     return () => window.clearInterval(interval);
   }, [reload, pauseAutoReload]);
 

@@ -2,6 +2,8 @@ import {
   isMysqlQuotaBackoff,
   markApiFailureFromStatus,
   mysqlQuotaBackoffRemainingMs,
+  noteApiGet,
+  shouldPollServer,
 } from "@/lib/offline/network";
 
 export type Rol = "admin" | "mesero" | "cocinero";
@@ -119,6 +121,7 @@ export async function validateSession(): Promise<AuthSession | null> {
   if (!stored) return null;
   // Sin MySQL no hay forma de renovar sesión: conservar la local para no echar al turno.
   if (isMysqlQuotaBackoff()) return stored;
+  if (!shouldPollServer("me")) return stored;
 
   let user: AuthUser | null;
   try {
@@ -126,7 +129,7 @@ export async function validateSession(): Promise<AuthSession | null> {
       headers: { Authorization: `Bearer ${stored.accessToken}` },
     });
     if (!res.ok) {
-      // Solo invalidar sesión con 401 (token/usuario). 5xx/503/cuota Hostinger → conservar local.
+      // Solo invalidar sesión con 401 (token/usuario). 5xx/503 → conservar local.
       if (res.status === 401) {
         clearSession();
         return null;
@@ -135,6 +138,7 @@ export async function validateSession(): Promise<AuthSession | null> {
       markApiFailureFromStatus(res.status, bodyText);
       return stored;
     }
+    noteApiGet("me");
     user = await res.json();
     if (!user) {
       clearSession();

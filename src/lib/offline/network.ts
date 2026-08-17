@@ -88,6 +88,90 @@ export function shouldSyncWithServer(): boolean {
   return apiReachable && !isMysqlQuotaBackoff();
 }
 
+/** Tope de GET por dispositivo/hora. Deja margen para pedidos (POST) bajo el límite de 500. */
+const LS_GET_BUDGET = "michelada_get_budget_v1";
+const LS_LAST_POLL = "michelada_last_poll_v1";
+const GETS_PER_DEVICE_HOUR = 70;
+const POLL_MIN_MS: Record<string, number> = {
+  comandas: 45_000,
+  mesas: 60_000,
+  inventario: 90_000,
+  caja: 60_000,
+  menu: 5 * 60_000,
+  me: 20 * 60_000,
+};
+
+type GetBudget = { hourStart: number; count: number };
+
+function readGetBudget(): GetBudget {
+  const empty: GetBudget = { hourStart: Date.now(), count: 0 };
+  if (typeof window === "undefined") return empty;
+  try {
+    const raw = localStorage.getItem(LS_GET_BUDGET);
+    if (!raw) return empty;
+    const parsed = JSON.parse(raw) as GetBudget;
+    if (!parsed?.hourStart || Date.now() - parsed.hourStart > 60 * 60_000) return empty;
+    return { hourStart: parsed.hourStart, count: Number(parsed.count) || 0 };
+  } catch {
+    return empty;
+  }
+}
+
+function writeGetBudget(b: GetBudget): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LS_GET_BUDGET, JSON.stringify(b));
+  } catch {
+    /* private mode */
+  }
+}
+
+function readLastPoll(resource: string): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = localStorage.getItem(LS_LAST_POLL);
+    if (!raw) return 0;
+    const map = JSON.parse(raw) as Record<string, number>;
+    return Number(map[resource]) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeLastPoll(resource: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(LS_LAST_POLL);
+    const map = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    map[resource] = Date.now();
+    localStorage.setItem(LS_LAST_POLL, JSON.stringify(map));
+  } catch {
+    /* private mode */
+  }
+}
+
+export function isGetBudgetExhausted(): boolean {
+  return readGetBudget().count >= GETS_PER_DEVICE_HOUR;
+}
+
+/**
+ * GET de sondeo (comandas/mesas/etc.). Los pedidos POST no usan esto.
+ * Así el turno no gasta el cupo en recargas; los pedidos siguen subiendo.
+ */
+export function shouldPollServer(resource = "comandas"): boolean {
+  if (!shouldSyncWithServer()) return false;
+  if (isGetBudgetExhausted()) return false;
+  const minMs = POLL_MIN_MS[resource] ?? 45_000;
+  return Date.now() - readLastPoll(resource) >= minMs;
+}
+
+/** Llamar solo cuando el GET salió realmente a la red. */
+export function noteApiGet(resource = "comandas"): void {
+  writeLastPoll(resource);
+  const b = readGetBudget();
+  writeGetBudget({ hourStart: b.hourStart, count: b.count + 1 });
+}
+
 function isQuotaErrorText(text: string | undefined | null): boolean {
   if (!text) return false;
   const t = text.toLowerCase();

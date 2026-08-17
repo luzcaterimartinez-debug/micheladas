@@ -48,7 +48,7 @@ import {
   type MetodoPago,
 } from "@/lib/caja-api";
 import type { Comanda } from "@/lib/micheladas-store";
-import { isApiReachable } from "@/lib/offline/network";
+import { shouldPollServer } from "@/lib/offline/network";
 import { cn } from "@/lib/utils";
 import { localDateIso, formatAppMoney } from "@/lib/local-date";
 
@@ -110,19 +110,17 @@ export function AdminCaja() {
 
   useEffect(() => {
     const onSync = () => {
-      if (!cobrarId && !editarId && isApiReachable()) void reload({ silent: true });
+      if (!cobrarId && !editarId && shouldPollServer("caja")) void reload({ silent: true });
     };
     window.addEventListener("michelada-sync-change", onSync);
     window.addEventListener("michelada-api-recovered", onSync);
-    window.addEventListener("focus", onSync);
     const interval = window.setInterval(() => {
       if (document.visibilityState === "hidden") return;
-      if (!cobrarId && !editarId && isApiReachable()) void reload({ silent: true });
-    }, 20_000);
+      if (!cobrarId && !editarId && shouldPollServer("caja")) void reload({ silent: true });
+    }, 60_000);
     return () => {
       window.removeEventListener("michelada-sync-change", onSync);
       window.removeEventListener("michelada-api-recovered", onSync);
-      window.removeEventListener("focus", onSync);
       window.clearInterval(interval);
     };
   }, [reload, cobrarId, editarId]);
