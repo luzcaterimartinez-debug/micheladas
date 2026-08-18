@@ -1,5 +1,5 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,6 +43,11 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [quotaLimit, setQuotaLimit] = useState(false);
+
+  useEffect(() => {
+    setQuotaLimit(isMysqlQuotaBackoff());
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -140,7 +145,7 @@ function LoginPage() {
                     )}
                   />
                 </div>
-                {isMysqlQuotaBackoff() && (
+                {quotaLimit && (
                   <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 leading-relaxed">
                     {queryLimitMessage()}
                   </p>

@@ -7,7 +7,6 @@ import {
   isApiReachable,
   isAppOnline,
   isMysqlQuotaBackoff,
-  isNetworkUsable,
   mysqlQuotaBackoffRemainingMs,
   notifySyncChange,
 } from "@/lib/offline/network";
@@ -18,10 +17,10 @@ const HEALTH_DOWN_MS = 5 * 60_000;
 const HEALTH_QUOTA_MS = 20 * 60_000;
 
 export function useOfflineSync() {
-  const [online, setOnline] = useState(() => isNetworkUsable());
-  const [serverReachable, setServerReachable] = useState(() => isApiReachable());
-  const [quotaBackoff, setQuotaBackoff] = useState(() => isMysqlQuotaBackoff());
-  const [pending, setPending] = useState(() => getPendingCount());
+  const [online, setOnline] = useState(true);
+  const [serverReachable, setServerReachable] = useState(true);
+  const [quotaBackoff, setQuotaBackoff] = useState(false);
+  const [pending, setPending] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const wasReachableRef = useRef(isApiReachable());
   const intervalRef = useRef<number | null>(null);

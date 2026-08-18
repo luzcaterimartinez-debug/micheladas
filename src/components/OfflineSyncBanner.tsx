@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CloudOff, CloudUpload, ChevronDown, ChevronUp, Loader2, Wifi } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 
@@ -40,11 +40,17 @@ function opLabel(op: OutboxOp): string {
 export function OfflineSyncBanner() {
   const { online, serverReachable, pending, syncing, syncNow } = useOfflineSync();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const hasSession = typeof window !== "undefined" && !!getStoredSession();
+  const [mounted, setMounted] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const hasSession = mounted && !!getStoredSession();
   const ops = useMemo(() => (pending > 0 ? listOutbox() : []), [pending, online, serverReachable, syncing]);
 
+  if (!mounted) return null;
   if (!hasSession && PUBLIC_ROUTES.has(pathname)) return null;
 
   // Hay red útil si el browser o un ping reciente lo confirman.
