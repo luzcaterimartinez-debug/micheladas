@@ -1,7 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
+import { getStoredSession } from "@/lib/auth";
+import { homePathForRole } from "@/lib/auth-routes";
 import { parseTicketHtml, consumePrintTicketSession } from "@/lib/ticket-print-session";
+
+function homeUrl(): string {
+  const session = getStoredSession();
+  return session ? homePathForRole(session.user.rol) : "/";
+}
 
 export const Route = createFileRoute("/ticket")({
   ssr: false,
@@ -18,7 +25,6 @@ function TicketRoute() {
 function TicketPrintPage() {
   const [session] = useState(() => consumePrintTicketSession());
   const [ticketHtml] = useState(session?.html ?? "");
-  const [returnUrl] = useState(session?.returnUrl ?? "/");
   const [autoPrint] = useState(session?.autoPrint ?? false);
 
   useEffect(() => {
@@ -28,17 +34,37 @@ function TicketPrintPage() {
   }, [session]);
 
   useEffect(() => {
-    if (!autoPrint) return;
+    if (!session) return;
 
-    const timer = window.setTimeout(() => window.print(), 700);
-    const goBack = () => window.location.replace(returnUrl);
-    window.addEventListener("afterprint", goBack, { once: true });
-    window.setTimeout(goBack, 120_000);
-    return () => window.clearTimeout(timer);
-  }, [autoPrint, returnUrl]);
+    let done = false;
+    const goHome = () => {
+      if (done) return;
+      done = true;
+      window.location.replace(homeUrl());
+    };
+
+    window.addEventListener("afterprint", goHome);
+    const printQuery = window.matchMedia("print");
+    const onPrintChange = (e: MediaQueryListEvent) => {
+      if (!e.matches) goHome();
+    };
+    printQuery.addEventListener("change", onPrintChange);
+
+    const timers: number[] = [];
+    if (autoPrint) {
+      timers.push(window.setTimeout(() => window.print(), 700));
+      timers.push(window.setTimeout(goHome, 120_000));
+    }
+
+    return () => {
+      window.removeEventListener("afterprint", goHome);
+      printQuery.removeEventListener("change", onPrintChange);
+      timers.forEach((t) => window.clearTimeout(t));
+    };
+  }, [session, autoPrint]);
 
   function handleBack() {
-    window.location.replace(returnUrl);
+    window.location.replace(homeUrl());
   }
 
   if (!session || !ticketHtml) {
