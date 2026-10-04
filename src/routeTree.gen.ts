@@ -9,37 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TicketRouteImport } from './routes/ticket'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as ImpresionRouteImport } from './routes/impresion'
-import { Route as CartaRouteImport } from './routes/carta'
-import { Route as BarraRouteImport } from './routes/barra'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as BarraRouteImport } from './routes/barra'
+import { Route as CartaRouteImport } from './routes/carta'
+import { Route as ImpresionRouteImport } from './routes/impresion'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as TicketRouteImport } from './routes/ticket'
 
-const TicketRoute = TicketRouteImport.update({
-  id: '/ticket',
-  path: '/ticket',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ImpresionRoute = ImpresionRouteImport.update({
-  id: '/impresion',
-  path: '/impresion',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CartaRoute = CartaRouteImport.update({
-  id: '/carta',
-  path: '/carta',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BarraRoute = BarraRouteImport.update({
-  id: '/barra',
-  path: '/barra',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -47,9 +27,29 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const BarraRoute = BarraRouteImport.update({
+  id: '/barra',
+  path: '/barra',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CartaRoute = CartaRouteImport.update({
+  id: '/carta',
+  path: '/carta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImpresionRoute = ImpresionRouteImport.update({
+  id: '/impresion',
+  path: '/impresion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TicketRoute = TicketRouteImport.update({
+  id: '/ticket',
+  path: '/ticket',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -84,13 +84,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
-    | '/admin'
-    | '/barra'
-    | '/carta'
-    | '/impresion'
-    | '/login'
-    | '/ticket'
+    '/' | '/admin' | '/barra' | '/carta' | '/impresion' | '/login' | '/ticket'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/admin' | '/barra' | '/carta' | '/impresion' | '/login' | '/ticket'
   id:
@@ -116,39 +110,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/ticket': {
-      id: '/ticket'
-      path: '/ticket'
-      fullPath: '/ticket'
-      preLoaderRoute: typeof TicketRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/impresion': {
-      id: '/impresion'
-      path: '/impresion'
-      fullPath: '/impresion'
-      preLoaderRoute: typeof ImpresionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/carta': {
-      id: '/carta'
-      path: '/carta'
-      fullPath: '/carta'
-      preLoaderRoute: typeof CartaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/barra': {
-      id: '/barra'
-      path: '/barra'
-      fullPath: '/barra'
-      preLoaderRoute: typeof BarraRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -158,11 +124,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/barra': {
+      id: '/barra'
+      path: '/barra'
+      fullPath: '/barra'
+      preLoaderRoute: typeof BarraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/carta': {
+      id: '/carta'
+      path: '/carta'
+      fullPath: '/carta'
+      preLoaderRoute: typeof CartaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/impresion': {
+      id: '/impresion'
+      path: '/impresion'
+      fullPath: '/impresion'
+      preLoaderRoute: typeof ImpresionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ticket': {
+      id: '/ticket'
+      path: '/ticket'
+      fullPath: '/ticket'
+      preLoaderRoute: typeof TicketRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
