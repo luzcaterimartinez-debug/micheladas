@@ -36,29 +36,50 @@ function TicketPrintPage() {
   useEffect(() => {
     if (!session) return;
 
+    // En Android, afterprint llega antes de que el sistema genere la hoja: si navegamos
+    // en ese momento se imprime la pantalla de inicio. Solo salir con el diálogo cerrado.
     let done = false;
+    let printed = false;
+    const timers: number[] = [];
+
+    const pageIsBack = () => document.visibilityState === "visible" && document.hasFocus();
+
     const goHome = () => {
       if (done) return;
       done = true;
       window.location.replace(homeUrl());
     };
 
-    window.addEventListener("afterprint", goHome);
-    const printQuery = window.matchMedia("print");
-    const onPrintChange = (e: MediaQueryListEvent) => {
-      if (!e.matches) goHome();
+    const tryGoHome = () => {
+      if (printed && pageIsBack()) timers.push(window.setTimeout(goHome, 800));
     };
-    printQuery.addEventListener("change", onPrintChange);
 
-    const timers: number[] = [];
+    const onAfterPrint = () => {
+      printed = true;
+      timers.push(window.setTimeout(tryGoHome, 1500));
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") tryGoHome();
+    };
+
+    window.addEventListener("afterprint", onAfterPrint);
+    window.addEventListener("focus", tryGoHome);
+    document.addEventListener("visibilitychange", onVisibility);
+
     if (autoPrint) {
       timers.push(window.setTimeout(() => window.print(), 700));
-      timers.push(window.setTimeout(goHome, 120_000));
+      timers.push(
+        window.setTimeout(() => {
+          printed = true;
+          tryGoHome();
+        }, 120_000),
+      );
     }
 
     return () => {
-      window.removeEventListener("afterprint", goHome);
-      printQuery.removeEventListener("change", onPrintChange);
+      window.removeEventListener("afterprint", onAfterPrint);
+      window.removeEventListener("focus", tryGoHome);
+      document.removeEventListener("visibilitychange", onVisibility);
       timers.forEach((t) => window.clearTimeout(t));
     };
   }, [session, autoPrint]);
