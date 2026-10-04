@@ -59,3 +59,7 @@ export function updateUser(id: number, input: UpdateUserInput): Promise<AdminUse
     body: JSON.stringify(input),
   });
 }
+
+export async function deleteUser(id: number): Promise<void> {
+  await adminFetch(`/api/admin/users/${id}`, { method: "DELETE" });
+}

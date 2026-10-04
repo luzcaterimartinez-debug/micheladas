@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Pencil, UserPlus } from "lucide-react";
+import { Loader2, Pencil, Trash2, UserPlus } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +36,7 @@ import type { Rol } from "@/lib/auth";
 import { ROL_LABELS, getStoredSession } from "@/lib/auth";
 import {
   createUser,
+  deleteUser,
   listUsers,
   updateUser,
   type AdminUser,
@@ -57,6 +68,8 @@ export function AdminUsers() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [toDelete, setToDelete] = useState<AdminUser | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const currentId = getStoredSession()?.user.id;
 
@@ -125,6 +138,21 @@ export function AdminUsers() {
     }
   }
 
+  async function handleDelete() {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await deleteUser(toDelete.id);
+      toast.success(`${toDelete.nombre} eliminado`);
+      setToDelete(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo eliminar");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -173,14 +201,28 @@ export function AdminUsers() {
                         </Badge>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0 h-10 w-10"
-                      onClick={() => openEdit(u)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex shrink-0 gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10"
+                        onClick={() => openEdit(u)}
+                        aria-label={`Editar ${u.nombre}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      {u.id !== currentId && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 text-destructive hover:text-destructive"
+                          onClick={() => setToDelete(u)}
+                          aria-label={`Eliminar ${u.nombre}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -192,7 +234,7 @@ export function AdminUsers() {
                       <th className="pb-2 pr-4">Correo</th>
                       <th className="pb-2 pr-4">Rol</th>
                       <th className="pb-2 pr-4">Estado</th>
-                      <th className="pb-2 w-20" />
+                      <th className="pb-2 w-24" />
                     </tr>
                   </thead>
                   <tbody>
@@ -212,9 +254,27 @@ export function AdminUsers() {
                           </Badge>
                         </td>
                         <td className="py-3">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(u)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEdit(u)}
+                              aria-label={`Editar ${u.nombre}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            {u.id !== currentId && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setToDelete(u)}
+                                aria-label={`Eliminar ${u.nombre}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -307,6 +367,37 @@ export function AdminUsers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={toDelete !== null}
+        onOpenChange={(o) => {
+          if (!o && !deleting) setToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar a {toDelete?.nombre}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se borra la cuenta y ya no podrá entrar. Si tiene comandas u otro historial, no se
+              eliminará: en ese caso desactívala. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDelete();
+              }}
+            >
+              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

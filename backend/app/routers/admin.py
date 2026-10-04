@@ -1,6 +1,7 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import mysql.connector
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.auth.dependencies import invalidate_auth_user_cache, require_roles
 from app.auth.password import hash_password
@@ -142,3 +143,70 @@ def update_user(user_id: int, body: UserUpdate, admin: AdminUser) -> UserAdmin:
         rol=updated["rol"],
         activo=bool(updated["activo"]),
     )
+
+
+# Historial que se perdería (CASCADE / SET NULL) o que bloquea el borrado (FK sin ON DELETE).
+_BLOCKING_HISTORY = (
+    ("comandas", "mesero_id", "comandas tomadas"),
+    ("comandas", "cobrado_por", "comandas cobradas"),
+    ("gastos", "creado_por", "gastos registrados"),
+    ("caja_cortes", "cerrado_por", "cortes de caja"),
+    ("nomina_recibos", "usuario_id", "recibos de nómina"),
+    ("nomina_prestamos", "usuario_id", "préstamos de nómina"),
+)
+
+
+def _count_refs(cursor, table: str, column: str, user_id: int) -> int:
+    try:
+        row = fetch_one(cursor, f"SELECT COUNT(*) AS n FROM {table} WHERE {column} = %s", (user_id,))
+    except mysql.connector.Error as exc:
+        if getattr(exc, "errno", None) == 1146:  # tabla no existe en esta instalación
+            return 0
+        raise
+    return int(row["n"]) if row else 0
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, admin: AdminUser) -> Response:
+    if user_id == admin.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No puedes eliminar tu propia cuenta")
+
+    with get_db() as (conn, cursor):
+        row = fetch_one(cursor, "SELECT id, rol, activo FROM usuarios WHERE id = %s", (user_id,))
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+
+        if row["rol"] == Rol.ADMIN.value and row["activo"]:
+            admins = fetch_one(
+                cursor,
+                "SELECT COUNT(*) AS n FROM usuarios WHERE rol = %s AND activo = 1",
+                (Rol.ADMIN.value,),
+            )
+            if admins and int(admins["n"]) <= 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No puedes eliminar al único administrador activo",
+                )
+
+        found = [label for table, col, label in _BLOCKING_HISTORY if _count_refs(cursor, table, col, user_id)]
+        if found:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"No se puede eliminar: tiene {', '.join(found)}. "
+                    "Desactiva la cuenta para que no pueda entrar sin perder ese historial."
+                ),
+            )
+
+        try:
+            cursor.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
+            conn.commit()
+        except mysql.connector.IntegrityError as exc:
+            conn.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar: el usuario tiene registros asociados. Desactiva la cuenta en su lugar.",
+            ) from exc
+
+    invalidate_users_cache(user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
